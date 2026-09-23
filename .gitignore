@@ -1,0 +1,21 @@
+# Rust build artifacts
+target/
+**/target/
+**/*.rs.bk
+
+# Environment variables & secrets
+.env
+*.env
+!.env.example
+
+# Reference implementation (separate git repository)
+reference_impl/
+
+# IDE & Editor settings
+.idea/
+.vscode/
+*.iml
+
+# OS files
+.DS_Store
+Thumbs.db
