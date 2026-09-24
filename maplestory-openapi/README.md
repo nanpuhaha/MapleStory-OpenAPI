@@ -6,7 +6,7 @@
 [![CI](https://github.com/yourusername/maplestory-openapi-rust/actions/workflows/ci.yml/badge.svg)](https://github.com/yourusername/maplestory-openapi-rust/actions)
 
 [NEXON MapleStory OpenAPI](https://openapi.nexon.com/ko/game/maplestory/)의 고성능·인체공학적(Ergonomic) Rust 클라이언트 라이브러리입니다.  
-공식 OpenAPI YAML 스펙을 완벽하게 준수하면서도, 실제 메이플스토리 전적 검색 사이트·디스코드 봇·데이터 분석 도구를 개발할 때 필요한 **실무 편의 기능(코디/외형 합성, 전투력 도메인 헬퍼, 자동 캐싱, 원클릭 프로필 등)**을 강력하게 지원합니다.
+공식 OpenAPI YAML 스펙을 완벽하게 준수하면서도, 실제 메이플스토리 캐릭터 정보/스펙 분석 사이트·디스코드 봇·데이터 분석 도구를 개발할 때 필요한 **실무 편의 기능(코디/외형 합성, 전투력 도메인 헬퍼, 자동 캐싱, 원클릭 프로필 등)**을 강력하게 지원합니다.
 
 > 🔑 **API Key 발급**: [NEXON Developers](https://openapi.nexon.com/)에서 손쉽게 발급받을 수 있습니다.
 
@@ -15,8 +15,8 @@
 ## 🌟 핵심 특징 (Key Highlights)
 
 - ⚡ **닉네임 원스톱 조회**: OCID를 먼저 수동으로 조회할 필요 없이, 인게임 닉네임으로 기본 정보·스탯·장비·코디 등을 단 1줄로 조회 (`get_character_by_name`, `get_character_stat_by_name` 등).
-- 🏆 **올인원 전적 대시보드 (`get_character_dashboard_by_name`)**:
-  - 메이플스카우터·츄츄지지·메애기·메짱 등 상용 전적 사이트에서 제공하는 **모든 정보(기본 스펙, 전투력, 스타포스 합, 심볼 포스, 유니온/아티팩트, 소속 길드/노블레스 스킬 자동 연계, 6차 헥사 코어/스탯, 5차 V매트릭스, 장비 세트효과, 펫, 안드로이드, 성향, 코디/아바타 렌더러)**를 단 1번의 닉네임 호출로 병렬 취합.
+- 🏆 **올인원 종합 스펙 대시보드 (`get_character_dashboard_by_name`)**:
+  - 메이플스카우터·츄츄지지·메애기·메짱 등 상용 캐릭터 정보 사이트에서 제공하는 **모든 정보(기본 스펙, 전투력, 스타포스 합, 심볼 포스, 유니온/아티팩트, 소속 길드/노블레스 스킬 자동 연계, 6차 헥사 코어/스탯, 5차 V매트릭스, 장비 세트효과, 펫, 안드로이드, 성향, 코디/아바타 렌더러)**를 단 1번의 닉네임 호출로 병렬 취합.
 - 👗 **최종 코디/외형 합성 (Coordination Look)**:
   - 인게임 노출 규칙 완벽 지원: **캐시 장비가 있으면 캐시 아이템 우선 노출, 없는 부위는 일반 장비 노출**.
   - **신비의 모루** 외형 변경 자동 반영 (`is_anvil: true`, 모루 외형명 및 아이콘 자동 우선 노출).
@@ -203,9 +203,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ---
 
-### 5. 🏆 상용 전적 서비스 수준의 올인원 대시보드 (`get_character_dashboard_by_name`)
+### 5. 🏆 상용 정보 사이트 수준의 올인원 대시보드 (`get_character_dashboard_by_name`)
 
-메이플스카우터, 츄츄지지, 메애기, 메이플로드, 메짱 등 OpenAPI 기반 전적/정보 사이트에서 보여주는 **모든 필수 데이터(기본 스펙, 전투력, 스타포스 합, 심볼 포스, 유니온/아티팩트, 길드/노블레스 스킬, 어빌리티, 6차 헥사 코어/스탯, 5차 V매트릭스, 장비 세트효과, 펫, 안드로이드, 성향, 코디/아바타 렌더러)**를 단 한 번의 호출로 취합합니다:
+메이플스카우터, 츄츄지지, 메애기, 메이플로드, 메짱 등 OpenAPI 기반 캐릭터 정보/스펙 분석 사이트에서 보여주는 **모든 필수 데이터(기본 스펙, 전투력, 스타포스 합, 심볼 포스, 유니온/아티팩트, 길드/노블레스 스킬, 어빌리티, 6차 헥사 코어/스탯, 5차 V매트릭스, 장비 세트효과, 펫, 안드로이드, 성향, 코디/아바타 렌더러)**를 단 한 번의 호출로 취합합니다:
 
 ```rust
 use maplestory_openapi::{AvatarAction, AvatarEmotion, MapleStoryClient, WeaponMotion};
@@ -304,7 +304,7 @@ async fn main() {
 
 | 분류 | 메서드 | 공식 엔드포인트 | 설명 |
 |------|--------|----------------|------|
-| **편의 기능** | `get_character_dashboard_by_name(name)` | — | **🏆 닉네임 한방 올인원 전적 대시보드 (길드·유니온·스펙·코디 병렬 취합)** |
+| **편의 기능** | `get_character_dashboard_by_name(name)` | — | **🏆 닉네임 한방 올인원 종합 스펙 대시보드 (길드·유니온·스펙·코디 병렬 취합)** |
 | **편의 기능** | `get_character_by_name(name)` | — | 닉네임 한방 기본 정보 조회 |
 | **편의 기능** | `get_character_stat_by_name(name)` | — | 닉네임 한방 종합 능력치 조회 |
 | **편의 기능** | `get_character_item_equipment_by_name(name)` | — | 닉네임 한방 장착 장비 조회 |
@@ -349,7 +349,7 @@ async fn main() {
 `.env` 파일에 `NEXON_API_KEY=...`를 입력한 후 즉시 실행할 수 있습니다:
 
 ```sh
-# 1. 🏆 올인원 전적 대시보드 (전투력, 스타포스, 심볼, 유니온, 길드, 노블스킬, 코디)
+# 1. 🏆 올인원 종합 스펙 대시보드 (전투력, 스타포스, 심볼, 유니온, 길드, 노블스킬, 코디)
 cargo run --example character_dashboard
 
 # 2. 닉네임 한방 조회 (전투력, 스공, 대표 코디 포함)

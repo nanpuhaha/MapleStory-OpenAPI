@@ -4,9 +4,9 @@
 
 ---
 
-## 🤖 레시피 1: 캐릭터 전적 디스코드 봇 (Discord Bot)
+## 🤖 레시피 1: 캐릭터 스펙 조회 디스코드 봇 (Discord Bot)
 
-유저가 `/전적 온앤온`을 입력하면 캐릭터의 레벨, 직업, 전투력, 유니온, 길드, 코디 룩을 화려한 디스코드 임베드로 전송합니다.
+유저가 `/스펙 온앤온`을 입력하면 캐릭터의 레벨, 직업, 전투력, 유니온, 길드, 코디 룩을 화려한 디스코드 임베드로 전송합니다.
 
 ### 🐍 Python (`discord.py`)
 ```python
@@ -19,7 +19,7 @@ intents = discord.Intents.default()
 bot = commands.Bot(command_prefix="!", intents=intents)
 maple = MapleStoryClient(os.environ["NEXON_API_KEY"])
 
-@bot.tree.command(name="전적", description="메이플스토리 캐릭터 종합 전적을 조회합니다.")
+@bot.tree.command(name="스펙", description="메이플스토리 캐릭터 종합 스펙 정보를 조회합니다.")
 async def lookup(interaction: discord.Interaction, 닉네임: str):
     await interaction.response.defer()
     
@@ -60,7 +60,7 @@ const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 const maple = MapleStoryClient.fromEnv();
 
 client.on('interactionCreate', async (interaction) => {
-  if (!interaction.isChatInputCommand() || interaction.commandName !== '전적') return;
+  if (!interaction.isChatInputCommand() || interaction.commandName !== '스펙') return;
 
   const characterName = interaction.options.getString('닉네임', true);
   await interaction.deferReply();
@@ -92,7 +92,7 @@ client.login(process.env.DISCORD_BOT_TOKEN);
 
 ---
 
-## 🌐 레시피 2: 초고속 전적 검색 REST API 서버
+## 🌐 레시피 2: 초고속 캐릭터 스펙 검색 REST API 서버
 
 ### 🦀 Rust (`Axum`)
 ```rust

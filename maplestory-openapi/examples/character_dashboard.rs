@@ -1,5 +1,5 @@
 // examples/character_dashboard.rs
-//! All-in-one Character Dashboard Example (올인원 전적 검색 대시보드 예제)
+//! All-in-one Character Dashboard Example (올인원 캐릭터 종합 스펙 대시보드 예제)
 //!
 //! Demonstrates how a single method call `get_character_dashboard_by_name(name)`
 //! concurrently fetches all combat specs, symbols, abilities, 6th HEXA matrix,
