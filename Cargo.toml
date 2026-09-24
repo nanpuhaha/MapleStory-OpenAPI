@@ -1,0 +1,5 @@
+[workspace]
+members = [
+    "maplestory-openapi",
+]
+resolver = "2"

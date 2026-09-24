@@ -2,82 +2,139 @@
 
 [![Crates.io](https://img.shields.io/crates/v/maplestory-openapi.svg)](https://crates.io/crates/maplestory-openapi)
 [![Docs.rs](https://docs.rs/maplestory-openapi/badge.svg)](https://docs.rs/maplestory-openapi)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE)
+[![CI](https://github.com/yourusername/maplestory-openapi-rust/actions/workflows/ci.yml/badge.svg)](https://github.com/yourusername/maplestory-openapi-rust/actions)
 
-NEXON MapleStory OpenAPI의 Rust 클라이언트 라이브러리입니다.  
-공식 Spec(`openapi.nexon.com`)을 Source of Truth로 구현했습니다.
+[NEXON MapleStory OpenAPI](https://openapi.nexon.com/ko/game/maplestory/)의 고성능·인체공학적(Ergonomic) Rust 클라이언트 라이브러리입니다.  
+공식 OpenAPI YAML 스펙을 완벽하게 준수하면서도, 실제 메이플스토리 전적 검색 사이트·디스코드 봇·데이터 분석 도구를 개발할 때 필요한 **실무 편의 기능(코디/외형 합성, 전투력 도메인 헬퍼, 자동 캐싱, 원클릭 프로필 등)**을 강력하게 지원합니다.
 
-> **API Key 발급**: [NEXON Developers](https://openapi.nexon.com/)
-
----
-
-## 특징
-
-- ✅ **25개 API 엔드포인트** 전체 지원 (User 2개 + Character 23개)
-- ⚡ **닉네임 한방 조회** — `get_character_by_name()` 한 줄로 끝
-- 🚀 **완전 비동기** (tokio 기반)
-- 🔒 **타입 안전** — 공식 YAML spec 기반 Rust 모델
-- 🛠 **에러 처리** — 상세한 에러 타입과 메시지
+> 🔑 **API Key 발급**: [NEXON Developers](https://openapi.nexon.com/)에서 손쉽게 발급받을 수 있습니다.
 
 ---
 
-## 설치
+## 🌟 핵심 특징 (Key Highlights)
+
+- ⚡ **닉네임 원스톱 조회**: OCID를 먼저 수동으로 조회할 필요 없이, 인게임 닉네임으로 기본 정보·스탯·장비·코디 등을 단 1줄로 조회 (`get_character_by_name`, `get_character_stat_by_name` 등).
+- 🏆 **올인원 전적 대시보드 (`get_character_dashboard_by_name`)**:
+  - 메이플스카우터·츄츄지지·메애기·메짱 등 상용 전적 사이트에서 제공하는 **모든 정보(기본 스펙, 전투력, 스타포스 합, 심볼 포스, 유니온/아티팩트, 소속 길드/노블레스 스킬 자동 연계, 6차 헥사 코어/스탯, 5차 V매트릭스, 장비 세트효과, 펫, 안드로이드, 성향, 코디/아바타 렌더러)**를 단 1번의 닉네임 호출로 병렬 취합.
+- 👗 **최종 코디/외형 합성 (Coordination Look)**:
+  - 인게임 노출 규칙 완벽 지원: **캐시 장비가 있으면 캐시 아이템 우선 노출, 없는 부위는 일반 장비 노출**.
+  - **신비의 모루** 외형 변경 자동 반영 (`is_anvil: true`, 모루 외형명 및 아이콘 자동 우선 노출).
+  - **한벌옷** 착용 시 하의가 가려지는 인게임 레이어 규칙 반영.
+  - **투명 장비/비노출 보조무기 감지** (`is_transparent`, `is_visually_rendered()`).
+  - 컬러링 프리즘 염색 정보 및 마스터라벨/스페셜라벨 정보 제공.
+- 🎨 **아바타 Look URL 파서 & 동적 렌더러 빌더 (`AvatarCode`)**:
+  - `open.api.nexon.com` 및 `avatar.maplestory.nexon.com`의 1024자리 Base16 아바타 코드 상호 변환.
+  - 표정(`emotion`), 포즈(`action`), 무기 모션(`wmotion`), 크기 커스텀 쿼리 빌더 (`AvatarLookQuery`).
+  - 512바이트 원본 바이너리 블록 언패킹 지원 (`AvatarCode::to_bytes()`).
+- ⚔️ **풍부한 도메인 헬퍼**:
+  - `dash.combat_power()` / `stat.combat_power()` (전투력 정밀 파싱)
+  - `dash.total_starforce()` (전체 장착 장비 스타포스 합계)
+  - `dash.arcane_force()`, `dash.authentic_force()` (아케인/어센틱 심볼 포스 합계)
+  - `dash.noblesse_skill_points()` (소속 길드 노블레스 스킬 포인트 총합)
+  - `stat.stat_attack()` (최소/최대 스탯공격력 튜플)
+  - `stat.boss_damage()`, `stat.ignore_monster_armor()` (보스 데미지, 방무 등)
+  - `equip.weapon()`, `equip.hat()`, `equip.find_slot("무기")` (부위별 장비 즉시 검색)
+- 🏰 **길드 & 유니온 모듈 완비**:
+  - 길드 ID 및 기본 정보, 노블레스 스킬 포인트 계산 (`get_guild_by_name`, `get_guild_basic`).
+  - 유니온 등급/레벨, 공격대 배치, 아티팩트 크리스탈/효과 (`get_user_union`, `get_user_union_raider`, `get_user_union_artifact`).
+- 🪶 **가벼운 의존성 발자국**: 라이브러리 레벨의 불필요한 `tokio` 런타임 강제를 제거하여, 초경량 컴파일 및 런타임-애그노스틱 비동기 환경 지원.
+- 💾 **인메모리 OCID 캐싱 (`cache` feature)**: `moka` 기반의 고성능 LRU+TTL 캐시 탑재. 거의 불변인 `닉네임 -> OCID` 매핑을 캐싱하여 API 호출 횟수를 절반으로 절약하고 레이트 리밋을 방어.
+- 🔒 **타입 안전성**: 넥슨 공식 엔드포인트 전체에 대한 엄격한 모델링 및 상세한 에러 핸들링.
+
+---
+
+## 📦 설치 (Installation)
 
 `Cargo.toml`에 추가:
 
 ```toml
 [dependencies]
 maplestory-openapi = "0.1"
-tokio = { version = "1", features = ["full"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+```
+
+### 기능 플래그 (Feature Flags)
+
+| Feature | 설명 | 기본값 |
+|---------|------|--------|
+| `default-tls` | 시스템 네이티브 TLS 백엔드 사용 (`reqwest/default-tls`) | ✅ 켜짐 |
+| `rustls-tls` | 순수 Rust 기반 `rustls` TLS 백엔드 사용 | ❌ 꺼짐 |
+| `cache` | `moka` 기반 인메모리 OCID 자동 캐싱 활성화 | ❌ 꺼짐 |
+
+캐싱을 활성화하려면:
+```toml
+[dependencies]
+maplestory-openapi = { version = "0.1", features = ["cache"] }
 ```
 
 ---
 
-## 빠른 시작
+## 🚀 빠른 시작 (Quick Start)
 
-### 닉네임 한방 조회 (추천)
+### 1. 환경 변수로부터 클라이언트 생성 (`from_env`)
+
+`.env` 파일이나 시스템 환경변수에 `NEXON_API_KEY`를 설정해두면 코드 1줄로 초기화할 수 있습니다:
 
 ```rust
 use maplestory_openapi::MapleStoryClient;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let client = MapleStoryClient::new("YOUR_API_KEY")?;
+    // NEXON_API_KEY 환경변수에서 자동으로 키 로드
+    let client = MapleStoryClient::from_env()?;
 
-    // OCID 조회 → 기본 정보 조회를 한 번에
-    let info = client.get_character_by_name("캐릭터명").await?;
-
-    println!("이름: {}", info.character_name.as_deref().unwrap_or("?"));
-    println!("레벨: {}", info.character_level.unwrap_or(0));
-    println!("직업: {}", info.character_class.as_deref().unwrap_or("?"));
-    println!("월드: {}", info.world_name.as_deref().unwrap_or("?"));
+    // 닉네임으로 기본 정보 조회
+    let info = client.get_character_by_name("온앤온").await?;
+    println!("Lv.{} {} ({})", 
+        info.character_level.unwrap_or(0),
+        info.character_name.as_deref().unwrap_or("?"),
+        info.world_name.as_deref().unwrap_or("?")
+    );
 
     Ok(())
 }
 ```
 
-### 단계별 조회
+---
+
+### 2. 코디/외형(Coordination) 정보 조회
+
+캐시 장비와 일반 장비, 신비의 모루 외형을 인게임 규칙에 맞춰 자동으로 합성해줍니다:
 
 ```rust
-use maplestory_openapi::{MapleStoryClient, SkillGrade};
+use maplestory_openapi::MapleStoryClient;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let client = MapleStoryClient::new("YOUR_API_KEY")?;
+    let client = MapleStoryClient::from_env()?;
 
-    // 1단계: OCID 조회
-    let ocid = client.get_ocid("캐릭터명").await?;
+    // 닉네임으로 최종 노출 코디/외형 조회
+    let look = client.get_character_coordination_by_name("온앤온").await?;
 
-    // 2단계: 여러 정보 병렬 조회
-    let (basic, stat, dojang) = tokio::join!(
-        client.get_character_basic(&ocid, None),
-        client.get_character_stat(&ocid, None),
-        client.get_character_dojang(&ocid, None),
-    );
+    // 1. 헤어 / 성형 / 피부
+    if let Some(hair) = &look.hair {
+        println!("헤어: {}", hair.hair_name.as_deref().unwrap_or("?"));
+    }
+    if let Some(face) = &look.face {
+        println!("성형: {}", face.face_name.as_deref().unwrap_or("?"));
+    }
 
-    let basic = basic?;
-    println!("Lv.{} {}", basic.character_level.unwrap_or(0),
-             basic.character_class.as_deref().unwrap_or("?"));
+    // 2. 최종 겉에 보이는 슬롯별 장비 목록
+    for item in &look.visible_items {
+        println!(
+            "[{}] {} (캐시템 여부: {}, 모루 여부: {})",
+            item.slot, item.name, item.is_cash, item.is_anvil
+        );
+    }
+
+    // 3. 도메인 헬퍼 접근자
+    if let Some(hat) = look.hat() {
+        println!("모자: {}", hat.name);
+    }
+    if let Some(weapon) = look.weapon() {
+        println!("무기: {}", weapon.name);
+    }
 
     Ok(())
 }
@@ -85,133 +142,264 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ---
 
-## 지원 API 목록
-
-### User
-
-| 메서드 | 엔드포인트 | 설명 |
-|--------|-----------|------|
-| `get_character_list()` | `GET /maplestory/v1/character/list` | 계정 캐릭터 목록 |
-| `get_achievement(date)` | `GET /maplestory/v1/user/achievement` | 업적 정보 |
-
-### Character
-
-| 메서드 | 엔드포인트 | 설명 |
-|--------|-----------|------|
-| `get_character_id(name)` | `GET /maplestory/v1/id` | OCID 조회 |
-| `get_ocid(name)` | `GET /maplestory/v1/id` | OCID 문자열 조회 |
-| `get_character_by_name(name)` | — | **닉네임 한방 조회** (OCID+basic) |
-| `get_character_basic(ocid, date)` | `GET /maplestory/v1/character/basic` | 기본 정보 |
-| `get_character_popularity(ocid, date)` | `GET /maplestory/v1/character/popularity` | 인기도 |
-| `get_character_stat(ocid, date)` | `GET /maplestory/v1/character/stat` | 종합 능력치 |
-| `get_character_hyper_stat(ocid, date)` | `GET /maplestory/v1/character/hyper-stat` | 하이퍼스탯 |
-| `get_character_propensity(ocid, date)` | `GET /maplestory/v1/character/propensity` | 성향 |
-| `get_character_ability(ocid, date)` | `GET /maplestory/v1/character/ability` | 어빌리티 |
-| `get_character_item_equipment(ocid, date)` | `GET /maplestory/v1/character/item-equipment` | 장착 장비 |
-| `get_character_cashitem_equipment(ocid, date)` | `GET /maplestory/v1/character/cashitem-equipment` | 캐시 장비 |
-| `get_character_symbol_equipment(ocid, date)` | `GET /maplestory/v1/character/symbol-equipment` | 심볼 |
-| `get_character_set_effect(ocid, date)` | `GET /maplestory/v1/character/set-effect` | 세트 효과 |
-| `get_character_beauty_equipment(ocid, date)` | `GET /maplestory/v1/character/beauty-equipment` | 헤어/성형/피부 |
-| `get_character_android_equipment(ocid, date)` | `GET /maplestory/v1/character/android-equipment` | 안드로이드 |
-| `get_character_pet_equipment(ocid, date)` | `GET /maplestory/v1/character/pet-equipment` | 펫 장비 |
-| `get_character_skill(ocid, grade, date)` | `GET /maplestory/v1/character/skill` | 스킬 정보 |
-| `get_character_link_skill(ocid, date)` | `GET /maplestory/v1/character/link-skill` | 링크 스킬 |
-| `get_character_vmatrix(ocid, date)` | `GET /maplestory/v1/character/vmatrix` | V매트릭스 |
-| `get_character_hexamatrix(ocid, date)` | `GET /maplestory/v1/character/hexamatrix` | HEXA 코어 |
-| `get_character_hexamatrix_stat(ocid, date)` | `GET /maplestory/v1/character/hexamatrix-stat` | HEXA 스탯 |
-| `get_character_dojang(ocid, date)` | `GET /maplestory/v1/character/dojang` | 무릉도장 기록 |
-| `get_character_other_stat(ocid, date)` | `GET /maplestory/v1/character/other-stat` | 기타 능력치 |
-| `get_character_ring_exchange_skill_equipment(ocid, date)` | `GET /maplestory/v1/character/ring-exchange-skill-equipment` | 링 익스체인지 |
-| `get_character_ring_reserve_skill_equipment(ocid, date)` | `GET /maplestory/v1/character/ring-reserve-skill-equipment` | 예비 특수 반지 |
-
----
-
-## 날짜 파라미터
-
-- 모든 날짜는 `"YYYY-MM-DD"` 형식 (KST 기준)
-- `None`을 전달하면 가장 최신 데이터 조회
-- 최소 조회 가능 날짜: **2023-12-21**
-- 전날 데이터는 당일 **오전 2시 (KST)** 이후 조회 가능
+### 3. 전투력 및 주요 스탯 헬퍼 활용
 
 ```rust
-// 특정 날짜 조회
-let basic = client.get_character_basic(&ocid, Some("2024-01-15")).await?;
+use maplestory_openapi::MapleStoryClient;
 
-// 최신 데이터 조회
-let basic = client.get_character_basic(&ocid, None).await?;
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let client = MapleStoryClient::from_env()?;
+
+    let stat = client.get_character_stat_by_name("온앤온").await?;
+
+    // 전투력 직접 가져오기
+    if let Some(cp) = stat.combat_power() {
+        println!("전투력: {}", cp);
+    }
+
+    // 스탯공격력 (최소, 최대)
+    let (min_att, max_att) = stat.stat_attack();
+    println!("스공: {:?} ~ {:?}", min_att, max_att);
+
+    // 보스 데미지 / 방무
+    println!("보스 데미지: {:?}%", stat.boss_damage());
+    println!("방어율 무시: {:?}%", stat.ignore_monster_armor());
+
+    // 특정 스탯 이름으로 직접 조회
+    if let Some(str_val) = stat.get_stat("STR") {
+        println!("STR: {}", str_val);
+    }
+
+    Ok(())
+}
 ```
 
 ---
 
-## 스킬 등급 (SkillGrade)
+### 4. 원스톱 종합 프로필 (`get_character_profile_by_name`)
 
-`get_character_skill` 사용 시 `SkillGrade` 지정 필요:
+기본 정보, 전투력, 장착 장비, 코디, 인기도, 무릉도장을 병렬로 한 번에 조회합니다:
 
 ```rust
-use maplestory_openapi::SkillGrade;
+use maplestory_openapi::MapleStoryClient;
 
-// 4차 스킬
-client.get_character_skill(&ocid, SkillGrade::Fourth, None).await?;
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let client = MapleStoryClient::from_env()?;
 
-// 5차 스킬
-client.get_character_skill(&ocid, SkillGrade::Fifth, None).await?;
+    let profile = client.get_character_profile_by_name("온앤온").await?;
 
-// 하이퍼 패시브
-client.get_character_skill(&ocid, SkillGrade::HyperPassive, None).await?;
+    println!("캐릭터: {} (Lv.{})", profile.basic.character_name.as_deref().unwrap_or("?"), profile.basic.character_level.unwrap_or(0));
+    println!("전투력: {:?}", profile.stat.combat_power());
+    println!("보이는 모자: {:?}", profile.coordination.hat().map(|h| &h.name));
+    if let Some(dojang) = &profile.dojang {
+        println!("무릉도장 최고 기록: {}층", dojang.dojang_best_floor.unwrap_or(0));
+    }
+
+    Ok(())
+}
 ```
-
-사용 가능한 값: `Zero`, `First`, `FirstHalf`, `Second`, `SecondHalf`, `Third`, `Fourth`, `HyperPassive`, `HyperActive`, `Fifth`, `Sixth`
 
 ---
 
-## 에러 처리
+### 5. 🏆 상용 전적 서비스 수준의 올인원 대시보드 (`get_character_dashboard_by_name`)
+
+메이플스카우터, 츄츄지지, 메애기, 메이플로드, 메짱 등 OpenAPI 기반 전적/정보 사이트에서 보여주는 **모든 필수 데이터(기본 스펙, 전투력, 스타포스 합, 심볼 포스, 유니온/아티팩트, 길드/노블레스 스킬, 어빌리티, 6차 헥사 코어/스탯, 5차 V매트릭스, 장비 세트효과, 펫, 안드로이드, 성향, 코디/아바타 렌더러)**를 단 한 번의 호출로 취합합니다:
+
+```rust
+use maplestory_openapi::{AvatarAction, AvatarEmotion, MapleStoryClient, WeaponMotion};
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let client = MapleStoryClient::from_env()?;
+
+    // 닉네임 1줄 호출로 20개 이상의 엔드포인트 병렬 취합 + 길드 자동 연계 조회
+    let dash = client.get_character_dashboard_by_name("온앤온").await?;
+
+    println!("=== {} (Lv.{} {}) ===", dash.character_name(), dash.character_level(), dash.character_class());
+    println!("전투력: {}", dash.combat_power());
+    println!("스타포스: {}성 | 아케인포스: {} | 어센틱포스: {}", 
+        dash.total_starforce(), dash.arcane_force(), dash.authentic_force());
+    println!("유니온: Lv.{} ({:?}) | 아티팩트: Lv.{:?}", 
+        dash.union_level().unwrap_or(0), dash.union_grade(), dash.union_artifact_level());
+    
+    // 길드 및 노블레스 스킬 (소속 길드 자동 연계 조회)
+    if let Some(guild) = &dash.guild {
+        println!("길드: {} (Lv.{}) | 마스터: {:?} | 노블스킬: {}p",
+            guild.guild_name.as_deref().unwrap_or(""),
+            guild.guild_level.unwrap_or(0),
+            guild.guild_master_name,
+            dash.noblesse_skill_points()
+        );
+    }
+
+    // 어빌리티 & 무릉도장
+    println!("어빌리티: {:?} | 무릉: {:?}층", dash.ability_grade(), dash.dojang_best_floor());
+
+    // 코디 프리즘 아이템 & 커스텀 아바타 렌더러 URL
+    println!("프리즘 아이템: {}개", dash.coordination.prism_items().count());
+    if let Some(img_url) = dash.coordination.custom_image(
+        AvatarAction::Jump,
+        AvatarEmotion::Wink,
+        WeaponMotion::Default,
+        96, 96,
+    ) {
+        println!("커스텀 점프+윙크 아바타 URL: {}", img_url);
+    }
+
+    Ok(())
+}
+```
+
+---
+
+## 🛠 정밀한 에러 처리 (Error Handling)
+
+`MapleStoryError`는 넥슨 API의 구체적인 에러 코드와 메시지를 포함하며, 편리한 판별 헬퍼를 제공합니다:
 
 ```rust
 use maplestory_openapi::{MapleStoryClient, MapleStoryError};
 
-match client.get_character_by_name("없는캐릭터").await {
-    Ok(info) => println!("{:?}", info),
-    Err(MapleStoryError::CharacterNotFound { name }) => {
-        println!("캐릭터 '{}' 를 찾을 수 없습니다", name);
+#[tokio::main]
+async fn main() {
+    let client = MapleStoryClient::from_env().unwrap();
+
+    match client.get_character_by_name("존재하지않는캐릭터12345").await {
+        Ok(info) => println!("조회 성공: {:?}", info.character_name),
+        Err(err) if err.is_not_found() => {
+            println!("해당 캐릭터를 찾을 수 없습니다.");
+        }
+        Err(err) if err.is_rate_limited() => {
+            println!("요청 한도 초과! {:?} 후에 재시도하세요.", err.retry_after());
+        }
+        Err(err) if err.is_auth_error() => {
+            println!("API 키가 올바르지 않습니다: {:?}", err.api_message());
+        }
+        // 패턴 매칭으로 상세 정보 추출
+        Err(MapleStoryError::ApiError { code, message, status }) => {
+            println!("API 오류 [{} (HTTP {})]: {}", code, status, message);
+        }
+        Err(e) => println!("기타 오류: {}", e),
     }
-    Err(MapleStoryError::AuthenticationFailed) => {
-        println!("API 키가 유효하지 않습니다");
-    }
-    Err(MapleStoryError::RateLimited { retry_after }) => {
-        println!("요청 한도 초과. {}초 후 재시도하세요", retry_after);
-    }
-    Err(e) => println!("오류: {}", e),
 }
 ```
 
 ---
 
-## 예제 실행
+## 💡 넥슨 OpenAPI 실무 주의사항 및 팁 (Gotchas)
+
+1. **데이터 갱신 주기 (평균 15분)**:
+   - 인게임 캐릭터 변경 사항(레벨업, 아이템 변경, 코디 변경 등)은 실시간이 아니며 **약 15분 후** API에 반영됩니다.
+2. **조회 가능 기준일 (2023-12-21)**:
+   - 넥슨 OpenAPI의 과거 데이터는 **2023-12-21** 이후의 데이터만 조회 가능합니다.
+3. **전일 데이터 갱신 시각 (오전 02:00 KST)**:
+   - 전일(어제) 데이터는 다음 날 오전 2시(KST) 이후부터 정상 확인이 가능합니다.
+4. **OCID 변경 가능성 & 캐시 활용**:
+   - 캐릭터 닉네임 변경이나 게임사 업데이트로 인해 드물게 OCID가 변경될 수 있습니다. 본 라이브러리의 `features = ["cache"]`는 기본 24시간 TTL을 적용하여 레이트 리밋을 보호하면서도 안전하게 최신성을 유지합니다.
+
+---
+
+## 📋 지원 API 전체 목록
+
+| 분류 | 메서드 | 공식 엔드포인트 | 설명 |
+|------|--------|----------------|------|
+| **편의 기능** | `get_character_dashboard_by_name(name)` | — | **🏆 닉네임 한방 올인원 전적 대시보드 (길드·유니온·스펙·코디 병렬 취합)** |
+| **편의 기능** | `get_character_by_name(name)` | — | 닉네임 한방 기본 정보 조회 |
+| **편의 기능** | `get_character_stat_by_name(name)` | — | 닉네임 한방 종합 능력치 조회 |
+| **편의 기능** | `get_character_item_equipment_by_name(name)` | — | 닉네임 한방 장착 장비 조회 |
+| **편의 기능** | `get_character_coordination_by_name(name)` | — | **닉네임 한방 최종 코디/외형 합성 조회** |
+| **편의 기능** | `get_character_profile_by_name(name)` | — | **닉네임 한방 전체 종합 프로필 병렬 조회** |
+| **User** | `get_character_list()` | `GET /maplestory/v1/character/list` | 계정 캐릭터 목록 |
+| **User** | `get_achievement(date)` | `GET /maplestory/v1/user/achievement` | 업적 정보 |
+| **Union** | `get_user_union(ocid, date)` | `GET /maplestory/v1/user/union` | 유니온 레벨 및 등급, 아티팩트 레벨 |
+| **Union** | `get_user_union_raider(ocid, date)` | `GET /maplestory/v1/user/union-raider` | 유니온 공격대원 배치 및 점령 스탯 |
+| **Union** | `get_user_union_artifact(ocid, date)` | `GET /maplestory/v1/user/union-artifact` | 유니온 아티팩트 효과 및 크리스탈 |
+| **Guild** | `get_guild_id(name, world)` | `GET /maplestory/v1/guild/id` | 길드 식별자(oguild_id) 조회 |
+| **Guild** | `get_guild_basic(oguild_id, date)` | `GET /maplestory/v1/guild/basic` | 길드 기본 정보 및 노블레스 스킬 |
+| **Guild** | `get_guild_by_name(name, world, date)`| — | 길드명+월드로 기본 정보 즉시 조회 |
+| **Character**| `get_character_id(name)` | `GET /maplestory/v1/id` | OCID 조회 |
+| **Character**| `get_character_basic(ocid, date)` | `GET /maplestory/v1/character/basic` | 기본 정보 |
+| **Character**| `get_character_popularity(ocid, date)`| `GET /maplestory/v1/character/popularity` | 인기도 |
+| **Character**| `get_character_stat(ocid, date)` | `GET /maplestory/v1/character/stat` | 종합 능력치 |
+| **Character**| `get_character_hyper_stat(ocid, date)`| `GET /maplestory/v1/character/hyper-stat` | 하이퍼스탯 |
+| **Character**| `get_character_propensity(ocid, date)`| `GET /maplestory/v1/character/propensity` | 성향 |
+| **Character**| `get_character_ability(ocid, date)` | `GET /maplestory/v1/character/ability` | 어빌리티 |
+| **Character**| `get_character_item_equipment(ocid, date)`| `GET /maplestory/v1/character/item-equipment` | 장착 장비 |
+| **Character**| `get_character_cashitem_equipment(ocid, date)`| `GET /maplestory/v1/character/cashitem-equipment` | 캐시 장비 |
+| **Character**| `get_character_symbol_equipment(ocid, date)`| `GET /maplestory/v1/character/symbol-equipment` | 심볼 |
+| **Character**| `get_character_set_effect(ocid, date)`| `GET /maplestory/v1/character/set-effect` | 세트 효과 |
+| **Character**| `get_character_beauty_equipment(ocid, date)`| `GET /maplestory/v1/character/beauty-equipment` | 헤어/성형/피부 |
+| **Character**| `get_character_android_equipment(ocid, date)`| `GET /maplestory/v1/character/android-equipment` | 안드로이드 |
+| **Character**| `get_character_pet_equipment(ocid, date)`| `GET /maplestory/v1/character/pet-equipment` | 펫 장비 |
+| **Character**| `get_character_skill(ocid, grade, date)`| `GET /maplestory/v1/character/skill` | 스킬 정보 |
+| **Character**| `get_character_link_skill(ocid, date)`| `GET /maplestory/v1/character/link-skill` | 링크 스킬 |
+| **Character**| `get_character_vmatrix(ocid, date)` | `GET /maplestory/v1/character/vmatrix` | V매트릭스 |
+| **Character**| `get_character_hexamatrix(ocid, date)`| `GET /maplestory/v1/character/hexamatrix` | HEXA 코어 |
+| **Character**| `get_character_hexamatrix_stat(ocid, date)`| `GET /maplestory/v1/character/hexamatrix-stat` | HEXA 스탯 |
+| **Character**| `get_character_dojang(ocid, date)` | `GET /maplestory/v1/character/dojang` | 무릉도장 기록 |
+| **Character**| `get_character_other_stat(ocid, date)`| `GET /maplestory/v1/character/other-stat` | 기타 능력치 |
+| **Character**| `get_character_ring_exchange_skill_equipment(ocid, date)`| `GET /maplestory/v1/character/ring-exchange-skill-equipment` | 링 익스체인지 |
+| **Character**| `get_character_ring_reserve_skill_equipment(ocid, date)`| `GET /maplestory/v1/character/ring-reserve-skill-equipment` | 예비 특수 반지 |
+
+---
+
+## 🏃 예제 실행
+
+`.env` 파일에 `NEXON_API_KEY=...`를 입력한 후 즉시 실행할 수 있습니다:
 
 ```sh
-# 환경 변수 설정
-export NEXON_API_KEY=your_api_key_here
+# 1. 🏆 올인원 전적 대시보드 (전투력, 스타포스, 심볼, 유니온, 길드, 노블스킬, 코디)
+cargo run --example character_dashboard
 
-# 닉네임 한방 조회
-cargo run --example quick_lookup -- 캐릭터명
+# 2. 닉네임 한방 조회 (전투력, 스공, 대표 코디 포함)
+cargo run --example quick_lookup -- 온앤온
 
-# 기본 사용법
+# 3. 최종 코디/외형 정보 상세 조회 (캐시 우선 + 모루 외형 + 프리즘)
+cargo run --example coordination_lookup -- 온앤온
+
+# 4. 아바타 1024자리 Base16 디코딩 및 동적 렌더러
+cargo run --example avatar_decoding_and_look -- 온앤온
+
+# 5. 🎬 아바타 애니메이션 GIF 생성 (걷기, 윙크, 숨쉬기, 점프 등)
+cargo run --example avatar_animation_gif --features animation -- 온앤온
+
+# 6. 기본 사용법
 cargo run --example basic_usage
 
-# 전체 정보 병렬 조회
-cargo run --example character_full_info -- 캐릭터명
+# 7. 전체 정보 병렬 조회
+cargo run --example character_full_info -- 온앤온
 ```
 
 ---
 
-## 라이선스
+### 🎬 아바타 애니메이션 GIF 생성 (`animation` 기능)
 
-MIT — 자세한 내용은 [LICENSE](LICENSE) 파일을 참조하세요.
+`animation` 기능을 켜면(`features = ["animation"]`), 단 몇 줄의 코드로 메이플스토리 아바타의 모션(걷기, 윙크, 대기 숨쉬기, 점프, 비행 등)을 **무손실 투명 배경의 애니메이션 GIF 파일**로 바로 생성할 수 있습니다:
+
+```rust
+use maplestory_openapi::{AnimationPreset, MapleStoryClient};
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let client = MapleStoryClient::from_env()?;
+
+    // 온앤온 캐릭터의 걷기(Walk) 애니메이션 GIF 생성 (128x128 해상도)
+    let gif_bytes = client
+        .render_character_gif_by_name("온앤온", &AnimationPreset::Walk, Some(128), Some(128))
+        .await?;
+
+    std::fs::write("walk.gif", gif_bytes)?;
+    println!("걷기 애니메이션 GIF 생성 완료!");
+
+    Ok(())
+}
+```
+
+* 제공 프리셋: `AnimationPreset::Walk`, `AnimationPreset::Wink`, `AnimationPreset::Stand`, `AnimationPreset::Jump`, `AnimationPreset::Fly`, `AnimationPreset::Sit`, `AnimationPreset::Prone`, `AnimationPreset::Climb`, `AnimationPreset::Custom(Vec<AnimationFrame>)`
 
 ---
 
-## 참고
+## 📜 라이선스 (License)
 
-- **공식 OpenAPI 문서**: https://openapi.nexon.com/ko/game/maplestory/
-- **Source of Truth**: `14_ko_script20260917040003.yaml`
-- **참고 구현체**: [SpiralMoon/maplestory.openapi](https://github.com/SpiralMoon/maplestory.openapi)
+이 프로젝트는 [MIT License](LICENSE-MIT) 또는 [Apache License 2.0](LICENSE-APACHE) 듀얼 라이선스로 배포됩니다.
