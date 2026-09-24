@@ -404,6 +404,38 @@ pub struct SymbolEquipmentDetail {
     pub symbol_require_growth_count: Option<i64>,
 }
 
+impl CharacterSymbolEquipment {
+    /// Calculate total Arcane Force (아케인포스 총합).
+    pub fn total_arcane_force(&self) -> i64 {
+        self.symbol
+            .as_ref()
+            .map(|symbols| {
+                symbols
+                    .iter()
+                    .filter(|item| item.symbol_name.as_deref().unwrap_or("").contains("아케인"))
+                    .filter_map(|item| item.symbol_force.as_deref())
+                    .filter_map(|s| s.parse::<i64>().ok())
+                    .sum()
+            })
+            .unwrap_or(0)
+    }
+
+    /// Calculate total Authentic Force (어센틱포스 총합).
+    pub fn total_authentic_force(&self) -> i64 {
+        self.symbol
+            .as_ref()
+            .map(|symbols| {
+                symbols
+                    .iter()
+                    .filter(|item| item.symbol_name.as_deref().unwrap_or("").contains("어센틱"))
+                    .filter_map(|item| item.symbol_force.as_deref())
+                    .filter_map(|s| s.parse::<i64>().ok())
+                    .sum()
+            })
+            .unwrap_or(0)
+    }
+}
+
 // ─── Set Effect ───────────────────────────────────────────────────────────────
 
 /// Response from `GET /maplestory/v1/character/set-effect`.
@@ -847,3 +879,765 @@ pub struct RingReserveSkillEquipment {
     pub special_ring_reserve_icon: Option<String>,
     pub special_ring_reserve_description: Option<String>,
 }
+
+// ─── CharacterStat Helpers ────────────────────────────────────────────────────
+
+impl CharacterStat {
+    /// Look up a stat value by its Korean name (e.g. "전투력", "보스 몬스터 데미지", "스탯공격력").
+    pub fn get_stat(&self, name: &str) -> Option<&str> {
+        self.final_stat.as_ref()?.iter().find_map(|entry| {
+            if entry.stat_name.as_deref() == Some(name) {
+                entry.stat_value.as_deref()
+            } else {
+                None
+            }
+        })
+    }
+
+    /// Look up a stat and parse its integer value as `i64`.
+    pub fn get_stat_i64(&self, name: &str) -> Option<i64> {
+        self.get_stat(name)?.parse::<i64>().ok()
+    }
+
+    /// Look up a stat and parse its floating-point or percentage value as `f64`.
+    pub fn get_stat_f64(&self, name: &str) -> Option<f64> {
+        self.get_stat(name)?.parse::<f64>().ok()
+    }
+
+    /// Combat power (전투력).
+    pub fn combat_power(&self) -> Option<i64> {
+        self.get_stat_i64("전투력")
+    }
+
+    /// Stat attack power as `(min, max)` (최소 스탯공격력, 최대 스탯공격력).
+    pub fn stat_attack(&self) -> (Option<i64>, Option<i64>) {
+        (
+            self.get_stat_i64("최소 스탯공격력"),
+            self.get_stat_i64("최대 스탯공격력"),
+        )
+    }
+
+    /// Boss monster damage percentage (보스 몬스터 데미지).
+    pub fn boss_damage(&self) -> Option<f64> {
+        self.get_stat_f64("보스 몬스터 데미지")
+    }
+
+    /// Ignore monster armor percentage (방어율 무시).
+    pub fn ignore_monster_armor(&self) -> Option<f64> {
+        self.get_stat_f64("방어율 무시")
+    }
+
+    /// Damage percentage (데미지).
+    pub fn damage(&self) -> Option<f64> {
+        self.get_stat_f64("데미지")
+    }
+
+    /// Critical hit rate percentage (크리티컬 확률).
+    pub fn critical_rate(&self) -> Option<f64> {
+        self.get_stat_f64("크리티컬 확률")
+    }
+
+    /// Critical damage percentage (크리티컬 데미지).
+    pub fn critical_damage(&self) -> Option<f64> {
+        self.get_stat_f64("크리티컬 데미지")
+    }
+}
+
+// ─── CharacterItemEquipment Helpers ───────────────────────────────────────────
+
+impl CharacterItemEquipment {
+    /// Returns the currently active list of equipped items according to `preset_no`.
+    pub fn active_items(&self) -> &[ItemEquipmentDetail] {
+        match self.preset_no {
+            Some(1) => self
+                .item_equipment_preset_1
+                .as_deref()
+                .unwrap_or(self.item_equipment.as_deref().unwrap_or(&[])),
+            Some(2) => self
+                .item_equipment_preset_2
+                .as_deref()
+                .unwrap_or(self.item_equipment.as_deref().unwrap_or(&[])),
+            Some(3) => self
+                .item_equipment_preset_3
+                .as_deref()
+                .unwrap_or(self.item_equipment.as_deref().unwrap_or(&[])),
+            _ => self.item_equipment.as_deref().unwrap_or(&[]),
+        }
+    }
+
+    /// Find an equipped item by its slot or part name (e.g. "무기", "모자", "상의").
+    pub fn find_slot(&self, slot_or_part: &str) -> Option<&ItemEquipmentDetail> {
+        self.active_items().iter().find(|item| {
+            item.item_equipment_slot.as_deref() == Some(slot_or_part)
+                || item.item_equipment_part.as_deref() == Some(slot_or_part)
+        })
+    }
+
+    /// Weapon (무기).
+    pub fn weapon(&self) -> Option<&ItemEquipmentDetail> {
+        self.find_slot("무기")
+    }
+
+    /// Sub-weapon (보조무기).
+    pub fn sub_weapon(&self) -> Option<&ItemEquipmentDetail> {
+        self.find_slot("보조무기")
+    }
+
+    /// Emblem (엠블렘).
+    pub fn emblem(&self) -> Option<&ItemEquipmentDetail> {
+        self.find_slot("엠블렘")
+    }
+
+    /// Hat (모자).
+    pub fn hat(&self) -> Option<&ItemEquipmentDetail> {
+        self.find_slot("모자")
+    }
+
+    /// Top (상의 / 한벌옷).
+    pub fn top(&self) -> Option<&ItemEquipmentDetail> {
+        self.find_slot("상의")
+    }
+
+    /// Bottom (하의).
+    pub fn bottom(&self) -> Option<&ItemEquipmentDetail> {
+        self.find_slot("하의")
+    }
+
+    /// Shoes (신발).
+    pub fn shoes(&self) -> Option<&ItemEquipmentDetail> {
+        self.find_slot("신발")
+    }
+
+    /// Gloves (장갑).
+    pub fn gloves(&self) -> Option<&ItemEquipmentDetail> {
+        self.find_slot("장갑")
+    }
+
+    /// Cape (망토).
+    pub fn cape(&self) -> Option<&ItemEquipmentDetail> {
+        self.find_slot("망토")
+    }
+
+    /// Calculate total Starforce count across all currently active equipped items.
+    pub fn total_starforce(&self) -> i64 {
+        self.active_items()
+            .iter()
+            .filter_map(|item| item.starforce.as_deref())
+            .filter_map(|s| s.parse::<i64>().ok())
+            .sum()
+    }
+}
+
+// ─── CharacterCashItemEquipment Helpers ───────────────────────────────────────
+
+impl CharacterCashItemEquipment {
+    /// Returns the currently active list of cash items according to `preset_no`.
+    pub fn active_items(&self) -> &[CashItemEquipmentDetail] {
+        match self.preset_no {
+            Some(1) => self
+                .cash_item_equipment_preset_1
+                .as_deref()
+                .unwrap_or(self.cash_item_equipment_base.as_deref().unwrap_or(&[])),
+            Some(2) => self
+                .cash_item_equipment_preset_2
+                .as_deref()
+                .unwrap_or(self.cash_item_equipment_base.as_deref().unwrap_or(&[])),
+            Some(3) => self
+                .cash_item_equipment_preset_3
+                .as_deref()
+                .unwrap_or(self.cash_item_equipment_base.as_deref().unwrap_or(&[])),
+            _ => self.cash_item_equipment_base.as_deref().unwrap_or(&[]),
+        }
+    }
+
+    /// Find an equipped cash item by its slot or part name.
+    pub fn find_slot(&self, slot_or_part: &str) -> Option<&CashItemEquipmentDetail> {
+        self.active_items().iter().find(|item| {
+            item.cash_item_equipment_slot.as_deref() == Some(slot_or_part)
+                || item.cash_item_equipment_part.as_deref() == Some(slot_or_part)
+        })
+    }
+}
+
+// ─── Coordination & Visible Appearance ────────────────────────────────────────
+
+/// A single visible equipment item in a character's final look/coordination.
+///
+/// If cash equipment is worn in a slot, it takes precedence. Otherwise,
+/// normal equipment is shown (with anvil shape taking priority if applied).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct VisibleEquipItem {
+    /// Slot name (e.g. "모자", "상의", "하의", "신발", "장갑", "망토", "무기", "보조무기", "눈장식", "얼굴장식", "귀고리")
+    pub slot: String,
+    /// Part category name
+    pub part: Option<String>,
+    /// Final displayed item name
+    pub name: String,
+    /// Final displayed icon URL
+    pub icon: Option<String>,
+    /// True if this slot is covered by a cash item
+    pub is_cash: bool,
+    /// True if this is a transparent cash item (e.g. "투명 장갑", "투명 신발") hiding the normal equipment
+    pub is_transparent: bool,
+    /// True if this slot is a normal item with an anvil (신비의 모루) shape applied
+    pub is_anvil: bool,
+    /// Original equipment name if anvil shape is applied
+    pub original_name: Option<String>,
+    /// Cash label (e.g. "마스터라벨", "스페셜라벨") if cash item
+    pub cash_label: Option<String>,
+    /// Coloring prism dye info if cash item
+    pub coloring_prism: Option<ColoringPrism>,
+}
+
+impl VisibleEquipItem {
+    /// Returns `true` if this item has custom coloring prism dye settings.
+    pub fn has_prism(&self) -> bool {
+        self.coloring_prism.is_some()
+    }
+
+    /// Returns the coloring prism dye information if applied.
+    pub fn prism(&self) -> Option<&ColoringPrism> {
+        self.coloring_prism.as_ref()
+    }
+
+    /// Returns `true` if this slot is typically visible on the character sprite.
+    ///
+    /// Note: Non-shield secondary weapons (such as spellbooks/마도서, orbs/오브,
+    /// arrows/화살깃) are not visually rendered on characters in MapleStory.
+    pub fn is_visually_rendered(&self) -> bool {
+        if self.is_transparent {
+            return false;
+        }
+
+        if self.slot == "보조무기" {
+            // In MapleStory, only shields, Katara/Blades, Force Shields, etc. are visible.
+            // Items like 마도서, 오브, 부적, 쥬얼 are invisible.
+            if let Some(part) = &self.part {
+                let non_rendered_parts = ["마도서", "오브", "부적", "보석", "체스피스", "화살", "화살깃", "탄창", "카트리지", "컨트롤러", "무기전송장치", "매직제어구", "소울링", "청심환", "유물", "무기전송"];
+                return !non_rendered_parts.iter().any(|&p| part.contains(p));
+            }
+        }
+
+        true
+    }
+}
+
+/// Consolidated character look, beauty, and coordination (최종 노출 코디/외형 정보).
+///
+/// Synthesizes beauty features (hair, face, skin) and combines cash equipment
+/// with normal equipment according to in-game display rules.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CharacterCoordination {
+    /// Character name
+    pub character_name: Option<String>,
+    /// World name
+    pub world_name: Option<String>,
+    /// Character class / job
+    pub character_class: Option<String>,
+    /// Character level
+    pub character_level: Option<i64>,
+    /// Official character avatar look image URL from OpenAPI
+    pub character_image: Option<String>,
+    /// 1024-character AvatarCode parsed from character_image (if available)
+    pub avatar_code: Option<crate::avatar::AvatarCode>,
+    /// Hair information
+    pub hair: Option<HairInfo>,
+    /// Face / cosmetic information
+    pub face: Option<FaceInfo>,
+    /// Skin information
+    pub skin: Option<SkinInfo>,
+    /// Active cash preset number
+    pub cash_preset_no: Option<i64>,
+    /// Final visible equipment items across all slots
+    pub visible_items: Vec<VisibleEquipItem>,
+}
+
+/// Alias for [`CharacterCoordination`].
+pub type CharacterAppearance = CharacterCoordination;
+
+impl CharacterCoordination {
+    /// Synthesizes coordination from separate beauty, cash, and normal equipment models.
+    pub fn from_parts(
+        beauty: &CharacterBeautyEquipment,
+        cash_equip: &CharacterCashItemEquipment,
+        normal_equip: &CharacterItemEquipment,
+    ) -> Self {
+        // Standard visual slots in typical display order
+        let standard_slots = [
+            "모자",
+            "얼굴장식",
+            "눈장식",
+            "귀고리",
+            "상의",
+            "하의",
+            "신발",
+            "장갑",
+            "망토",
+            "무기",
+            "보조무기",
+            "반지1",
+            "반지2",
+            "반지3",
+            "반지4",
+        ];
+
+        let cash_items = cash_equip.active_items();
+        let base_cash_items = cash_equip.cash_item_equipment_base.as_deref().unwrap_or(&[]);
+        let normal_items = normal_equip.active_items();
+
+        let mut visible_items = Vec::new();
+        let mut handled_cash_indices = std::collections::HashSet::new();
+        let mut has_overall = false;
+
+        // 1. Process standard slots
+        for &slot in &standard_slots {
+            // If character is wearing an overall (한벌옷), bottom is covered and not visible
+            if slot == "하의" && has_overall {
+                continue;
+            }
+
+            // Find cash item for this slot in active preset, with fallback to base
+            let cash_match = cash_items
+                .iter()
+                .enumerate()
+                .find(|(idx, item)| {
+                    !handled_cash_indices.contains(idx)
+                        && (item.cash_item_equipment_slot.as_deref() == Some(slot)
+                            || item.cash_item_equipment_part.as_deref() == Some(slot))
+                })
+                .or_else(|| {
+                    // Fallback to base cash items if active preset slot is empty
+                    base_cash_items.iter().enumerate().find(|(_, item)| {
+                        item.cash_item_equipment_slot.as_deref() == Some(slot)
+                            || item.cash_item_equipment_part.as_deref() == Some(slot)
+                    })
+                });
+
+            if let Some((idx, cash)) = cash_match {
+                handled_cash_indices.insert(idx);
+                let is_overall = cash.cash_item_equipment_part.as_deref() == Some("한벌옷");
+                if is_overall || slot == "상의" && cash.cash_item_equipment_part.as_deref() == Some("한벌옷") {
+                    has_overall = true;
+                }
+
+                let display_slot = if is_overall {
+                    "한벌옷".to_string()
+                } else {
+                    slot.to_string()
+                };
+
+                let item_name = cash
+                    .cash_item_name
+                    .clone()
+                    .unwrap_or_else(|| "Unknown".to_string());
+                let is_transparent = item_name.starts_with("투명 ") || item_name == "투명장갑" || item_name == "투명모자" || item_name == "투명망토";
+
+                visible_items.push(VisibleEquipItem {
+                    slot: display_slot,
+                    part: cash.cash_item_equipment_part.clone(),
+                    name: item_name,
+                    icon: cash.cash_item_icon.clone(),
+                    is_cash: true,
+                    is_transparent,
+                    is_anvil: false,
+                    original_name: None,
+                    cash_label: cash.cash_item_label.clone(),
+                    coloring_prism: cash.cash_item_coloring_prism.clone(),
+                });
+            } else {
+                // Check normal equipment for this slot
+                let normal_match = normal_items.iter().find(|item| {
+                    item.item_equipment_slot.as_deref() == Some(slot)
+                        || item.item_equipment_part.as_deref() == Some(slot)
+                });
+
+                if let Some(norm) = normal_match {
+                    let is_overall = norm.item_equipment_part.as_deref() == Some("한벌옷");
+                    if is_overall {
+                        has_overall = true;
+                    }
+
+                    let display_slot = if is_overall {
+                        "한벌옷".to_string()
+                    } else {
+                        slot.to_string()
+                    };
+                    let has_anvil = norm.item_shape_name.is_some()
+                        && norm.item_shape_name != norm.item_name;
+
+                    let (name, icon) = if has_anvil {
+                        (
+                            norm.item_shape_name
+                                .clone()
+                                .unwrap_or_else(|| norm.item_name.clone().unwrap_or_default()),
+                            norm.item_shape_icon.clone().or_else(|| norm.item_icon.clone()),
+                        )
+                    } else {
+                        (
+                            norm.item_name.clone().unwrap_or_else(|| "Unknown".to_string()),
+                            norm.item_icon.clone(),
+                        )
+                    };
+
+                    visible_items.push(VisibleEquipItem {
+                        slot: display_slot,
+                        part: norm.item_equipment_part.clone(),
+                        name,
+                        icon,
+                        is_cash: false,
+                        is_transparent: false,
+                        is_anvil: has_anvil,
+                        original_name: if has_anvil { norm.item_name.clone() } else { None },
+                        cash_label: None,
+                        coloring_prism: None,
+                    });
+                }
+            }
+        }
+
+        // 2. Include any remaining cash items not in standard slot list (e.g. effect, medals, extra rings)
+        for (idx, cash) in cash_items.iter().enumerate() {
+            if !handled_cash_indices.contains(&idx) {
+                let slot = cash
+                    .cash_item_equipment_slot
+                    .clone()
+                    .or_else(|| cash.cash_item_equipment_part.clone())
+                    .unwrap_or_else(|| "기타".to_string());
+
+                let item_name = cash
+                    .cash_item_name
+                    .clone()
+                    .unwrap_or_else(|| "Unknown".to_string());
+                let is_transparent = item_name.starts_with("투명 ") || item_name == "투명장갑" || item_name == "투명모자" || item_name == "투명망토";
+
+                visible_items.push(VisibleEquipItem {
+                    slot,
+                    part: cash.cash_item_equipment_part.clone(),
+                    name: item_name,
+                    icon: cash.cash_item_icon.clone(),
+                    is_cash: true,
+                    is_transparent,
+                    is_anvil: false,
+                    original_name: None,
+                    cash_label: cash.cash_item_label.clone(),
+                    coloring_prism: cash.cash_item_coloring_prism.clone(),
+                });
+            }
+        }
+
+        Self {
+            character_name: None,
+            world_name: None,
+            character_class: None,
+            character_level: None,
+            character_image: None,
+            avatar_code: None,
+            hair: beauty.character_hair.clone(),
+            face: beauty.character_face.clone(),
+            skin: beauty.character_skin.clone(),
+            cash_preset_no: cash_equip.preset_no,
+            visible_items,
+        }
+    }
+
+    /// Synthesizes coordination including basic character profile information.
+    pub fn from_full_parts(
+        basic: &CharacterBasic,
+        beauty: &CharacterBeautyEquipment,
+        cash_equip: &CharacterCashItemEquipment,
+        normal_equip: &CharacterItemEquipment,
+    ) -> Self {
+        let mut coord = Self::from_parts(beauty, cash_equip, normal_equip);
+        coord.character_name = basic.character_name.clone();
+        coord.world_name = basic.world_name.clone();
+        coord.character_class = basic.character_class.clone();
+        coord.character_level = basic.character_level;
+        coord.character_image = basic.character_image.clone();
+        if let Some(ref img_url) = basic.character_image {
+            coord.avatar_code = crate::avatar::AvatarCode::from_url_or_code(img_url).ok();
+        }
+        coord
+    }
+
+    /// Returns an iterator over all visible items that have a Coloring Prism (컬러링 프리즘) applied.
+    pub fn prism_items(&self) -> impl Iterator<Item = &VisibleEquipItem> {
+        self.visible_items.iter().filter(|item| item.has_prism())
+    }
+
+    /// Generates a customized avatar look URL with specific action, emotion, and weapon motion.
+    pub fn custom_image(
+        &self,
+        action: crate::avatar::AvatarAction,
+        emotion: crate::avatar::AvatarEmotion,
+        wmotion: crate::avatar::WeaponMotion,
+        width: u32,
+        height: u32,
+    ) -> Option<String> {
+        let code = self.avatar_code.as_ref()?;
+        let query = crate::avatar::AvatarLookQuery::new()
+            .action(action)
+            .emotion(emotion)
+            .weapon_motion(wmotion)
+            .size(width, height);
+        Some(code.to_look_url(&query))
+    }
+
+    /// Generates a custom avatar look URL using an [`AvatarLookQuery`](crate::avatar::AvatarLookQuery).
+    pub fn custom_avatar_url(&self, query: &crate::avatar::AvatarLookQuery) -> Option<String> {
+        self.avatar_code.as_ref().map(|code| code.to_look_url(query))
+    }
+
+    /// Generates a list of frame URLs and frame durations (ms) for an animation preset.
+    pub fn animation_frame_urls(
+        &self,
+        preset: &crate::avatar::AnimationPreset,
+        width: Option<u32>,
+        height: Option<u32>,
+    ) -> Option<Vec<(String, u32)>> {
+        self.avatar_code
+            .as_ref()
+            .map(|code| code.animation_frame_urls(preset, width, height))
+    }
+
+    /// Find visible item by slot or part name.
+    pub fn get_slot(&self, slot_or_part: &str) -> Option<&VisibleEquipItem> {
+        self.visible_items.iter().find(|item| {
+            item.slot == slot_or_part
+                || item.part.as_deref() == Some(slot_or_part)
+        })
+    }
+
+    /// Visible hat (모자).
+    pub fn hat(&self) -> Option<&VisibleEquipItem> {
+        self.get_slot("모자")
+    }
+
+    /// Visible top or overall (상의/한벌옷).
+    pub fn top(&self) -> Option<&VisibleEquipItem> {
+        self.get_slot("상의").or_else(|| self.get_slot("한벌옷"))
+    }
+
+    /// Visible bottom (하의).
+    pub fn bottom(&self) -> Option<&VisibleEquipItem> {
+        self.get_slot("하의")
+    }
+
+    /// Visible shoes (신발).
+    pub fn shoes(&self) -> Option<&VisibleEquipItem> {
+        self.get_slot("신발")
+    }
+
+    /// Visible gloves (장갑).
+    pub fn gloves(&self) -> Option<&VisibleEquipItem> {
+        self.get_slot("장갑")
+    }
+
+    /// Visible cape (망토).
+    pub fn cape(&self) -> Option<&VisibleEquipItem> {
+        self.get_slot("망토")
+    }
+
+    /// Visible weapon (무기).
+    pub fn weapon(&self) -> Option<&VisibleEquipItem> {
+        self.get_slot("무기")
+    }
+
+    /// Visible sub-weapon (보조무기).
+    pub fn sub_weapon(&self) -> Option<&VisibleEquipItem> {
+        self.get_slot("보조무기")
+    }
+}
+
+// ─── Aggregated Character Profile ─────────────────────────────────────────────
+
+/// Full aggregated character profile (종합 캐릭터 프로필).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CharacterProfile {
+    /// Basic information
+    pub basic: CharacterBasic,
+    /// Detailed stats and combat power
+    pub stat: CharacterStat,
+    /// Normal equipment
+    pub item_equipment: CharacterItemEquipment,
+    /// Cash equipment
+    pub cash_item_equipment: CharacterCashItemEquipment,
+    /// Beauty features
+    pub beauty_equipment: CharacterBeautyEquipment,
+    /// Synthesized final visual look (코디 정보)
+    pub coordination: CharacterCoordination,
+    /// Popularity
+    pub popularity: Option<CharacterPopularity>,
+    /// Mu Lung Dojo records
+    pub dojang: Option<CharacterDojang>,
+}
+
+// ─── All-In-One Character Dashboard ──────────────────────────────────────────
+
+/// Comprehensive all-in-one character dashboard (올인원 캐릭터 종합 대시보드).
+///
+/// Designed to provide all information required by modern MapleStory ranking &
+/// analytics services (e.g. MapleScouter, ChuChu.gg, Meaegi, MapleRoad, Mezzang)
+/// in a single aggregated structure.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CharacterDashboard {
+    /// Basic information (이름, 월드, 직업, 레벨, 경험치, 이미지 등)
+    pub basic: CharacterBasic,
+    /// Detailed stats and combat power (스탯, 전투력, 보공, 방무 등)
+    pub stat: CharacterStat,
+    /// Normal equipment (일반 장비, 스타포스, 잠재 등)
+    pub item_equipment: CharacterItemEquipment,
+    /// Cash equipment (캐시 장비 및 프리즘 정보)
+    pub cash_item_equipment: CharacterCashItemEquipment,
+    /// Beauty features (헤어, 성형, 피부, 믹스염색)
+    pub beauty_equipment: CharacterBeautyEquipment,
+    /// Synthesized final visual look (최종 외형 코디 + 아바타 코드)
+    pub coordination: CharacterCoordination,
+    /// Arcane / Authentic Symbol equipment (아케인/어센틱 심볼 장비 및 포스)
+    pub symbols: Option<CharacterSymbolEquipment>,
+    /// Character ability (어빌리티 등급 및 옵션 3줄)
+    pub ability: Option<CharacterAbility>,
+    /// Hyper stats (하이퍼 스탯)
+    pub hyper_stat: Option<CharacterHyperStat>,
+    /// 6th job HEXA Matrix cores (6차 헥사 코어 장착 정보)
+    pub hexa_matrix: Option<CharacterHexaMatrix>,
+    /// 6th job HEXA Matrix stats (6차 헥사 스탯 1, 2)
+    pub hexa_matrix_stat: Option<CharacterHexaMatrixStat>,
+    /// 5th job V Matrix cores (5차 V매트릭스 코어 정보)
+    pub v_matrix: Option<CharacterVMatrix>,
+    /// Set effects of equipped items (장비 세트 효과)
+    pub set_effect: Option<CharacterSetEffect>,
+    /// Pet equipment and pet buffs (장착 펫 3마리 및 펫 장비 스탯)
+    pub pet_equipment: Option<CharacterPetEquipment>,
+    /// Android equipment and mechanical heart (안드로이드 및 기계심장)
+    pub android_equipment: Option<CharacterAndroidEquipment>,
+    /// Link skills (링크 스킬)
+    pub link_skill: Option<CharacterLinkSkill>,
+    /// Propensities (성향 6종: 카리스마, 감성, 통찰력, 의지, 손재주, 매력)
+    pub propensity: Option<CharacterPropensity>,
+    /// Popularity (인기도)
+    pub popularity: Option<CharacterPopularity>,
+    /// Mu Lung Dojo record (무릉도장 최고 기록)
+    pub dojang: Option<CharacterDojang>,
+    /// Union basic info (유니온 레벨, 등급)
+    pub union: Option<crate::models::union::UserUnion>,
+    /// Union artifact info (아티팩트 레벨, 효과, 크리스탈)
+    pub union_artifact: Option<crate::models::union::UserUnionArtifact>,
+    /// Guild basic info (길드명, 레벨, 길드마스터, 노블레스 스킬)
+    /// Automatically looked up if the character belongs to a guild.
+    pub guild: Option<crate::models::guild::GuildBasic>,
+}
+
+impl CharacterDashboard {
+    /// Character name.
+    pub fn character_name(&self) -> &str {
+        self.basic.character_name.as_deref().unwrap_or("")
+    }
+
+    /// World / server name (e.g. "스카니아").
+    pub fn world_name(&self) -> &str {
+        self.basic.world_name.as_deref().unwrap_or("")
+    }
+
+    /// Character class / job (e.g. "아크메이지(썬,콜)").
+    pub fn character_class(&self) -> &str {
+        self.basic.character_class.as_deref().unwrap_or("")
+    }
+
+    /// Character level.
+    pub fn character_level(&self) -> i64 {
+        self.basic.character_level.unwrap_or(0)
+    }
+
+    /// Character official render image URL.
+    pub fn character_image(&self) -> Option<&str> {
+        self.basic.character_image.as_deref()
+    }
+
+    /// Combat power (전투력).
+    pub fn combat_power(&self) -> i64 {
+        self.stat.combat_power().unwrap_or(0)
+    }
+
+    /// Total Starforce sum across all currently active equipped items.
+    pub fn total_starforce(&self) -> i64 {
+        self.item_equipment.total_starforce()
+    }
+
+    /// Arcane Force sum from symbol equipment (아케인포스 총합).
+    pub fn arcane_force(&self) -> i64 {
+        self.symbols
+            .as_ref()
+            .map(|s| s.total_arcane_force())
+            .unwrap_or(0)
+    }
+
+    /// Authentic Force sum from symbol equipment (어센틱포스 총합).
+    pub fn authentic_force(&self) -> i64 {
+        self.symbols
+            .as_ref()
+            .map(|s| s.total_authentic_force())
+            .unwrap_or(0)
+    }
+
+    /// Union level if available.
+    pub fn union_level(&self) -> Option<i64> {
+        self.union.as_ref().and_then(|u| u.union_level)
+    }
+
+    /// Union grade if available (e.g. "그랜드 마스터 유니온 4").
+    pub fn union_grade(&self) -> Option<&str> {
+        self.union.as_ref().and_then(|u| u.union_grade.as_deref())
+    }
+
+    /// Union artifact level if available.
+    pub fn union_artifact_level(&self) -> Option<i64> {
+        self.union
+            .as_ref()
+            .and_then(|u| u.union_artifact_level)
+    }
+
+    /// Guild name if the character belongs to a guild.
+    pub fn guild_name(&self) -> Option<&str> {
+        self.basic.character_guild_name.as_deref()
+    }
+
+    /// Guild master name if guild info is loaded.
+    pub fn guild_master_name(&self) -> Option<&str> {
+        self.guild.as_ref().and_then(|g| g.guild_master_name.as_deref())
+    }
+
+    /// Guild level if guild info is loaded.
+    pub fn guild_level(&self) -> Option<i64> {
+        self.guild.as_ref().and_then(|g| g.guild_level)
+    }
+
+    /// Total Noblesse skill points of the character's guild (노블레스 스킬 총합 포인트).
+    pub fn noblesse_skill_points(&self) -> i64 {
+        self.guild
+            .as_ref()
+            .map(|g| g.total_noblesse_points())
+            .unwrap_or(0)
+    }
+
+    /// Ability grade (e.g. "레전드리", "유니크") if available.
+    pub fn ability_grade(&self) -> Option<&str> {
+        self.ability.as_ref().and_then(|a| a.ability_grade.as_deref())
+    }
+
+    /// Highest floor reached in Mu Lung Dojo (무릉도장 최고 층수).
+    pub fn dojang_best_floor(&self) -> Option<i64> {
+        self.dojang.as_ref().and_then(|d| d.dojang_best_floor)
+    }
+
+    /// Character popularity score if available.
+    pub fn popularity(&self) -> i64 {
+        self.popularity.as_ref().and_then(|p| p.popularity).unwrap_or(0)
+    }
+
+    /// Parsed AvatarCode if available from coordination.
+    pub fn avatar_code(&self) -> Option<&crate::avatar::AvatarCode> {
+        self.coordination.avatar_code.as_ref()
+    }
+}
+
+

@@ -183,7 +183,7 @@ pub struct StatEntry {
 }
 
 /// Cash item coloring prism info (컬러링 프리즘).
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ColoringPrism {
     pub color_range: Option<String>,
     pub hue: Option<i64>,
@@ -193,7 +193,7 @@ pub struct ColoringPrism {
 }
 
 /// Skill detail used in multiple contexts (link skill, character skill, etc.).
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SkillDetail {
     pub skill_name: Option<String>,
     pub skill_description: Option<String>,
@@ -204,7 +204,7 @@ pub struct SkillDetail {
 }
 
 /// Hair information (헤어 정보).
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct HairInfo {
     pub hair_name: Option<String>,
     pub base_color: Option<String>,
@@ -214,7 +214,7 @@ pub struct HairInfo {
 }
 
 /// Face (성형) information.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct FaceInfo {
     pub face_name: Option<String>,
     pub base_color: Option<String>,
@@ -224,7 +224,7 @@ pub struct FaceInfo {
 }
 
 /// Skin (피부) information.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SkinInfo {
     pub skin_name: Option<String>,
     pub color_style: Option<String>,
