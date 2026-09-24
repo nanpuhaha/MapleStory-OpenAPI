@@ -2,17 +2,25 @@
 name = "maplestory-openapi"
 version = "0.1.0"
 edition = "2021"
-description = "Rust client library for NEXON MapleStory OpenAPI"
+description = "Production-quality, ergonomic Rust client library for NEXON MapleStory OpenAPI"
 readme = "README.md"
 license = "MIT"
 repository = "https://github.com/yourusername/maplestory-openapi-rust"
 documentation = "https://docs.rs/maplestory-openapi"
 keywords = ["maplestory", "nexon", "openapi", "game", "api"]
 categories = ["api-bindings", "web-programming", "async"]
+include = [
+    "src/**/*",
+    "tests/**/*",
+    "examples/**/*",
+    "Cargo.toml",
+    "README.md",
+    "LICENSE*",
+]
 
 [dependencies]
-# HTTP client
-reqwest = { version = "0.12", features = ["json", "rustls-tls"] }
+# HTTP client (TLS backends configured via features)
+reqwest = { version = "0.12", default-features = false, features = ["json"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 
@@ -22,27 +30,32 @@ chrono = { version = "0.4", features = ["serde"] }
 # Error handling
 thiserror = "1.0"
 
-# Async runtime
-tokio = { version = "1.0", features = ["full"] }
-
 # URL building
 url = "2.5"
+
+# Lightweight async utilities (no heavyweight runtime dependency)
+futures-util = { version = "0.3", default-features = false, features = ["alloc", "async-await", "async-await-macro"] }
 
 # Logging
 tracing = "0.1"
 
-# Caching (optional feature)
+# In-memory OCID caching (optional feature)
 moka = { version = "0.12", features = ["future"], optional = true }
+image = { version = "0.25.10", default-features = false, features = ["png", "gif"], optional = true }
 
 [features]
-default = []
-cache = ["moka"]
+default = ["default-tls"]
+default-tls = ["reqwest/default-tls"]
+rustls-tls = ["reqwest/rustls-tls"]
+cache = ["dep:moka"]
+animation = ["dep:image"]
 
 [dev-dependencies]
-tokio = { version = "1.0", features = ["full"] }
+tokio = { version = "1.0", features = ["macros", "rt-multi-thread"] }
 tokio-test = "0.4"
 pretty_assertions = "1.4"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+dotenvy = "0.15"
 
 [lib]
 name = "maplestory_openapi"
@@ -59,3 +72,24 @@ path = "examples/quick_lookup.rs"
 [[example]]
 name = "character_full_info"
 path = "examples/character_full_info.rs"
+
+[[example]]
+name = "inspect_coordination"
+path = "examples/inspect_coordination.rs"
+
+[[example]]
+name = "coordination_lookup"
+path = "examples/coordination_lookup.rs"
+
+[[example]]
+name = "investigate_details"
+path = "examples/investigate_details.rs"
+
+[[example]]
+name = "character_dashboard"
+path = "examples/character_dashboard.rs"
+
+[[example]]
+name = "avatar_animation_gif"
+path = "examples/avatar_animation_gif.rs"
+required-features = ["animation"]

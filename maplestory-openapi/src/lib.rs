@@ -1,15 +1,16 @@
 // src/lib.rs
 //! # MapleStory OpenAPI Rust Client
 //!
-//! A production-quality Rust client library for the [NEXON MapleStory OpenAPI](https://openapi.nexon.com/ko/game/maplestory/).
+//! A production-quality, ergonomic Rust client library for the [NEXON MapleStory OpenAPI](https://openapi.nexon.com/ko/game/maplestory/).
 //!
-//! ## Features
-//! - Full async/await support via `tokio`
-//! - All 25 MapleStory OpenAPI endpoints
-//! - Type-safe request/response models
-//! - One-call nickname lookup (`get_character_by_name`)
-//! - Ergonomic builder pattern for client configuration
-//! - Comprehensive error handling
+//! ## Key Features
+//! - 🚀 **Runtime-agnostic async client** (lightweight dependency footprint)
+//! - ⚡ **One-call nickname lookups** — `get_character_by_name()`, `get_character_stat_by_name()`, etc.
+//! - 👗 **Consolidated Coordination / Fashion (코디/외형 합성)** — `get_character_coordination_by_name()` automatically prioritizes cash equipment over normal items and handles anvil (신비의 모루) shapes.
+//! - 📊 **Aggregated Profile** — `get_character_profile_by_name()` fetches full character stats, equipment, beauty, and dojang in one parallel call.
+//! - ⚔️ **Domain Helpers** — `stat.combat_power()`, `stat.boss_damage()`, `equip.weapon()`, `equip.hat()`, etc.
+//! - ⚡ **In-memory OCID Caching** — Optional `cache` feature powered by `moka` to reduce API round-trips and preserve rate limits.
+//! - 🔒 **Type-safe models** covering all 25 MapleStory OpenAPI endpoints.
 //!
 //! ## Quick Start
 //!
@@ -18,24 +19,47 @@
 //!
 //! #[tokio::main]
 //! async fn main() -> Result<(), Box<dyn std::error::Error>> {
-//!     let client = MapleStoryClient::builder()
-//!         .api_key("YOUR_API_KEY")
-//!         .build()?;
+//!     // 1. Initialize client using NEXON_API_KEY environment variable
+//!     let client = MapleStoryClient::from_env()?;
 //!
-//!     // One-call lookup by character name
-//!     let basic = client.get_character_by_name("캐릭터명").await?;
-//!     println!("World: {:?}", basic.world_name);
+//!     // 2. One-call lookup by character nickname
+//!     let basic = client.get_character_by_name("온앤온").await?;
+//!     println!("이름: {}", basic.character_name.as_deref().unwrap_or("?"));
+//!     println!("직업: {}", basic.character_class.as_deref().unwrap_or("?"));
+//!     println!("레벨: Lv.{}", basic.character_level.unwrap_or(0));
+//!
+//!     // 3. Direct stat lookup with domain helpers
+//!     let stat = client.get_character_stat_by_name("온앤온").await?;
+//!     println!("전투력: {:?}", stat.combat_power());
+//!
+//!     // 4. One-call coordination (코디/외형) lookup
+//!     let look = client.get_character_coordination_by_name("온앤온").await?;
+//!     for item in &look.visible_items {
+//!         println!("[{}] {} (캐시 여부: {})", item.slot, item.name, item.is_cash);
+//!     }
 //!
 //!     Ok(())
 //! }
 //! ```
 
+pub mod avatar;
 pub mod client;
 pub mod error;
 pub mod models;
 
-// Re-export commonly used types at crate root
+pub use avatar::{
+    AnimationFrame, AnimationPreset, AvatarAction, AvatarCode, AvatarEmotion, AvatarLookQuery,
+    WeaponMotion,
+};
+#[cfg(feature = "animation")]
+pub use avatar::encode_animated_gif;
 pub use client::{MapleStoryClient, MapleStoryClientBuilder};
 pub use error::{MapleStoryError, Result};
-pub use models::character::CharacterBasic;
+pub use models::character::{
+    CharacterAppearance, CharacterBasic, CharacterBeautyEquipment, CharacterCashItemEquipment,
+    CharacterCoordination, CharacterDashboard, CharacterDojang, CharacterItemEquipment,
+    CharacterOcid, CharacterPopularity, CharacterProfile, CharacterStat, VisibleEquipItem,
+};
 pub use models::common::SkillGrade;
+pub use models::guild::{GuildBasic, GuildId, GuildSkill};
+pub use models::union::{UserUnion, UserUnionArtifact, UserUnionRaider};
