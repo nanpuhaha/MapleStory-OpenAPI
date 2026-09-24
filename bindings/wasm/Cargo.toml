@@ -1,0 +1,15 @@
+[package]
+name = "maplestory-openapi-wasm"
+version = "0.1.0"
+edition = "2021"
+description = "WebAssembly bindings for NEXON MapleStory avatar and look rendering"
+license = "MIT"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+wasm-bindgen = "0.2"
+serde = { version = "1.0", features = ["derive"] }
+serde-wasm-bindgen = "0.6"
+maplestory-openapi = { path = "../../maplestory-openapi", default-features = false }

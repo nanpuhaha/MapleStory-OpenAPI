@@ -26,3 +26,12 @@ output_gifs/
 *.gif
 .omx/
 curma_avatar.js
+
+# Node.js & Python build artifacts
+node_modules/
+**/node_modules/
+*.node
+*.whl
+*.egg-info/
+__pycache__/
+**/__pycache__/

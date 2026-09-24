@@ -1,0 +1,21 @@
+[build-system]
+requires = ["maturin>=1.5,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "maplestory-openapi"
+version = "0.1.0"
+description = "High-performance Python bindings for NEXON MapleStory OpenAPI, powered by Rust"
+readme = "README.md"
+requires-python = ">=3.8"
+keywords = ["maplestory", "nexon", "openapi", "rust", "game"]
+classifiers = [
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Python :: 3",
+    "Topic :: Games/Entertainment",
+]
+
+[tool.maturin]
+features = ["pyo3/extension-module"]
+module-name = "maplestory_openapi"

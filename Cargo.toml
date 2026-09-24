@@ -1,5 +1,8 @@
 [workspace]
 members = [
     "maplestory-openapi",
+    "bindings/python",
+    "bindings/nodejs",
+    "bindings/wasm",
 ]
 resolver = "2"

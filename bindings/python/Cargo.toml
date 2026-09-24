@@ -1,0 +1,19 @@
+[package]
+name = "maplestory-openapi-python"
+version = "0.1.0"
+edition = "2021"
+description = "Official Python bindings for NEXON MapleStory OpenAPI Rust client"
+readme = "README.md"
+license = "MIT"
+
+[lib]
+name = "maplestory_openapi"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.22", features = ["extension-module", "abi3-py38"] }
+pyo3-async-runtimes = { version = "0.22", features = ["tokio-runtime"] }
+tokio = { version = "1", features = ["full"] }
+serde_json = "1.0"
+pythonize = "0.22"
+maplestory_core = { package = "maplestory-openapi", path = "../../maplestory-openapi", features = ["animation", "cache"] }

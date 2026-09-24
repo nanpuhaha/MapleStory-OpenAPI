@@ -1,0 +1,18 @@
+[package]
+name = "maplestory-openapi-nodejs"
+version = "0.1.0"
+edition = "2021"
+description = "Node.js bindings for NEXON MapleStory OpenAPI via napi-rs"
+license = "MIT"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+napi = { version = "2", default-features = false, features = ["async", "napi4", "tokio_rt", "serde-json"] }
+napi-derive = "2"
+serde_json = "1.0"
+maplestory-openapi = { path = "../../maplestory-openapi", features = ["animation", "cache"] }
+
+[build-dependencies]
+napi-build = "2"
