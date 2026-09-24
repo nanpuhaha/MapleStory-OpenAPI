@@ -2,13 +2,49 @@
 
 [![Crates.io](https://img.shields.io/crates/v/maplestory-openapi.svg)](https://crates.io/crates/maplestory-openapi)
 [![Docs.rs](https://docs.rs/maplestory-openapi/badge.svg)](https://docs.rs/maplestory-openapi)
-[![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE)
+[![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE-MIT)
 [![CI](https://github.com/yourusername/maplestory-openapi-rust/actions/workflows/ci.yml/badge.svg)](https://github.com/yourusername/maplestory-openapi-rust/actions)
 
-[NEXON MapleStory OpenAPI](https://openapi.nexon.com/ko/game/maplestory/)의 고성능·인체공학적(Ergonomic) Rust 클라이언트 라이브러리입니다.  
-공식 OpenAPI YAML 스펙을 완벽하게 준수하면서도, 실제 메이플스토리 전적 검색 사이트·디스코드 봇·데이터 분석 도구를 개발할 때 필요한 **실무 편의 기능(코디/외형 합성, 전투력 도메인 헬퍼, 자동 캐싱, 원클릭 프로필 등)**을 강력하게 지원합니다.
+[NEXON MapleStory OpenAPI](https://openapi.nexon.com/ko/game/maplestory/)의 고성능·인체공학적(Ergonomic) Rust 클라이언트 라이브러리이자 **다국어 네이티브 SDK 코어(Python, Node.js, C#, Go, WASM, 모바일)**입니다.  
+공식 OpenAPI 스펙을 100% 준수하면서도, 실제 메이플스토리 전적 검색 사이트·디스코드 봇·데이터 분석 도구를 개발할 때 필요한 **실무 편의 기능(코디/외형 자동 합성, 전투력 도메인 헬퍼, 인메모리 캐시, 올인원 전적 대시보드, 아바타 모션 GIF 생성)**을 강력하게 지원합니다.
 
-> 🔑 **API Key 발급**: [NEXON Developers](https://openapi.nexon.com/)에서 손쉽게 발급받을 수 있습니다.
+> 🔑 **API Key 발급**: [NEXON Developers](https://openapi.nexon.com/)에서 손쉽게 발급받을 수 있습니다.  
+> 📖 **빠른 링크**: [📚 공식 기술 문서 전체 보기](docs/README.md) | [🤖 디스코드 봇 레시피](docs/recipes-and-examples.md) | [❓ FAQ & 트러블슈팅](docs/error-handling-and-faq.md) | [🤝 기여 가이드](CONTRIBUTING.md)
+
+---
+
+## 💡 왜 이 라이브러리를 써야 할까요? (Why This Library?)
+
+넥슨 공식 API를 직접 HTTP fetch로 호출할 때 겪게 되는 수많은 번거로움과 기술적 난관들을 완벽하게 해결했습니다:
+
+| 구분 | 넥슨 OpenAPI 직접 호출 (Raw REST) | `maplestory-openapi` 사용 시 |
+|---|---|---|
+| **캐릭터 조회** | 닉네임 -> `GET /id` -> `ocid` 추출 -> 본 API 호출 (최소 2-Step) | `get_character_by_name("온앤온")` **단 1줄 호출** |
+| **전적 대시보드** | 스펙, 장비, 유니온, 길드 등 20개 엔드포인트 수동 병합 (수백 줄 코드) | `get_character_dashboard_by_name()` **단 1줄 병렬 자동 취합** |
+| **코디 / 외형** | 뷰티, 캐시장비, 일반장비 파편화 / 모루, 프리즘, 한벌옷 계산 불가 | `CharacterCoordination` **인게임 렌더링 규칙 100% 자동 합성** |
+| **아바타 렌더러** | 정적 PNG 이미지 URL만 제공 | 걷기/윙크/점프 **무손실 투명 배경 애니메이션 GIF 자동 인코딩** |
+| **API 호출 한도** | 동일 캐릭터 반복 조회 시 초당 한도(Rate Limit 429) 초과 빈번 | `moka` 기반 **인메모리 OCID 캐시로 트래픽 50% 절감 (0ms)** |
+| **언어 지원** | 언어마다 직접 모델링 및 HTTP 클라이언트 구현 필요 | **Python, Node.js, C#, Go, WASM, iOS, Android 공식 SDK 제공** |
+
+---
+
+## 📑 목차 (Table of Contents)
+- [🌟 핵심 특징 (Key Highlights)](#-핵심-특징-key-highlights)
+- [🌐 다국어 지원 생태계 (Multi-Language Ecosystem)](#-다국어-지원-생태계-multi-language-ecosystem)
+- [📦 Rust 크레이트 설치 (Rust Installation)](#-rust-크레이트-설치-rust-installation)
+- [🚀 빠른 시작 (Quick Start)](#-빠른-시작-quick-start)
+  - [1. 환경 변수로부터 클라이언트 생성](#1-환경-변수로부터-클라이언트-생성-from_env)
+  - [2. 코디/외형(Coordination) 정보 조회](#2-코디외형coordination-정보-조회)
+  - [3. 전투력 및 주요 스탯 헬퍼 활용](#3-전투력-및-주요-스탯-헬퍼-활용)
+  - [4. 원스톱 종합 프로필 조회](#4-원스톱-종합-프로필-get_character_profile_by_name)
+  - [5. 🏆 상용 전적 서비스 올인원 대시보드](#5--상용-전적-서비스-수준의-올인원-대시보드-get_character_dashboard_by_name)
+- [🛠 에러 처리 및 트러블슈팅](#-정밀한-에러-처리-error-handling)
+- [💡 넥슨 OpenAPI 실무 팁 & FAQ](#-넥슨-openapi-실무-주의사항-및-팁-gotchas)
+- [📋 지원 API 전체 목록](#-지원-api-전체-목록)
+- [🏃 예제 실행](#-예제-실행)
+  - [🎬 아바타 애니메이션 GIF 생성](#-아바타-애니메이션-gif-생성-animation-기능)
+- [💻 언어별 빠른 시작 (Python, Node.js, C#, Go, WASM, 모바일)](#-언어별-빠른-시작-multi-language-quick-starts)
+- [🤝 기여 가이드 및 라이선스](#-기여-가이드-contributing)
 
 ---
 
@@ -430,8 +466,13 @@ from maplestory_openapi import MapleStoryClient
 
 async def main():
     client = MapleStoryClient.from_env()
-    dash = await client.get_character_dashboard_by_name("온앤온")
-    print(f"닉네임: {dash['name']}, 전투력: {dash['combat_power']:,}")
+    dash = await client.get_character_dashboard("온앤온")
+    print(f"닉네임: {dash['basic']['character_name']}, 레벨: Lv.{dash['basic']['character_level']}")
+
+    # 걷기 애니메이션 GIF 생성
+    gif_bytes = await client.render_character_gif("온앤온", preset="walk", width=128, height=128)
+    with open("walk.gif", "wb") as f:
+        f.write(gif_bytes)
 
 asyncio.run(main())
 ```
@@ -443,10 +484,15 @@ asyncio.run(main())
 
 ```typescript
 import { MapleStoryClient } from 'maplestory-openapi';
+import * as fs from 'fs';
 
 const client = MapleStoryClient.fromEnv();
-const dash = await client.getCharacterDashboardByName("온앤온");
-console.log(`닉네임: ${dash.name}, 전투력: ${dash.combat_power.toLocaleString()}`);
+const dash = await client.getCharacterDashboard("온앤온");
+console.log(`닉네임: ${dash.basic.character_name}, 레벨: Lv.${dash.basic.character_level}`);
+
+// 걷기 애니메이션 GIF 생성 (Buffer 반환)
+const gifBuffer = await client.renderCharacterGif("온앤온", "walk", 128, 128);
+fs.writeFileSync("walk.gif", gifBuffer);
 ```
 자세한 빌드 및 사용법: [`bindings/nodejs/README.md`](./bindings/nodejs)
 </details>
@@ -458,8 +504,12 @@ console.log(`닉네임: ${dash.name}, 전투력: ${dash.combat_power.toLocaleStr
 using MapleStory.OpenApi;
 
 using var client = MapleStoryClient.FromEnv();
-var dash = client.GetCharacterDashboardByName("온앤온");
-Console.WriteLine($"닉네임: {dash.Name}, 전투력: {dash.CombatPower:N0}");
+string dashJson = await client.GetCharacterDashboardAsync("온앤온");
+Console.WriteLine(dashJson);
+
+// 걷기 애니메이션 GIF 생성
+byte[] gifBytes = await client.RenderCharacterGifAsync("온앤온", "walk", 128, 128);
+File.WriteAllBytes("walk.gif", gifBytes);
 ```
 자세한 빌드 및 사용법: [`bindings/dotnet/README.md`](./bindings/dotnet)
 </details>
@@ -472,14 +522,19 @@ package main
 
 import (
     "fmt"
+    "os"
     "maplestory-openapi/bindings/go"
 )
 
 func main() {
     client, _ := maplestory.FromEnv()
     defer client.Close()
-    dash, _ := client.GetCharacterDashboardByName("온앤온")
-    fmt.Printf("닉네임: %s, 전투력: %d\n", dash.Name, dash.CombatPower)
+
+    dashJson, _ := client.GetCharacterDashboard("온앤온")
+    fmt.Println(dashJson)
+
+    gifBytes, _ := client.RenderCharacterGif("온앤온", "walk", 128, 128)
+    os.WriteFile("walk.gif", gifBytes, 0644)
 }
 ```
 자세한 빌드 및 사용법: [`bindings/go/README.md`](./bindings/go)
@@ -507,7 +562,16 @@ const walkingUrl = buildAvatarUrl(parsed.code, "walk", 1, "smile", 1, "default")
 
 ---
 
+## 🤝 기여 가이드 (Contributing)
+
+버그 리포트, 새로운 기능 제안, 문서 보강 등 모든 기여를 환영합니다!  
+로컬 개발 환경 설정, 커밋 컨벤션, PR 제출 방법은 [CONTRIBUTING.md](CONTRIBUTING.md)를 참고해 주세요.
+
+---
+
 ## 📜 라이선스 (License)
 
 이 프로젝트는 [MIT License](LICENSE-MIT) 또는 [Apache License 2.0](LICENSE-APACHE) 듀얼 라이선스로 배포됩니다.
+공식 문서 및 가이드는 [docs/README.md](docs/README.md)에서 확인하실 수 있습니다.
+
 
