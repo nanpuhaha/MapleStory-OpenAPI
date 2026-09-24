@@ -19,3 +19,10 @@ reference_impl/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Generated outputs & temp artifacts
+output_gifs/
+**/output_gifs/
+*.gif
+.omx/
+curma_avatar.js
