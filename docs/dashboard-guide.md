@@ -1,4 +1,4 @@
-# 올인원 캐릭터 종합 스펙 대시보드 가이드 (CharacterDashboard)
+# 올인원 캐릭터 종합 대시보드 가이드 (CharacterDashboard)
 
 ## 1. 메이플 정보/스펙 분석 서비스 벤치마킹 설계
 

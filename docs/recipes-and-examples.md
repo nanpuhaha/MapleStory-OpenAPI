@@ -4,9 +4,9 @@
 
 ---
 
-## 🤖 레시피 1: 캐릭터 스펙 조회 디스코드 봇 (Discord Bot)
+## 🤖 레시피 1: 캐릭터 정보 조회 디스코드 봇 (Discord Bot)
 
-유저가 `/스펙 온앤온`을 입력하면 캐릭터의 레벨, 직업, 전투력, 유니온, 길드, 코디 룩을 화려한 디스코드 임베드로 전송합니다.
+유저가 `/정보 온앤온`을 입력하면 캐릭터의 레벨, 직업, 전투력, 유니온, 길드, 코디 룩을 화려한 디스코드 임베드로 전송합니다.
 
 ### 🐍 Python (`discord.py`)
 ```python
@@ -19,7 +19,7 @@ intents = discord.Intents.default()
 bot = commands.Bot(command_prefix="!", intents=intents)
 maple = MapleStoryClient(os.environ["NEXON_API_KEY"])
 
-@bot.tree.command(name="스펙", description="메이플스토리 캐릭터 종합 스펙 정보를 조회합니다.")
+@bot.tree.command(name="정보", description="메이플스토리 캐릭터 종합 정보를 조회합니다.")
 async def lookup(interaction: discord.Interaction, 닉네임: str):
     await interaction.response.defer()
     
@@ -60,7 +60,7 @@ const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 const maple = MapleStoryClient.fromEnv();
 
 client.on('interactionCreate', async (interaction) => {
-  if (!interaction.isChatInputCommand() || interaction.commandName !== '스펙') return;
+  if (!interaction.isChatInputCommand() || interaction.commandName !== '정보') return;
 
   const characterName = interaction.options.getString('닉네임', true);
   await interaction.deferReply();

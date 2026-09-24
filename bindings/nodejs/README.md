@@ -17,7 +17,7 @@ import * as fs from 'fs';
 async function main() {
   const client = new MapleStoryClient(process.env.NEXON_API_KEY!);
 
-  // 1. 올인원 종합 스펙 대시보드 조회
+  // 1. 올인원 종합 대시보드 조회
   const dash = await client.getCharacterDashboard('온앤온');
   console.log(`이름: ${dash.basic.character_name}`);
   console.log(`전투력: ${dash.stat.combat_power}`);
