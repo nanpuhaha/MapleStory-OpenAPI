@@ -41,10 +41,29 @@
 - 🪶 **가벼운 의존성 발자국**: 라이브러리 레벨의 불필요한 `tokio` 런타임 강제를 제거하여, 초경량 컴파일 및 런타임-애그노스틱 비동기 환경 지원.
 - 💾 **인메모리 OCID 캐싱 (`cache` feature)**: `moka` 기반의 고성능 LRU+TTL 캐시 탑재. 거의 불변인 `닉네임 -> OCID` 매핑을 캐싱하여 API 호출 횟수를 절반으로 절약하고 레이트 리밋을 방어.
 - 🔒 **타입 안전성**: 넥슨 공식 엔드포인트 전체에 대한 엄격한 모델링 및 상세한 에러 핸들링.
+- 🌐 **다국어 네이티브 바인딩 완비**: Rust 코어 엔진을 기반으로 Python, Node.js/TypeScript, C# .NET, Go, WebAssembly, 모바일(iOS/Android)까지 100% 동일한 기능 지원.
 
 ---
 
-## 📦 설치 (Installation)
+## 🌐 다국어 지원 생태계 (Multi-Language Ecosystem)
+
+Rust의 압도적인 성능과 메모리 안전성을 모든 언어 환경에서 누리실 수 있도록 공식 네이티브 바인딩을 제공합니다.
+
+| 언어 / 플랫폼 | 기술 스택 | 경로 | 설명 |
+|---|---|---|---|
+| **Rust** | 네이티브 크레이트 | [`maplestory-openapi`](./maplestory-openapi) | 공식 고성능 코어 엔진 |
+| **Python** | PyO3 + Maturin | [`bindings/python`](./bindings/python) | 데이터 분석, 머신러닝, Discord.py 봇 연동 |
+| **Node.js / TS** | napi-rs | [`bindings/nodejs`](./bindings/nodejs) | 백엔드(NestJS/Express), Next.js, Discord.js 봇 |
+| **WebAssembly** | wasm-bindgen | [`bindings/wasm`](./bindings/wasm) | 웹 브라우저 클라이언트, Cloudflare Workers |
+| **C# / .NET** | P/Invoke (.NET 8+) | [`bindings/dotnet`](./bindings/dotnet) | Unity 게임 클라이언트, ASP.NET Core 백엔드 |
+| **Go** | cgo | [`bindings/go`](./bindings/go) | 대규모 트래픽 마이크로서비스, Gin/Fiber API 서버 |
+| **iOS (Swift)** | C-ABI Native FFI | [`bindings/mobile/ios`](./bindings/mobile) | Swift Package Manager / iOS 네이티브 앱 |
+| **Android (Kotlin)** | JNI Native FFI | [`bindings/mobile/android`](./bindings/mobile) | Android NDK / Kotlin 네이티브 앱 |
+| **C / C++** | C-ABI Dynamic Lib | [`bindings/c`](./bindings/c) | C 헤더(`maplestory_openapi.h`) 및 `.dll`/`.so` |
+
+---
+
+## 📦 Rust 크레이트 설치 (Rust Installation)
 
 `Cargo.toml`에 추가:
 
@@ -400,6 +419,95 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ---
 
+## 💻 언어별 빠른 시작 (Multi-Language Quick Starts)
+
+<details>
+<summary><b>🐍 Python</b> (자세히 보기)</summary>
+
+```python
+import asyncio
+from maplestory_openapi import MapleStoryClient
+
+async def main():
+    client = MapleStoryClient.from_env()
+    dash = await client.get_character_dashboard_by_name("온앤온")
+    print(f"닉네임: {dash['name']}, 전투력: {dash['combat_power']:,}")
+
+asyncio.run(main())
+```
+자세한 빌드 및 사용법: [`bindings/python/README.md`](./bindings/python)
+</details>
+
+<details>
+<summary><b>🟩 Node.js / TypeScript</b> (자세히 보기)</summary>
+
+```typescript
+import { MapleStoryClient } from 'maplestory-openapi';
+
+const client = MapleStoryClient.fromEnv();
+const dash = await client.getCharacterDashboardByName("온앤온");
+console.log(`닉네임: ${dash.name}, 전투력: ${dash.combat_power.toLocaleString()}`);
+```
+자세한 빌드 및 사용법: [`bindings/nodejs/README.md`](./bindings/nodejs)
+</details>
+
+<details>
+<summary><b>🔷 C# (.NET 8+)</b> (자세히 보기)</summary>
+
+```csharp
+using MapleStory.OpenApi;
+
+using var client = MapleStoryClient.FromEnv();
+var dash = client.GetCharacterDashboardByName("온앤온");
+Console.WriteLine($"닉네임: {dash.Name}, 전투력: {dash.CombatPower:N0}");
+```
+자세한 빌드 및 사용법: [`bindings/dotnet/README.md`](./bindings/dotnet)
+</details>
+
+<details>
+<summary><b>🐹 Go</b> (자세히 보기)</summary>
+
+```go
+package main
+
+import (
+    "fmt"
+    "maplestory-openapi/bindings/go"
+)
+
+func main() {
+    client, _ := maplestory.FromEnv()
+    defer client.Close()
+    dash, _ := client.GetCharacterDashboardByName("온앤온")
+    fmt.Printf("닉네임: %s, 전투력: %d\n", dash.Name, dash.CombatPower)
+}
+```
+자세한 빌드 및 사용법: [`bindings/go/README.md`](./bindings/go)
+</details>
+
+<details>
+<summary><b>🌐 WebAssembly / Browser</b> (자세히 보기)</summary>
+
+```javascript
+import init, { decodeAvatarLook, buildAvatarUrl } from './pkg/maplestory_openapi_wasm.js';
+
+await init();
+const parsed = decodeAvatarLook(avatarUrl);
+const walkingUrl = buildAvatarUrl(parsed.code, "walk", 1, "smile", 1, "default");
+```
+자세한 빌드 및 사용법: [`bindings/wasm/README.md`](./bindings/wasm)
+</details>
+
+<details>
+<summary><b>📱 Mobile (iOS Swift / Android Kotlin)</b> (자세히 보기)</summary>
+
+- **iOS Swift**: C-ABI Native FFI를 활용한 고성능 클라이언트 [`bindings/mobile/ios/MapleStoryClient.swift`](./bindings/mobile/ios)
+- **Android Kotlin**: JNI 네이티브 브릿지 클라이언트 [`bindings/mobile/android/MapleStoryClient.kt`](./bindings/mobile/android)
+</details>
+
+---
+
 ## 📜 라이선스 (License)
 
 이 프로젝트는 [MIT License](LICENSE-MIT) 또는 [Apache License 2.0](LICENSE-APACHE) 듀얼 라이선스로 배포됩니다.
+

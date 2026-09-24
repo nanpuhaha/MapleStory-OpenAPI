@@ -1,9 +1,9 @@
-use napi::bindgen_prelude::*;
-use napi_derive::napi;
 use maplestory_openapi::{
     AnimationPreset, AvatarAction, AvatarCode as CoreAvatarCode, AvatarEmotion, AvatarLookQuery,
     MapleStoryClient as CoreClient, WeaponMotion,
 };
+use napi::bindgen_prelude::*;
+use napi_derive::napi;
 use std::sync::Arc;
 
 #[napi(js_name = "MapleStoryClient")]
@@ -15,8 +15,7 @@ pub struct JsMapleStoryClient {
 impl JsMapleStoryClient {
     #[napi(constructor)]
     pub fn new(api_key: String) -> Result<Self> {
-        let client = CoreClient::new(&api_key)
-            .map_err(|e| Error::from_reason(e.to_string()))?;
+        let client = CoreClient::new(&api_key).map_err(|e| Error::from_reason(e.to_string()))?;
         Ok(Self {
             inner: Arc::new(client),
         })
@@ -24,7 +23,10 @@ impl JsMapleStoryClient {
 
     /// Retrieve comprehensive all-in-one character dashboard as a parsed JSON object.
     #[napi]
-    pub async fn get_character_dashboard(&self, character_name: String) -> Result<serde_json::Value> {
+    pub async fn get_character_dashboard(
+        &self,
+        character_name: String,
+    ) -> Result<serde_json::Value> {
         let dash = self
             .inner
             .get_character_dashboard_by_name(&character_name)
@@ -46,7 +48,10 @@ impl JsMapleStoryClient {
 
     /// Retrieve character coordination look with synthesized visible items.
     #[napi]
-    pub async fn get_character_coordination(&self, character_name: String) -> Result<serde_json::Value> {
+    pub async fn get_character_coordination(
+        &self,
+        character_name: String,
+    ) -> Result<serde_json::Value> {
         let look = self
             .inner
             .get_character_coordination_by_name(&character_name)

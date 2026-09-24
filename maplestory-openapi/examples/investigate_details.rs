@@ -19,9 +19,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("\n--- Base Cash Items ---");
     if let Some(items) = &cash.cash_item_equipment_base {
         for it in items {
-            println!("Slot: {:?}, Name: {:?}, Icon: {:?}", it.cash_item_equipment_slot, it.cash_item_name, it.cash_item_icon);
-            if it.cash_item_coloring_prism.is_some() || it.cash_item_coloring_prism_flag.as_deref() == Some("true") {
-                println!("  -> Prism Flag: {:?}, Prism: {:?}", it.cash_item_coloring_prism_flag, it.cash_item_coloring_prism);
+            println!(
+                "Slot: {:?}, Name: {:?}, Icon: {:?}",
+                it.cash_item_equipment_slot, it.cash_item_name, it.cash_item_icon
+            );
+            if it.cash_item_coloring_prism.is_some()
+                || it.cash_item_coloring_prism_flag.as_deref() == Some("true")
+            {
+                println!(
+                    "  -> Prism Flag: {:?}, Prism: {:?}",
+                    it.cash_item_coloring_prism_flag, it.cash_item_coloring_prism
+                );
             }
         }
     }
@@ -29,9 +37,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("\n--- Preset 1 Cash Items ---");
     if let Some(items) = &cash.cash_item_equipment_preset_1 {
         for it in items {
-            println!("Slot: {:?}, Name: {:?}, Icon: {:?}", it.cash_item_equipment_slot, it.cash_item_name, it.cash_item_icon);
-            if it.cash_item_coloring_prism.is_some() || it.cash_item_coloring_prism_flag.as_deref() == Some("true") {
-                println!("  -> Prism Flag: {:?}, Prism: {:?}", it.cash_item_coloring_prism_flag, it.cash_item_coloring_prism);
+            println!(
+                "Slot: {:?}, Name: {:?}, Icon: {:?}",
+                it.cash_item_equipment_slot, it.cash_item_name, it.cash_item_icon
+            );
+            if it.cash_item_coloring_prism.is_some()
+                || it.cash_item_coloring_prism_flag.as_deref() == Some("true")
+            {
+                println!(
+                    "  -> Prism Flag: {:?}, Prism: {:?}",
+                    it.cash_item_coloring_prism_flag, it.cash_item_coloring_prism
+                );
             }
         }
     }
@@ -51,8 +67,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("\n=== Sub Weapon & Gloves in Normal Equipment ===");
     if let Some(items) = &item_eq.item_equipment {
         for it in items {
-            if it.item_equipment_slot.as_deref() == Some("보조무기") || it.item_equipment_slot.as_deref() == Some("장갑") {
-                println!("Slot: {:?}, Part: {:?}, Name: {:?}, Icon: {:?}", it.item_equipment_slot, it.item_equipment_part, it.item_name, it.item_icon);
+            if it.item_equipment_slot.as_deref() == Some("보조무기")
+                || it.item_equipment_slot.as_deref() == Some("장갑")
+            {
+                println!(
+                    "Slot: {:?}, Part: {:?}, Name: {:?}, Icon: {:?}",
+                    it.item_equipment_slot, it.item_equipment_part, it.item_name, it.item_icon
+                );
             }
         }
     }

@@ -112,10 +112,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 "  - 길드마스터: {}",
                 guild.guild_master_name.as_deref().unwrap_or("")
             );
-            println!(
-                "  - 길드원 수: {}명",
-                guild.guild_member_count.unwrap_or(0)
-            );
+            println!("  - 길드원 수: {}명", guild.guild_member_count.unwrap_or(0));
             println!(
                 "  - 노블레스 스킬 총합: {} 포인트",
                 guild.total_noblesse_points()
@@ -137,7 +134,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         // 6. 6차 헥사 매트릭스 & 스탯
         if let Some(hexa) = &dash.hexa_matrix {
-            let core_count = hexa.character_hexa_core_equipment.as_ref().map(|c| c.len()).unwrap_or(0);
+            let core_count = hexa
+                .character_hexa_core_equipment
+                .as_ref()
+                .map(|c| c.len())
+                .unwrap_or(0);
             println!("\n🔮 [6차 전직 헥사 매트릭스]");
             println!("  - 장착 헥사 코어: {}개", core_count);
             if let Some(stat) = &dash.hexa_matrix_stat {
@@ -201,16 +202,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         // 아바타 코드 및 동적 렌더링 URL
         if let Some(code) = dash.avatar_code() {
-            println!("  - 아바타 1024자 코드: {}... (총 {}자)", &code.as_str()[..32], code.as_str().len());
+            println!(
+                "  - 아바타 1024자 코드: {}... (총 {}자)",
+                &code.as_str()[..32],
+                code.as_str().len()
+            );
             println!(
                 "  - [동적 렌더러] 윙크 + 점프 포즈 (96x96):\n    {}",
-                coord.custom_image(
-                    AvatarAction::Jump,
-                    AvatarEmotion::Wink,
-                    WeaponMotion::Default,
-                    96,
-                    96,
-                ).unwrap_or_default()
+                coord
+                    .custom_image(
+                        AvatarAction::Jump,
+                        AvatarEmotion::Wink,
+                        WeaponMotion::Default,
+                        96,
+                        96,
+                    )
+                    .unwrap_or_default()
             );
         }
     }
@@ -221,13 +228,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 fn format_number(val: i64) -> String {
     let s = val.to_string();
     let mut result = String::new();
-    let mut count = 0;
-    for c in s.chars().rev() {
+    for (count, c) in s.chars().rev().enumerate() {
         if count > 0 && count % 3 == 0 {
             result.push(',');
         }
         result.push(c);
-        count += 1;
     }
     result.chars().rev().collect()
 }

@@ -10,10 +10,11 @@ use maplestory_openapi::{MapleStoryClient, SkillGrade};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let api_key = std::env::var("NEXON_API_KEY")
-        .expect("Set NEXON_API_KEY environment variable");
+    let api_key = std::env::var("NEXON_API_KEY").expect("Set NEXON_API_KEY environment variable");
 
-    let character_name = std::env::args().nth(1).unwrap_or_else(|| "캐릭터명".to_string());
+    let character_name = std::env::args()
+        .nth(1)
+        .unwrap_or_else(|| "캐릭터명".to_string());
 
     let client = MapleStoryClient::new(api_key)?;
 
@@ -39,8 +40,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("  월드   : {}", b.world_name.as_deref().unwrap_or("?"));
         println!("  직업   : {}", b.character_class.as_deref().unwrap_or("?"));
         println!("  레벨   : Lv.{}", b.character_level.unwrap_or(0));
-        println!("  경험치 : {}%", b.character_exp_rate.as_deref().unwrap_or("?"));
-        println!("  길드   : {}", b.character_guild_name.as_deref().unwrap_or("(없음)"));
+        println!(
+            "  경험치 : {}%",
+            b.character_exp_rate.as_deref().unwrap_or("?")
+        );
+        println!(
+            "  길드   : {}",
+            b.character_guild_name.as_deref().unwrap_or("(없음)")
+        );
     }
 
     // ─── Popularity ───────────────────────────────────────────────────────────
@@ -84,7 +91,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // ─── 5th job skills (sequential example) ─────────────────────────────────
     println!("\n=== 5차 스킬 ===");
-    match client.get_character_skill(&ocid, SkillGrade::Fifth, None).await {
+    match client
+        .get_character_skill(&ocid, SkillGrade::Fifth, None)
+        .await
+    {
         Ok(skills) => {
             if let Some(list) = skills.character_skill {
                 for skill in list.iter().take(5) {

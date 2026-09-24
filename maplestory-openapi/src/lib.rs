@@ -47,12 +47,12 @@ pub mod client;
 pub mod error;
 pub mod models;
 
+#[cfg(feature = "animation")]
+pub use avatar::encode_animated_gif;
 pub use avatar::{
     AnimationFrame, AnimationPreset, AvatarAction, AvatarCode, AvatarEmotion, AvatarLookQuery,
     WeaponMotion,
 };
-#[cfg(feature = "animation")]
-pub use avatar::encode_animated_gif;
 pub use client::{MapleStoryClient, MapleStoryClientBuilder};
 pub use error::{MapleStoryError, Result};
 pub use models::character::{

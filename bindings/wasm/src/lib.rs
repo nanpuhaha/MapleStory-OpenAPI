@@ -1,9 +1,9 @@
-use wasm_bindgen::prelude::*;
 use maplestory_openapi::{
     AnimationPreset, AvatarAction, AvatarCode as CoreAvatarCode, AvatarEmotion, AvatarLookQuery,
     WeaponMotion,
 };
 use serde::{Deserialize, Serialize};
+use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
 pub struct WasmAvatarCode {

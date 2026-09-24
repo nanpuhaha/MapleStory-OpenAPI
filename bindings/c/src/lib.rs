@@ -1,3 +1,5 @@
+#![allow(clippy::missing_safety_doc)]
+
 use maplestory_openapi::{
     AnimationPreset, AvatarAction, AvatarCode, AvatarEmotion, AvatarLookQuery, MapleStoryClient,
     WeaponMotion,
@@ -80,9 +82,9 @@ pub unsafe extern "C" fn maplestory_get_character_dashboard(
     };
 
     let h = &*handle;
-    let res = h.runtime.block_on(async {
-        h.client.get_character_dashboard_by_name(name).await
-    });
+    let res = h
+        .runtime
+        .block_on(async { h.client.get_character_dashboard_by_name(name).await });
 
     match res {
         Ok(dash) => match serde_json::to_string(&dash) {
@@ -123,10 +125,7 @@ pub unsafe extern "C" fn maplestory_render_character_gif(
     let preset_str = if preset.is_null() {
         "walk"
     } else {
-        match CStr::from_ptr(preset).to_str() {
-            Ok(s) => s,
-            Err(_) => "walk",
-        }
+        CStr::from_ptr(preset).to_str().unwrap_or("walk")
     };
 
     let anim_preset = match preset_str.to_lowercase().as_str() {

@@ -32,7 +32,8 @@ fn test_character_basic_deserialization() {
         "liberation_quest_clear_flag": "true"
     }"#;
 
-    let basic: CharacterBasic = serde_json::from_str(json_data).expect("failed to deserialize basic");
+    let basic: CharacterBasic =
+        serde_json::from_str(json_data).expect("failed to deserialize basic");
     assert_eq!(basic.character_name.as_deref(), Some("아델"));
     assert_eq!(basic.character_level, Some(260));
     assert_eq!(basic.world_name.as_deref(), Some("스카니아"));
@@ -83,7 +84,8 @@ fn test_character_item_equipment_deserialization() {
         ]
     }"#;
 
-    let equip: CharacterItemEquipment = serde_json::from_str(json_data).expect("failed to deserialize equip");
+    let equip: CharacterItemEquipment =
+        serde_json::from_str(json_data).expect("failed to deserialize equip");
     assert_eq!(equip.preset_no, Some(1));
     let items = equip.item_equipment.expect("missing items");
     assert_eq!(items.len(), 1);
@@ -111,7 +113,8 @@ fn test_character_list_deserialization() {
         ]
     }"#;
 
-    let list: CharacterList = serde_json::from_str(json_data).expect("failed to deserialize character list");
+    let list: CharacterList =
+        serde_json::from_str(json_data).expect("failed to deserialize character list");
     let accounts = list.account_list.unwrap();
     assert_eq!(accounts.len(), 1);
     let chars = accounts[0].character_list.as_ref().unwrap();

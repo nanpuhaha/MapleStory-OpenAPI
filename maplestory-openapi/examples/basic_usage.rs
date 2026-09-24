@@ -33,9 +33,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("\n=== Character Basic Info ===");
     println!("Name  : {}", basic.character_name.as_deref().unwrap_or("?"));
     println!("World : {}", basic.world_name.as_deref().unwrap_or("?"));
-    println!("Class : {}", basic.character_class.as_deref().unwrap_or("?"));
+    println!(
+        "Class : {}",
+        basic.character_class.as_deref().unwrap_or("?")
+    );
     println!("Level : {}", basic.character_level.unwrap_or(0));
-    println!("Guild : {}", basic.character_guild_name.as_deref().unwrap_or("(없음)"));
+    println!(
+        "Guild : {}",
+        basic.character_guild_name.as_deref().unwrap_or("(없음)")
+    );
 
     Ok(())
 }

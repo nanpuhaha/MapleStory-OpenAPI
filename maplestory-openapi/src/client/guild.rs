@@ -31,7 +31,12 @@ impl MapleStoryClient {
             ("world_name", world_name.to_string()),
         ];
         let result: GuildId = self.get("/maplestory/v1/guild/id", &params).await?;
-        if result.oguild_id.as_deref().map(|s| s.is_empty()).unwrap_or(true) {
+        if result
+            .oguild_id
+            .as_deref()
+            .map(|s| s.is_empty())
+            .unwrap_or(true)
+        {
             return Err(MapleStoryError::InvalidParameter(format!(
                 "Guild '{}' not found in world '{}'",
                 guild_name, world_name

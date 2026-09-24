@@ -68,7 +68,10 @@ async fn test_live_lookup_and_coordination_for_target_characters() {
             println!("    Skin: {:?}", skin.skin_name);
         }
 
-        println!("  [Visible Items ({} slots)]", coordination.visible_items.len());
+        println!(
+            "  [Visible Items ({} slots)]",
+            coordination.visible_items.len()
+        );
         assert!(
             !coordination.visible_items.is_empty(),
             "character should have visible equipment"
@@ -111,13 +114,15 @@ async fn test_live_lookup_and_coordination_for_target_characters() {
             assert!(dash.authentic_force() > 0);
             assert!(dash.dojang_best_floor().is_some());
             assert!(dash.avatar_code().is_some());
-            println!("  Dashboard verified for 온앤온: CP={}, Guild={}, Noblesse={}p",
+            println!(
+                "  Dashboard verified for 온앤온: CP={}, Guild={}, Noblesse={}p",
                 dash.combat_power(),
                 dash.guild_name().unwrap_or(""),
                 dash.noblesse_skill_points()
             );
         } else {
-            println!("  Dashboard verified for {}: CP={}, Union Lv={:?}",
+            println!(
+                "  Dashboard verified for {}: CP={}, Union Lv={:?}",
                 name,
                 dash.combat_power(),
                 dash.union_level()

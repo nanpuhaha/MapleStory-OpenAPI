@@ -15,17 +15,14 @@ use std::path::Path;
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let _ = dotenvy::dotenv();
 
-    let character_name = env::args()
-        .nth(1)
-        .unwrap_or_else(|| "온앤온".to_string());
+    let character_name = env::args().nth(1).unwrap_or_else(|| "온앤온".to_string());
 
     println!("========================================================");
     println!(" [메이플스토리 아바타 애니메이션 GIF 생성기]");
     println!(" 대상 캐릭터: {}", character_name);
     println!("========================================================");
 
-    let client = MapleStoryClient::from_env()
-        .or_else(|_| MapleStoryClient::new("test"))?;
+    let client = MapleStoryClient::from_env().or_else(|_| MapleStoryClient::new("test"))?;
 
     let presets = [
         ("walk", AnimationPreset::Walk),
@@ -40,8 +37,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     for (name, preset) in presets {
-        println!("\n>> [{}] 애니메이션 렌더링 중... (프레임 수: {})", name, preset.frames().len());
-        
+        println!(
+            "\n>> [{}] 애니메이션 렌더링 중... (프레임 수: {})",
+            name,
+            preset.frames().len()
+        );
+
         let start = std::time::Instant::now();
         let gif_bytes = client
             .render_character_gif_by_name(&character_name, &preset, Some(128), Some(128))

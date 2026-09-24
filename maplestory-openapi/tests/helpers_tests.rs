@@ -636,10 +636,16 @@ fn test_transparent_equipment_and_invisible_sub_weapon() {
     assert_eq!(gloves.name, "투명 장갑");
     assert!(gloves.is_cash);
     assert!(gloves.is_transparent);
-    assert!(!gloves.is_visually_rendered(), "transparent gloves are visually hidden");
+    assert!(
+        !gloves.is_visually_rendered(),
+        "transparent gloves are visually hidden"
+    );
 
     // Sub weapon: Spellbook (마도서) is in inventory, but not visually rendered on sprite
     let sub = coord.sub_weapon().expect("sub weapon must exist");
     assert_eq!(sub.name, "청은의 서 <종장>");
-    assert!(!sub.is_visually_rendered(), "spellbooks are not visually rendered on sprites");
+    assert!(
+        !sub.is_visually_rendered(),
+        "spellbooks are not visually rendered on sprites"
+    );
 }

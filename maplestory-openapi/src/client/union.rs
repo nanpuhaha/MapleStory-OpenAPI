@@ -73,7 +73,8 @@ impl MapleStoryClient {
         if let Some(d) = date {
             params.push(("date", Self::validate_date(d)?));
         }
-        self.get("/maplestory/v1/user/union-artifact", &params).await
+        self.get("/maplestory/v1/user/union-artifact", &params)
+            .await
     }
 
     /// Retrieve Union Artifact information directly by character name.

@@ -1,9 +1,11 @@
-use pyo3::prelude::*;
-use pyo3::types::PyBytes;
+#![allow(clippy::useless_conversion)]
+
 use maplestory_core::{
     AnimationPreset, AvatarAction, AvatarCode as CoreAvatarCode, AvatarEmotion, AvatarLookQuery,
     MapleStoryClient as CoreClient, WeaponMotion,
 };
+use pyo3::prelude::*;
+use pyo3::types::PyBytes;
 use pythonize::pythonize;
 use std::sync::Arc;
 
@@ -48,7 +50,7 @@ impl PyMapleStoryClient {
                 .get_character_dashboard_by_name(&character_name)
                 .await
                 .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))?;
-            
+
             Python::with_gil(|py| {
                 pythonize(py, &dash)
                     .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
@@ -69,7 +71,7 @@ impl PyMapleStoryClient {
                 .get_character_by_name(&character_name)
                 .await
                 .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))?;
-            
+
             Python::with_gil(|py| {
                 pythonize(py, &basic)
                     .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
@@ -90,7 +92,7 @@ impl PyMapleStoryClient {
                 .get_character_coordination_by_name(&character_name)
                 .await
                 .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))?;
-            
+
             Python::with_gil(|py| {
                 pythonize(py, &look)
                     .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
@@ -133,7 +135,7 @@ impl PyMapleStoryClient {
                 .render_character_gif_by_name(&character_name, &anim_preset, Some(w), Some(h))
                 .await
                 .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))?;
-            
+
             Python::with_gil(|py| Ok(PyBytes::new_bound(py, &gif_bytes).into_any().unbind()))
         })
     }

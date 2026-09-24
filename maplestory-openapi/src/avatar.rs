@@ -99,6 +99,7 @@ impl AvatarCode {
     ///
     /// Each character 'A'..='P' represents a 4-bit nibble (0..15).
     /// Two consecutive characters form 1 byte (high nibble first).
+    #[allow(clippy::chunks_exact_to_as_chunks)]
     pub fn to_bytes(&self) -> Vec<u8> {
         let nibbles: Vec<u8> = self.0.bytes().map(|b| b - b'A').collect();
         let mut bytes = Vec::with_capacity(nibbles.len() / 2);
@@ -360,38 +361,114 @@ impl AnimationPreset {
     pub fn frames(&self) -> Vec<AnimationFrame> {
         match self {
             Self::Stand => vec![
-                AnimationFrame { action: AvatarAction::Stand1, emotion: AvatarEmotion::Default, wmotion: WeaponMotion::Default, delay_ms: 500 },
-                AnimationFrame { action: AvatarAction::Stand2, emotion: AvatarEmotion::Default, wmotion: WeaponMotion::Default, delay_ms: 500 },
+                AnimationFrame {
+                    action: AvatarAction::Stand1,
+                    emotion: AvatarEmotion::Default,
+                    wmotion: WeaponMotion::Default,
+                    delay_ms: 500,
+                },
+                AnimationFrame {
+                    action: AvatarAction::Stand2,
+                    emotion: AvatarEmotion::Default,
+                    wmotion: WeaponMotion::Default,
+                    delay_ms: 500,
+                },
             ],
             Self::Walk => vec![
-                AnimationFrame { action: AvatarAction::Walk1, emotion: AvatarEmotion::Default, wmotion: WeaponMotion::Default, delay_ms: 250 },
-                AnimationFrame { action: AvatarAction::Walk2, emotion: AvatarEmotion::Default, wmotion: WeaponMotion::Default, delay_ms: 250 },
+                AnimationFrame {
+                    action: AvatarAction::Walk1,
+                    emotion: AvatarEmotion::Default,
+                    wmotion: WeaponMotion::Default,
+                    delay_ms: 250,
+                },
+                AnimationFrame {
+                    action: AvatarAction::Walk2,
+                    emotion: AvatarEmotion::Default,
+                    wmotion: WeaponMotion::Default,
+                    delay_ms: 250,
+                },
             ],
             Self::Jump => vec![
-                AnimationFrame { action: AvatarAction::Stand1, emotion: AvatarEmotion::Default, wmotion: WeaponMotion::Default, delay_ms: 300 },
-                AnimationFrame { action: AvatarAction::Jump, emotion: AvatarEmotion::Default, wmotion: WeaponMotion::Default, delay_ms: 600 },
+                AnimationFrame {
+                    action: AvatarAction::Stand1,
+                    emotion: AvatarEmotion::Default,
+                    wmotion: WeaponMotion::Default,
+                    delay_ms: 300,
+                },
+                AnimationFrame {
+                    action: AvatarAction::Jump,
+                    emotion: AvatarEmotion::Default,
+                    wmotion: WeaponMotion::Default,
+                    delay_ms: 600,
+                },
             ],
-            Self::Sit => vec![
-                AnimationFrame { action: AvatarAction::Sit, emotion: AvatarEmotion::Default, wmotion: WeaponMotion::Default, delay_ms: 1000 },
-            ],
-            Self::Prone => vec![
-                AnimationFrame { action: AvatarAction::Prone, emotion: AvatarEmotion::Default, wmotion: WeaponMotion::Default, delay_ms: 1000 },
-            ],
+            Self::Sit => vec![AnimationFrame {
+                action: AvatarAction::Sit,
+                emotion: AvatarEmotion::Default,
+                wmotion: WeaponMotion::Default,
+                delay_ms: 1000,
+            }],
+            Self::Prone => vec![AnimationFrame {
+                action: AvatarAction::Prone,
+                emotion: AvatarEmotion::Default,
+                wmotion: WeaponMotion::Default,
+                delay_ms: 1000,
+            }],
             Self::Fly => vec![
-                AnimationFrame { action: AvatarAction::Fly, emotion: AvatarEmotion::Default, wmotion: WeaponMotion::Default, delay_ms: 500 },
-                AnimationFrame { action: AvatarAction::Stand1, emotion: AvatarEmotion::Default, wmotion: WeaponMotion::Default, delay_ms: 500 },
+                AnimationFrame {
+                    action: AvatarAction::Fly,
+                    emotion: AvatarEmotion::Default,
+                    wmotion: WeaponMotion::Default,
+                    delay_ms: 500,
+                },
+                AnimationFrame {
+                    action: AvatarAction::Stand1,
+                    emotion: AvatarEmotion::Default,
+                    wmotion: WeaponMotion::Default,
+                    delay_ms: 500,
+                },
             ],
             Self::Climb => vec![
-                AnimationFrame { action: AvatarAction::Ladder, emotion: AvatarEmotion::Default, wmotion: WeaponMotion::Default, delay_ms: 300 },
-                AnimationFrame { action: AvatarAction::Rope, emotion: AvatarEmotion::Default, wmotion: WeaponMotion::Default, delay_ms: 300 },
+                AnimationFrame {
+                    action: AvatarAction::Ladder,
+                    emotion: AvatarEmotion::Default,
+                    wmotion: WeaponMotion::Default,
+                    delay_ms: 300,
+                },
+                AnimationFrame {
+                    action: AvatarAction::Rope,
+                    emotion: AvatarEmotion::Default,
+                    wmotion: WeaponMotion::Default,
+                    delay_ms: 300,
+                },
             ],
             Self::Blink => vec![
-                AnimationFrame { action: AvatarAction::Stand1, emotion: AvatarEmotion::Default, wmotion: WeaponMotion::Default, delay_ms: 800 },
-                AnimationFrame { action: AvatarAction::Stand1, emotion: AvatarEmotion::Blink, wmotion: WeaponMotion::Default, delay_ms: 200 },
+                AnimationFrame {
+                    action: AvatarAction::Stand1,
+                    emotion: AvatarEmotion::Default,
+                    wmotion: WeaponMotion::Default,
+                    delay_ms: 800,
+                },
+                AnimationFrame {
+                    action: AvatarAction::Stand1,
+                    emotion: AvatarEmotion::Blink,
+                    wmotion: WeaponMotion::Default,
+                    delay_ms: 200,
+                },
             ],
             Self::Wink => vec![
-                AnimationFrame { action: AvatarAction::Stand1, emotion: AvatarEmotion::Default, wmotion: WeaponMotion::Default, delay_ms: 600 },
-                AnimationFrame { action: AvatarAction::Stand1, emotion: AvatarEmotion::Wink, wmotion: WeaponMotion::Default, delay_ms: 400 },
+                AnimationFrame {
+                    action: AvatarAction::Stand1,
+                    emotion: AvatarEmotion::Default,
+                    wmotion: WeaponMotion::Default,
+                    delay_ms: 600,
+                },
+                AnimationFrame {
+                    action: AvatarAction::Stand1,
+                    emotion: AvatarEmotion::Wink,
+                    wmotion: WeaponMotion::Default,
+                    delay_ms: 400,
+                },
             ],
             Self::Custom(frames) => frames.clone(),
         }

@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use crate::models::common::{
     ColoringPrism, FaceInfo, HairInfo, ItemAddOption, ItemBaseOption, ItemEtcOption,
     ItemExceptionalOption, ItemKvOption, ItemStarforceOption, ItemTotalOption, PetAutoSkill,
-    PetItemEquipment, SkinInfo, SkillDetail,
+    PetItemEquipment, SkillDetail, SkinInfo,
 };
 
 // ─── OCID ────────────────────────────────────────────────────────────────────
@@ -1113,7 +1113,24 @@ impl VisibleEquipItem {
             // In MapleStory, only shields, Katara/Blades, Force Shields, etc. are visible.
             // Items like 마도서, 오브, 부적, 쥬얼 are invisible.
             if let Some(part) = &self.part {
-                let non_rendered_parts = ["마도서", "오브", "부적", "보석", "체스피스", "화살", "화살깃", "탄창", "카트리지", "컨트롤러", "무기전송장치", "매직제어구", "소울링", "청심환", "유물", "무기전송"];
+                let non_rendered_parts = [
+                    "마도서",
+                    "오브",
+                    "부적",
+                    "보석",
+                    "체스피스",
+                    "화살",
+                    "화살깃",
+                    "탄창",
+                    "카트리지",
+                    "컨트롤러",
+                    "무기전송장치",
+                    "매직제어구",
+                    "소울링",
+                    "청심환",
+                    "유물",
+                    "무기전송",
+                ];
                 return !non_rendered_parts.iter().any(|&p| part.contains(p));
             }
         }
@@ -1182,7 +1199,10 @@ impl CharacterCoordination {
         ];
 
         let cash_items = cash_equip.active_items();
-        let base_cash_items = cash_equip.cash_item_equipment_base.as_deref().unwrap_or(&[]);
+        let base_cash_items = cash_equip
+            .cash_item_equipment_base
+            .as_deref()
+            .unwrap_or(&[]);
         let normal_items = normal_equip.active_items();
 
         let mut visible_items = Vec::new();
@@ -1216,7 +1236,9 @@ impl CharacterCoordination {
             if let Some((idx, cash)) = cash_match {
                 handled_cash_indices.insert(idx);
                 let is_overall = cash.cash_item_equipment_part.as_deref() == Some("한벌옷");
-                if is_overall || slot == "상의" && cash.cash_item_equipment_part.as_deref() == Some("한벌옷") {
+                if is_overall
+                    || slot == "상의" && cash.cash_item_equipment_part.as_deref() == Some("한벌옷")
+                {
                     has_overall = true;
                 }
 
@@ -1230,7 +1252,10 @@ impl CharacterCoordination {
                     .cash_item_name
                     .clone()
                     .unwrap_or_else(|| "Unknown".to_string());
-                let is_transparent = item_name.starts_with("투명 ") || item_name == "투명장갑" || item_name == "투명모자" || item_name == "투명망토";
+                let is_transparent = item_name.starts_with("투명 ")
+                    || item_name == "투명장갑"
+                    || item_name == "투명모자"
+                    || item_name == "투명망토";
 
                 visible_items.push(VisibleEquipItem {
                     slot: display_slot,
@@ -1262,19 +1287,23 @@ impl CharacterCoordination {
                     } else {
                         slot.to_string()
                     };
-                    let has_anvil = norm.item_shape_name.is_some()
-                        && norm.item_shape_name != norm.item_name;
+                    let has_anvil =
+                        norm.item_shape_name.is_some() && norm.item_shape_name != norm.item_name;
 
                     let (name, icon) = if has_anvil {
                         (
                             norm.item_shape_name
                                 .clone()
                                 .unwrap_or_else(|| norm.item_name.clone().unwrap_or_default()),
-                            norm.item_shape_icon.clone().or_else(|| norm.item_icon.clone()),
+                            norm.item_shape_icon
+                                .clone()
+                                .or_else(|| norm.item_icon.clone()),
                         )
                     } else {
                         (
-                            norm.item_name.clone().unwrap_or_else(|| "Unknown".to_string()),
+                            norm.item_name
+                                .clone()
+                                .unwrap_or_else(|| "Unknown".to_string()),
                             norm.item_icon.clone(),
                         )
                     };
@@ -1287,7 +1316,11 @@ impl CharacterCoordination {
                         is_cash: false,
                         is_transparent: false,
                         is_anvil: has_anvil,
-                        original_name: if has_anvil { norm.item_name.clone() } else { None },
+                        original_name: if has_anvil {
+                            norm.item_name.clone()
+                        } else {
+                            None
+                        },
                         cash_label: None,
                         coloring_prism: None,
                     });
@@ -1308,7 +1341,10 @@ impl CharacterCoordination {
                     .cash_item_name
                     .clone()
                     .unwrap_or_else(|| "Unknown".to_string());
-                let is_transparent = item_name.starts_with("투명 ") || item_name == "투명장갑" || item_name == "투명모자" || item_name == "투명망토";
+                let is_transparent = item_name.starts_with("투명 ")
+                    || item_name == "투명장갑"
+                    || item_name == "투명모자"
+                    || item_name == "투명망토";
 
                 visible_items.push(VisibleEquipItem {
                     slot,
@@ -1384,7 +1420,9 @@ impl CharacterCoordination {
 
     /// Generates a custom avatar look URL using an [`AvatarLookQuery`](crate::avatar::AvatarLookQuery).
     pub fn custom_avatar_url(&self, query: &crate::avatar::AvatarLookQuery) -> Option<String> {
-        self.avatar_code.as_ref().map(|code| code.to_look_url(query))
+        self.avatar_code
+            .as_ref()
+            .map(|code| code.to_look_url(query))
     }
 
     /// Generates a list of frame URLs and frame durations (ms) for an animation preset.
@@ -1401,10 +1439,9 @@ impl CharacterCoordination {
 
     /// Find visible item by slot or part name.
     pub fn get_slot(&self, slot_or_part: &str) -> Option<&VisibleEquipItem> {
-        self.visible_items.iter().find(|item| {
-            item.slot == slot_or_part
-                || item.part.as_deref() == Some(slot_or_part)
-        })
+        self.visible_items
+            .iter()
+            .find(|item| item.slot == slot_or_part || item.part.as_deref() == Some(slot_or_part))
     }
 
     /// Visible hat (모자).
@@ -1591,9 +1628,7 @@ impl CharacterDashboard {
 
     /// Union artifact level if available.
     pub fn union_artifact_level(&self) -> Option<i64> {
-        self.union
-            .as_ref()
-            .and_then(|u| u.union_artifact_level)
+        self.union.as_ref().and_then(|u| u.union_artifact_level)
     }
 
     /// Guild name if the character belongs to a guild.
@@ -1603,7 +1638,9 @@ impl CharacterDashboard {
 
     /// Guild master name if guild info is loaded.
     pub fn guild_master_name(&self) -> Option<&str> {
-        self.guild.as_ref().and_then(|g| g.guild_master_name.as_deref())
+        self.guild
+            .as_ref()
+            .and_then(|g| g.guild_master_name.as_deref())
     }
 
     /// Guild level if guild info is loaded.
@@ -1621,7 +1658,9 @@ impl CharacterDashboard {
 
     /// Ability grade (e.g. "레전드리", "유니크") if available.
     pub fn ability_grade(&self) -> Option<&str> {
-        self.ability.as_ref().and_then(|a| a.ability_grade.as_deref())
+        self.ability
+            .as_ref()
+            .and_then(|a| a.ability_grade.as_deref())
     }
 
     /// Highest floor reached in Mu Lung Dojo (무릉도장 최고 층수).
@@ -1631,7 +1670,10 @@ impl CharacterDashboard {
 
     /// Character popularity score if available.
     pub fn popularity(&self) -> i64 {
-        self.popularity.as_ref().and_then(|p| p.popularity).unwrap_or(0)
+        self.popularity
+            .as_ref()
+            .and_then(|p| p.popularity)
+            .unwrap_or(0)
     }
 
     /// Parsed AvatarCode if available from coordination.
@@ -1639,5 +1681,3 @@ impl CharacterDashboard {
         self.coordination.avatar_code.as_ref()
     }
 }
-
-

@@ -81,12 +81,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 "  - [{}] {} | Hue: {:?}, Saturation: {:?}, Value: {:?}",
                 item.slot, item.name, prism.hue, prism.saturation, prism.value
             );
-            println!("    └ Icon URL (이미 프리즘 적용 완료): {}", item.icon.as_deref().unwrap_or("None"));
+            println!(
+                "    └ Icon URL (이미 프리즘 적용 완료): {}",
+                item.icon.as_deref().unwrap_or("None")
+            );
         }
 
         // Generate customized avatar directly from the look object
-        if let Some(jump_heart_url) = look.custom_image(AvatarAction::Jump, AvatarEmotion::Love, WeaponMotion::Default, 200, 200) {
-            println!("\nCustom Jump+Love Avatar from Look Object:\n  {}", jump_heart_url);
+        if let Some(jump_heart_url) = look.custom_image(
+            AvatarAction::Jump,
+            AvatarEmotion::Love,
+            WeaponMotion::Default,
+            200,
+            200,
+        ) {
+            println!(
+                "\nCustom Jump+Love Avatar from Look Object:\n  {}",
+                jump_heart_url
+            );
         }
     }
 

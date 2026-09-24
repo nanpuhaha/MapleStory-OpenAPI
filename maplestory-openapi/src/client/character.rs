@@ -179,7 +179,9 @@ impl MapleStoryClient {
         let cash = cash_res?;
         let equip = equip_res?;
 
-        Ok(CharacterCoordination::from_full_parts(&basic, &beauty, &cash, &equip))
+        Ok(CharacterCoordination::from_full_parts(
+            &basic, &beauty, &cash, &equip,
+        ))
     }
 
     /// Retrieve final visible coordination (코디 정보) directly by character name.
@@ -199,7 +201,8 @@ impl MapleStoryClient {
         &self,
         character_name: &str,
     ) -> Result<CharacterCoordination> {
-        self.get_character_coordination_by_name(character_name).await
+        self.get_character_coordination_by_name(character_name)
+            .await
     }
 
     /// Alias for [`get_character_coordination_by_name`](Self::get_character_coordination_by_name).
@@ -207,7 +210,8 @@ impl MapleStoryClient {
         &self,
         character_name: &str,
     ) -> Result<CharacterAppearance> {
-        self.get_character_coordination_by_name(character_name).await
+        self.get_character_coordination_by_name(character_name)
+            .await
     }
 
     // ─── Comprehensive Profile (원클릭 종합 프로필 조회) ─────────────────────
@@ -339,8 +343,12 @@ impl MapleStoryClient {
             basic.character_guild_name.as_deref(),
             basic.world_name.as_deref(),
         ) {
-            (Some(guild_name), Some(world_name)) if !guild_name.is_empty() && !world_name.is_empty() => {
-                self.get_guild_by_name(guild_name, world_name, date).await.ok()
+            (Some(guild_name), Some(world_name))
+                if !guild_name.is_empty() && !world_name.is_empty() =>
+            {
+                self.get_guild_by_name(guild_name, world_name, date)
+                    .await
+                    .ok()
             }
             _ => None,
         };
@@ -464,7 +472,8 @@ impl MapleStoryClient {
             ))
         })?;
         let avatar_code = crate::avatar::AvatarCode::from_url_or_code(&img_url)?;
-        self.render_avatar_gif(&avatar_code, preset, width, height).await
+        self.render_avatar_gif(&avatar_code, preset, width, height)
+            .await
     }
 
     // ─── Basic ───────────────────────────────────────────────────────────────
