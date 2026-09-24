@@ -42,17 +42,30 @@ MapleStory-OpenAPI-Rust/
 │   ├── Cargo.toml
 │   └── src/
 ├── bindings/
-│   ├── python/                    # [Python] PyO3 바인딩 (PyPI 배포용)
+│   ├── python/                    # [Python] PyO3 바인딩 (PyPI: .whl)
 │   │   ├── Cargo.toml
 │   │   ├── pyproject.toml
 │   │   └── src/lib.rs
-│   ├── nodejs/                    # [Node.js] napi-rs 바인딩 (npm 배포용)
+│   ├── nodejs/                    # [Node.js] napi-rs 바인딩 (npm: .node + index.d.ts)
 │   │   ├── Cargo.toml
 │   │   ├── package.json
 │   │   └── src/lib.rs
-│   └── wasm/                      # [WebAssembly] 브라우저 바인딩
-│       ├── Cargo.toml
-│       └── src/lib.rs
+│   ├── wasm/                      # [WebAssembly] 브라우저 바인딩
+│   │   ├── Cargo.toml
+│   │   └── src/lib.rs
+│   ├── c/                         # [C-ABI FFI] C, C++, 모바일 공통 네이티브 코어
+│   │   ├── Cargo.toml
+│   │   ├── include/maplestory_openapi.h
+│   │   └── src/lib.rs
+│   ├── dotnet/                    # [C# / .NET] NuGet 패키지 (net8.0/net9.0/netstandard2.0)
+│   │   ├── MapleStory.OpenApi.csproj
+│   │   └── MapleStoryClient.cs
+│   ├── go/                        # [Go] cgo 패키지
+│   │   ├── go.mod
+│   │   └── maplestory.go
+│   └── mobile/                    # [모바일] iOS (Swift) & Android (Kotlin)
+│       ├── swift/MapleStoryClient.swift
+│       └── kotlin/MapleStoryClient.kt
 └── docs/
 ```
 

@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0;netstandard2.0</TargetFrameworks>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>MapleStory.OpenApi</RootNamespace>
+    <AssemblyName>MapleStory.OpenApi</AssemblyName>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <PackageId>MapleStory.OpenApi</PackageId>
+    <Version>0.1.0</Version>
+    <Authors>Senior Engineer</Authors>
+    <Description>High-performance .NET bindings for NEXON MapleStory OpenAPI, powered by Rust</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+  </PropertyGroup>
+
+  <!-- Copy native Rust DLL to output directory on Windows -->
+  <ItemGroup Condition="$([MSBuild]::IsOSPlatform('Windows'))">
+    <None Include="..\..\target\debug\maplestory_openapi_c.dll" Link="maplestory_openapi_c.dll" CopyToOutputDirectory="PreserveNewest" Visible="false" />
+  </ItemGroup>
+
+</Project>

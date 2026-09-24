@@ -4,5 +4,6 @@ members = [
     "bindings/python",
     "bindings/nodejs",
     "bindings/wasm",
+    "bindings/c",
 ]
 resolver = "2"

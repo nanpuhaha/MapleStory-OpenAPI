@@ -35,3 +35,9 @@ node_modules/
 *.egg-info/
 __pycache__/
 **/__pycache__/
+
+# .NET build artifacts
+bin/
+**/bin/
+obj/
+**/obj/

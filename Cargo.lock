@@ -827,6 +827,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "maplestory-openapi-c"
+version = "0.1.0"
+dependencies = [
+ "libc",
+ "maplestory-openapi",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "maplestory-openapi-nodejs"
 version = "0.1.0"
 dependencies = [
