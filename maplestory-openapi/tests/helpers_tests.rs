@@ -1553,3 +1553,52 @@ async fn test_hierarchical_domain_namespaces() {
 
     server_task.abort();
 }
+
+#[tokio::test]
+async fn test_history_auto_paginating_stream() {
+    use futures_util::StreamExt;
+    use maplestory_openapi::MapleStoryClient;
+
+    let (base_url, server_task) = spawn_mock_server(|req_text| {
+        if req_text.contains("/maplestory/v1/history/starforce") {
+            if req_text.contains("cursor=page2_cursor") {
+                let body = r#"{
+                    "count": 1,
+                    "next_cursor": null,
+                    "starforce_history": [
+                        {"id": "sf_item_2", "item_upgrade_result": "성공", "before_starforce_count": 15, "after_starforce_count": 16}
+                    ]
+                }"#.to_string();
+                (200, body, None)
+            } else {
+                let body = r#"{
+                    "count": 1,
+                    "next_cursor": "page2_cursor",
+                    "starforce_history": [
+                        {"id": "sf_item_1", "item_upgrade_result": "성공", "before_starforce_count": 14, "after_starforce_count": 15}
+                    ]
+                }"#.to_string();
+                (200, body, None)
+            }
+        } else {
+            (200, r#"{}"#.to_string(), None)
+        }
+    })
+    .await;
+
+    let client = MapleStoryClient::builder()
+        .api_key("test-key")
+        .base_url(base_url)
+        .build()
+        .unwrap();
+
+    let mut stream = client.history().get_starforce_stream(10, None);
+    let mut collected = Vec::new();
+    while let Some(item_res) = stream.next().await {
+        let entry = item_res.unwrap();
+        collected.push(entry.id.unwrap());
+    }
+
+    assert_eq!(collected, vec!["sf_item_1", "sf_item_2"]);
+    server_task.abort();
+}

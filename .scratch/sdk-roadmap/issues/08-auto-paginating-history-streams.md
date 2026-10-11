@@ -4,9 +4,9 @@
 
 **Blocked by:** None
 
-**Status:** todo
+**Status:** done
 
-- [ ] Add `get_starforce_history_stream(&self, count: u32, date: impl Into<DateParam>) -> impl Stream<Item = Result<StarforceHistoryEntry>>` on `HistoryClient`.
-- [ ] Add equivalent auto-paginating stream methods for Potential, Cube, and Soul Potential history (`get_potential_history_stream`, `get_cube_history_stream`, `get_soul_potential_history_stream`).
-- [ ] Support graceful early termination and bounded page fetching with cancellation.
-- [ ] Add unit/mock tests verifying pagination termination when `next_cursor` is null or exhausted.
+- [x] Add `get_starforce_history_stream(&self, count: u32, date: impl Into<DateParam>) -> impl Stream<Item = Result<StarforceHistoryEntry>>` on `HistoryClient`.
+- [x] Add equivalent auto-paginating stream methods for Potential, Cube, and Soul Potential history (`get_potential_history_stream`, `get_cube_history_stream`, `get_soul_potential_history_stream`).
+- [x] Support graceful early termination and bounded page fetching with cancellation.
+- [x] Add unit/mock tests verifying pagination termination when `next_cursor` is null or exhausted.
