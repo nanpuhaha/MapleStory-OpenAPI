@@ -204,7 +204,7 @@ pub struct SkillDetail {
 }
 
 /// Hair information (헤어 정보).
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct HairInfo {
     pub hair_name: Option<String>,
     pub base_color: Option<String>,
@@ -214,7 +214,7 @@ pub struct HairInfo {
 }
 
 /// Face (성형) information.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct FaceInfo {
     pub face_name: Option<String>,
     pub base_color: Option<String>,
@@ -224,7 +224,7 @@ pub struct FaceInfo {
 }
 
 /// Skin (피부) information.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct SkinInfo {
     pub skin_name: Option<String>,
     pub color_style: Option<String>,
@@ -275,5 +275,186 @@ mod tests {
         assert_eq!(SkillGrade::HyperPassive.to_string(), "hyperpassive");
         assert_eq!(SkillGrade::HyperActive.to_string(), "hyperactive");
         assert_eq!(SkillGrade::Sixth.to_string(), "6");
+    }
+}
+
+// ─── MapleDate & DateParam ───────────────────────────────────────────────────
+
+/// Strongly typed date representation for the NEXON MapleStory OpenAPI.
+///
+/// Ensures dates conform to `YYYY-MM-DD`, are not earlier than `MIN_DATE` (`2023-12-21`),
+/// and respect NEXON's 01:00 AM KST daily refresh boundary.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub struct MapleDate(pub(crate) String);
+
+impl MapleDate {
+    /// Earliest available date across NEXON MapleStory OpenAPI (`2023-12-21`).
+    pub const MIN_DATE: &'static str = "2023-12-21";
+
+    /// Create a new `MapleDate` from a string slice without range validation.
+    pub fn new(date: impl Into<String>) -> Self {
+        Self(date.into())
+    }
+
+    /// Access the raw date string in `YYYY-MM-DD` format.
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+
+    /// Convert into the underlying `String`.
+    pub fn into_string(self) -> String {
+        self.0
+    }
+
+    /// Parse this date into a `chrono::NaiveDate`.
+    pub fn to_naive_date(&self) -> Option<chrono::NaiveDate> {
+        chrono::NaiveDate::parse_from_str(&self.0, "%Y-%m-%d").ok()
+    }
+
+    /// Calculate the latest available date for querying NEXON MapleStory OpenAPI
+    /// based on the current UTC time converted to KST (+09:00).
+    ///
+    /// NEXON releases daily snapshots at 01:00 AM KST:
+    /// - Before 01:00 AM KST: data is available up to 2 days ago.
+    /// - At or after 01:00 AM KST: data is available up to yesterday (1 day ago).
+    pub fn latest_available() -> Self {
+        Self::latest_available_at(chrono::Utc::now())
+    }
+
+    /// Calculate the latest available date relative to an arbitrary datetime.
+    pub fn latest_available_at<Tz: chrono::TimeZone>(dt: chrono::DateTime<Tz>) -> Self {
+        use chrono::Timelike;
+        let kst_offset = chrono::FixedOffset::east_opt(9 * 3600).unwrap();
+        let kst_dt = dt.with_timezone(&kst_offset);
+        let days_ago = if kst_dt.hour() < 1 { 2 } else { 1 };
+        let date = kst_dt.date_naive() - chrono::Duration::days(days_ago);
+        Self(date.format("%Y-%m-%d").to_string())
+    }
+}
+
+impl std::fmt::Display for MapleDate {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl std::ops::Deref for MapleDate {
+    type Target = str;
+    fn deref(&self) -> &str {
+        &self.0
+    }
+}
+
+impl AsRef<str> for MapleDate {
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}
+
+impl From<&str> for MapleDate {
+    fn from(s: &str) -> Self {
+        Self(s.to_string())
+    }
+}
+
+impl From<String> for MapleDate {
+    fn from(s: String) -> Self {
+        Self(s)
+    }
+}
+
+impl From<&String> for MapleDate {
+    fn from(s: &String) -> Self {
+        Self(s.clone())
+    }
+}
+
+impl From<chrono::NaiveDate> for MapleDate {
+    fn from(d: chrono::NaiveDate) -> Self {
+        Self(d.format("%Y-%m-%d").to_string())
+    }
+}
+
+impl<Tz: chrono::TimeZone> From<chrono::DateTime<Tz>> for MapleDate {
+    fn from(dt: chrono::DateTime<Tz>) -> Self {
+        let kst_offset = chrono::FixedOffset::east_opt(9 * 3600).unwrap();
+        let kst_dt = dt.with_timezone(&kst_offset);
+        Self(kst_dt.format("%Y-%m-%d").to_string())
+    }
+}
+
+/// Parameter helper for API methods that accept an optional date.
+///
+/// Can be constructed from:
+/// - `None` (or `Option<&str>`)
+/// - `Some("YYYY-MM-DD")`
+/// - `"YYYY-MM-DD"` (`&str` directly)
+/// - `String` / `&String`
+/// - `MapleDate` / `&MapleDate`
+/// - `chrono::NaiveDate`
+/// - `chrono::DateTime<Tz>`
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DateParam {
+    None,
+    Date(String),
+}
+
+impl DateParam {
+    pub fn as_deref(&self) -> Option<&str> {
+        match self {
+            DateParam::None => None,
+            DateParam::Date(s) => Some(s.as_str()),
+        }
+    }
+}
+
+impl From<Option<&str>> for DateParam {
+    fn from(opt: Option<&str>) -> Self {
+        match opt {
+            Some(s) => DateParam::Date(s.to_string()),
+            None => DateParam::None,
+        }
+    }
+}
+
+impl From<&str> for DateParam {
+    fn from(s: &str) -> Self {
+        DateParam::Date(s.to_string())
+    }
+}
+
+impl From<String> for DateParam {
+    fn from(s: String) -> Self {
+        DateParam::Date(s)
+    }
+}
+
+impl From<&String> for DateParam {
+    fn from(s: &String) -> Self {
+        DateParam::Date(s.clone())
+    }
+}
+
+impl From<MapleDate> for DateParam {
+    fn from(d: MapleDate) -> Self {
+        DateParam::Date(d.0)
+    }
+}
+
+impl From<&MapleDate> for DateParam {
+    fn from(d: &MapleDate) -> Self {
+        DateParam::Date(d.0.clone())
+    }
+}
+
+impl From<chrono::NaiveDate> for DateParam {
+    fn from(d: chrono::NaiveDate) -> Self {
+        DateParam::Date(d.format("%Y-%m-%d").to_string())
+    }
+}
+
+impl<Tz: chrono::TimeZone> From<chrono::DateTime<Tz>> for DateParam {
+    fn from(dt: chrono::DateTime<Tz>) -> Self {
+        DateParam::Date(MapleDate::from(dt).0)
     }
 }

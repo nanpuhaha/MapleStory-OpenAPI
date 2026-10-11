@@ -68,3 +68,12 @@ pub struct AchievementItem {
     /// Date achievement was completed (KST)
     pub date_completed: Option<String>,
 }
+
+// ─── OUID ─────────────────────────────────────────────────────────────────────
+
+/// Response from `GET /maplestory/v1/ouid` and `GET /maplestory/legacy/ouid`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct User {
+    /// Account identifier (ouid)
+    pub ouid: Option<String>,
+}

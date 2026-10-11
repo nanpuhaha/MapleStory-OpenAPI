@@ -202,7 +202,7 @@ pub struct CharacterItemEquipment {
 }
 
 /// Full detail of a single equipped item.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ItemEquipmentDetail {
     pub item_equipment_part: Option<String>,
     pub item_equipment_slot: Option<String>,
@@ -251,6 +251,313 @@ pub struct ItemEquipmentDetail {
     pub special_ring_level: Option<i64>,
     pub date_expire: Option<String>,
     pub freestyle_flag: Option<String>,
+}
+
+/// Category of character stat boosted by potential or equipment options.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum StatType {
+    /// STR (힘)
+    Str,
+    /// DEX (민첩)
+    Dex,
+    /// INT (지력)
+    Int,
+    /// LUK (행운)
+    Luk,
+    /// All Stat (올스탯)
+    AllStat,
+    /// Max HP (최대 HP)
+    MaxHp,
+    /// Max MP (최대 MP)
+    MaxMp,
+    /// Attack Power (공격력)
+    AttackPower,
+    /// Magic Power (마력)
+    MagicPower,
+    /// Armor / Defense (방어력)
+    Armor,
+    /// Boss Damage (보스 몬스터 공격 시 데미지)
+    BossDamage,
+    /// Ignore Monster Armor / Defense (몬스터 방어율 무시)
+    IgnoreMonsterArmor,
+    /// Damage (데미지)
+    Damage,
+    /// Critical Damage (크리티컬 데미지)
+    CriticalDamage,
+    /// Critical Rate (크리티컬 확률)
+    CriticalRate,
+    /// Item Drop Rate (아이템 드롭률 / 획득 확률)
+    ItemDropRate,
+    /// Meso Drop Rate (메소 획득량)
+    MesoDropRate,
+    /// Cooldown Reduction (스킬 재사용 대기시간 감소)
+    CooldownReduction,
+    /// Other / Unclassified stat
+    Other,
+}
+
+impl StatType {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            StatType::Str => "STR",
+            StatType::Dex => "DEX",
+            StatType::Int => "INT",
+            StatType::Luk => "LUK",
+            StatType::AllStat => "올스탯",
+            StatType::MaxHp => "최대 HP",
+            StatType::MaxMp => "최대 MP",
+            StatType::AttackPower => "공격력",
+            StatType::MagicPower => "마력",
+            StatType::Armor => "방어력",
+            StatType::BossDamage => "보스 몬스터 공격 시 데미지",
+            StatType::IgnoreMonsterArmor => "몬스터 방어율 무시",
+            StatType::Damage => "데미지",
+            StatType::CriticalDamage => "크리티컬 데미지",
+            StatType::CriticalRate => "크리티컬 확률",
+            StatType::ItemDropRate => "아이템 드롭률",
+            StatType::MesoDropRate => "메소 획득량",
+            StatType::CooldownReduction => "모든 스킬의 재사용 대기시간",
+            StatType::Other => "기타",
+        }
+    }
+}
+
+impl std::fmt::Display for StatType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.as_str())
+    }
+}
+
+/// A parsed potential or additional potential line with typed category and numeric value.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ParsedPotentialOption {
+    /// Raw unparsed string from NEXON OpenAPI (e.g. `"STR : +12%"`).
+    pub raw: String,
+    /// Stat category.
+    pub stat_type: StatType,
+    /// Parsed numeric magnitude (e.g. `12.0` from `"+12%"` or `30.0` from `"+30"`).
+    pub value: f64,
+    /// Whether the value represents a percentage boost (`true`) or flat boost (`false`).
+    pub is_percentage: bool,
+}
+
+impl ParsedPotentialOption {
+    /// Attempt to parse a potential line string from NEXON MapleStory OpenAPI.
+    ///
+    /// Returns `None` for non-stat lines (e.g. "피격 시 일정 확률로 데미지 무시",
+    /// "쓸만한 윈드 부스터 스킬 사용 가능") or malformed strings.
+    pub fn parse(line: &str) -> Option<Self> {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            return None;
+        }
+
+        // Split by ':'
+        let parts: Vec<&str> = trimmed.splitn(2, ':').collect();
+        if parts.len() != 2 {
+            return None;
+        }
+
+        let stat_name = parts[0].trim();
+        let val_part = parts[1].trim();
+
+        // Match StatType
+        let stat_type = if stat_name == "STR" || stat_name == "힘" {
+            StatType::Str
+        } else if stat_name == "DEX" || stat_name == "민첩" {
+            StatType::Dex
+        } else if stat_name == "INT" || stat_name == "지력" {
+            StatType::Int
+        } else if stat_name == "LUK" || stat_name == "행운" {
+            StatType::Luk
+        } else if stat_name == "올스탯" {
+            StatType::AllStat
+        } else if stat_name == "최대 HP" || stat_name == "HP" {
+            StatType::MaxHp
+        } else if stat_name == "최대 MP" || stat_name == "MP" {
+            StatType::MaxMp
+        } else if stat_name == "공격력" {
+            StatType::AttackPower
+        } else if stat_name == "마력" {
+            StatType::MagicPower
+        } else if stat_name == "방어력" {
+            StatType::Armor
+        } else if stat_name.contains("보스") && stat_name.contains("데미지") {
+            StatType::BossDamage
+        } else if stat_name.contains("방어율") && stat_name.contains("무시") {
+            StatType::IgnoreMonsterArmor
+        } else if stat_name == "데미지" {
+            StatType::Damage
+        } else if stat_name.contains("크리티컬") && stat_name.contains("데미지") {
+            StatType::CriticalDamage
+        } else if stat_name.contains("크리티컬") && stat_name.contains("확률") {
+            StatType::CriticalRate
+        } else if stat_name.contains("아이템") && (stat_name.contains("드롭") || stat_name.contains("획득")) {
+            StatType::ItemDropRate
+        } else if stat_name.contains("메소") && stat_name.contains("획득") {
+            StatType::MesoDropRate
+        } else if stat_name.contains("재사용") && stat_name.contains("대기시간") {
+            StatType::CooldownReduction
+        } else {
+            return None;
+        };
+
+        // Parse value & percentage
+        if stat_type == StatType::CooldownReduction {
+            // E.g. "-2초(10초 이하는 10%감소, 5초 미만으로 감소 불가)" or "-1초"
+            let sec_idx = val_part.find('초')?;
+            let num_str = &val_part[..sec_idx];
+            let num: f64 = num_str
+                .trim()
+                .trim_start_matches('+')
+                .trim_start_matches('-')
+                .parse()
+                .ok()?;
+            return Some(Self {
+                raw: line.to_string(),
+                stat_type,
+                value: num,
+                is_percentage: false,
+            });
+        }
+
+        let is_percentage = val_part.contains('%');
+        // Extract numeric digits and optional decimal point
+        let mut num_str = String::new();
+        for ch in val_part.chars() {
+            if ch.is_ascii_digit() || ch == '.' {
+                num_str.push(ch);
+            } else if !num_str.is_empty() {
+                break;
+            }
+        }
+
+        if num_str.is_empty() {
+            return None;
+        }
+
+        let value = num_str.parse::<f64>().ok()?;
+
+        Some(Self {
+            raw: line.to_string(),
+            stat_type,
+            value,
+            is_percentage,
+        })
+    }
+}
+
+impl ItemEquipmentDetail {
+    /// Parsed main potential line 1.
+    pub fn potential_option_1_parsed(&self) -> Option<ParsedPotentialOption> {
+        self.potential_option_1.as_deref().and_then(ParsedPotentialOption::parse)
+    }
+
+    /// Alias for [`potential_option_1_parsed`](Self::potential_option_1_parsed).
+    pub fn potential_1_parsed(&self) -> Option<ParsedPotentialOption> {
+        self.potential_option_1_parsed()
+    }
+
+    /// Parsed main potential line 2.
+    pub fn potential_option_2_parsed(&self) -> Option<ParsedPotentialOption> {
+        self.potential_option_2.as_deref().and_then(ParsedPotentialOption::parse)
+    }
+
+    /// Alias for [`potential_option_2_parsed`](Self::potential_option_2_parsed).
+    pub fn potential_2_parsed(&self) -> Option<ParsedPotentialOption> {
+        self.potential_option_2_parsed()
+    }
+
+    /// Parsed main potential line 3.
+    pub fn potential_option_3_parsed(&self) -> Option<ParsedPotentialOption> {
+        self.potential_option_3.as_deref().and_then(ParsedPotentialOption::parse)
+    }
+
+    /// Alias for [`potential_option_3_parsed`](Self::potential_option_3_parsed).
+    pub fn potential_3_parsed(&self) -> Option<ParsedPotentialOption> {
+        self.potential_option_3_parsed()
+    }
+
+    /// Parsed additional potential line 1.
+    pub fn additional_potential_option_1_parsed(&self) -> Option<ParsedPotentialOption> {
+        self.additional_potential_option_1.as_deref().and_then(ParsedPotentialOption::parse)
+    }
+
+    /// Alias for [`additional_potential_option_1_parsed`](Self::additional_potential_option_1_parsed).
+    pub fn additional_potential_1_parsed(&self) -> Option<ParsedPotentialOption> {
+        self.additional_potential_option_1_parsed()
+    }
+
+    /// Parsed additional potential line 2.
+    pub fn additional_potential_option_2_parsed(&self) -> Option<ParsedPotentialOption> {
+        self.additional_potential_option_2.as_deref().and_then(ParsedPotentialOption::parse)
+    }
+
+    /// Alias for [`additional_potential_option_2_parsed`](Self::additional_potential_option_2_parsed).
+    pub fn additional_potential_2_parsed(&self) -> Option<ParsedPotentialOption> {
+        self.additional_potential_option_2_parsed()
+    }
+
+    /// Parsed additional potential line 3.
+    pub fn additional_potential_option_3_parsed(&self) -> Option<ParsedPotentialOption> {
+        self.additional_potential_option_3.as_deref().and_then(ParsedPotentialOption::parse)
+    }
+
+    /// Alias for [`additional_potential_option_3_parsed`](Self::additional_potential_option_3_parsed).
+    pub fn additional_potential_3_parsed(&self) -> Option<ParsedPotentialOption> {
+        self.additional_potential_option_3_parsed()
+    }
+
+    /// All parsed main potential lines.
+    pub fn all_potential_options_parsed(&self) -> Vec<ParsedPotentialOption> {
+        [
+            self.potential_option_1_parsed(),
+            self.potential_option_2_parsed(),
+            self.potential_option_3_parsed(),
+        ]
+        .into_iter()
+        .flatten()
+        .collect()
+    }
+
+    /// All parsed additional potential lines.
+    pub fn all_additional_potential_options_parsed(&self) -> Vec<ParsedPotentialOption> {
+        [
+            self.additional_potential_option_1_parsed(),
+            self.additional_potential_option_2_parsed(),
+            self.additional_potential_option_3_parsed(),
+        ]
+        .into_iter()
+        .flatten()
+        .collect()
+    }
+
+    /// All parsed potential lines across both main and additional potentials.
+    pub fn all_potentials_parsed(&self) -> Vec<ParsedPotentialOption> {
+        let mut all = self.all_potential_options_parsed();
+        all.extend(self.all_additional_potential_options_parsed());
+        all
+    }
+
+    /// Total potential stat contribution for a given [`StatType`].
+    ///
+    /// Returns `(flat_boost, percentage_boost)`.
+    pub fn total_potential_stat(&self, stat: StatType) -> (f64, f64) {
+        let mut flat = 0.0;
+        let mut percent = 0.0;
+
+        for opt in self.all_potentials_parsed() {
+            if opt.stat_type == stat {
+                if opt.is_percentage {
+                    percent += opt.value;
+                } else {
+                    flat += opt.value;
+                }
+            }
+        }
+
+        (flat, percent)
+    }
 }
 
 /// Title equipment detail.
@@ -321,7 +628,7 @@ pub struct SpecialItemEquipment {
 // ─── Cash Item Equipment ──────────────────────────────────────────────────────
 
 /// Response from `GET /maplestory/v1/character/cashitem-equipment`.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct CharacterCashItemEquipment {
     /// Query reference date (KST)
     pub date: Option<String>,
@@ -464,10 +771,55 @@ pub struct SetEffectOption {
     pub set_option: Option<String>,
 }
 
+impl CharacterSetEffect {
+    /// Check whether a set effect is active with at least `required_count` items equipped.
+    pub fn is_set_active(&self, set_name: &str, required_count: i64) -> bool {
+        self.find_set(set_name)
+            .and_then(|s| s.total_set_count)
+            .map(|count| count >= required_count)
+            .unwrap_or(false)
+    }
+
+    /// Find a set effect by name (substring match).
+    pub fn find_set(&self, set_name: &str) -> Option<&SetEffectInfo> {
+        self.set_effect
+            .as_deref()
+            .unwrap_or(&[])
+            .iter()
+            .find(|s| {
+                s.set_name
+                    .as_deref()
+                    .map(|name| name.contains(set_name))
+                    .unwrap_or(false)
+            })
+    }
+
+    /// Retrieve all active set effect options across all equipped sets.
+    ///
+    /// Filters set effect options by checking whether the equipped piece count
+    /// ([`SetEffectInfo::total_set_count`]) meets or exceeds the required threshold
+    /// ([`SetEffectOption::set_count`]).
+    pub fn active_set_options(&self) -> Vec<&SetEffectOption> {
+        self.set_effect
+            .as_deref()
+            .unwrap_or(&[])
+            .iter()
+            .flat_map(|s| {
+                let total = s.total_set_count.unwrap_or(0);
+                s.set_effect_info
+                    .as_deref()
+                    .unwrap_or(&[])
+                    .iter()
+                    .filter(move |opt| opt.set_count.is_none_or(|req| total >= req))
+            })
+            .collect()
+    }
+}
+
 // ─── Beauty Equipment ─────────────────────────────────────────────────────────
 
 /// Response from `GET /maplestory/v1/character/beauty-equipment`.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct CharacterBeautyEquipment {
     /// Query reference date (KST)
     pub date: Option<String>,
@@ -1510,6 +1862,171 @@ pub struct CharacterProfile {
 
 // ─── All-In-One Character Dashboard ──────────────────────────────────────────
 
+/// Individual sections that compose the [`CharacterDashboard`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DashboardSection {
+    /// Basic character profile (이름, 월드, 직업, 레벨, 경험치, 이미지 등)
+    Basic,
+    /// Detailed stats and combat power (스탯, 전투력 등)
+    Stat,
+    /// Normal equipment (일반 장비, 스타포스 등)
+    ItemEquipment,
+    /// Cash equipment (캐시 장비 및 프리즘 정보)
+    CashItemEquipment,
+    /// Beauty features (헤어, 성형, 피부)
+    BeautyEquipment,
+    /// Arcane and authentic symbols (심볼 장비 및 포스)
+    Symbols,
+    /// Character ability (어빌리티 등급 및 옵션)
+    Ability,
+    /// Hyper stats (하이퍼 스탯)
+    HyperStat,
+    /// 6th job HEXA Matrix cores (6차 헥사 코어)
+    HexaMatrix,
+    /// 6th job HEXA Matrix stats (6차 헥사 스탯)
+    HexaMatrixStat,
+    /// 5th job V Matrix cores (5차 V매트릭스 코어)
+    VMatrix,
+    /// Set effects of equipped items (장비 세트 효과)
+    SetEffect,
+    /// Pet equipment (장착 펫 및 펫 장비)
+    PetEquipment,
+    /// Android equipment (안드로이드 및 기계심장)
+    AndroidEquipment,
+    /// Link skills (링크 스킬)
+    LinkSkill,
+    /// Propensities (성향 6종)
+    Propensity,
+    /// Popularity (인기도)
+    Popularity,
+    /// Mu Lung Dojo record (무릉도장 최고 기록)
+    Dojang,
+    /// Union basic info (유니온 레벨, 등급)
+    Union,
+    /// Union artifact info (아티팩트 레벨, 효과)
+    UnionArtifact,
+    /// Guild basic info (길드명, 레벨, 노블레스 스킬)
+    Guild,
+}
+
+/// Diagnostic failure information for a specific dashboard section.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DashboardSectionError {
+    /// The section that experienced an error
+    pub section: DashboardSection,
+    /// Formatted error message
+    pub message: String,
+    /// OpenAPI error code if returned by NEXON (e.g. "OPENAPI00004")
+    pub api_code: Option<String>,
+    /// HTTP status code if available (e.g. 429, 500)
+    pub status_code: Option<u16>,
+}
+
+impl DashboardSectionError {
+    /// Create a new section error from a [`MapleStoryError`](crate::error::MapleStoryError).
+    pub fn from_error(section: DashboardSection, err: &crate::error::MapleStoryError) -> Self {
+        Self {
+            section,
+            message: err.to_string(),
+            api_code: err.api_code().map(str::to_string),
+            status_code: err.status_code(),
+        }
+    }
+}
+
+/// Options and section mask controlling what data is queried when fetching [`CharacterDashboard`].
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DashboardOptions {
+    /// Enabled dashboard sections
+    pub enabled_sections: std::collections::HashSet<DashboardSection>,
+}
+
+impl Default for DashboardOptions {
+    fn default() -> Self {
+        Self::all()
+    }
+}
+
+impl DashboardOptions {
+    /// Enable all dashboard sections (default behavior).
+    pub fn all() -> Self {
+        use DashboardSection::*;
+        let sections = [
+            Basic,
+            Stat,
+            ItemEquipment,
+            CashItemEquipment,
+            BeautyEquipment,
+            Symbols,
+            Ability,
+            HyperStat,
+            HexaMatrix,
+            HexaMatrixStat,
+            VMatrix,
+            SetEffect,
+            PetEquipment,
+            AndroidEquipment,
+            LinkSkill,
+            Propensity,
+            Popularity,
+            Dojang,
+            Union,
+            UnionArtifact,
+            Guild,
+        ];
+        Self {
+            enabled_sections: sections.into_iter().collect(),
+        }
+    }
+
+    /// Enable all sections except the specified excluded sections.
+    pub fn all_except(excluded: &[DashboardSection]) -> Self {
+        let mut opts = Self::all();
+        for section in excluded {
+            opts.enabled_sections.remove(section);
+        }
+        opts
+    }
+
+    /// Create a builder to selectively configure enabled sections.
+    pub fn builder() -> DashboardOptionsBuilder {
+        DashboardOptionsBuilder::default()
+    }
+
+    /// Returns `true` if the given section is enabled.
+    pub fn is_enabled(&self, section: DashboardSection) -> bool {
+        self.enabled_sections.contains(&section)
+    }
+}
+
+/// Builder for [`DashboardOptions`].
+#[derive(Debug, Default)]
+pub struct DashboardOptionsBuilder {
+    sections: std::collections::HashSet<DashboardSection>,
+}
+
+impl DashboardOptionsBuilder {
+    /// Include a section.
+    pub fn include(mut self, section: DashboardSection) -> Self {
+        self.sections.insert(section);
+        self
+    }
+
+    /// Exclude a section.
+    pub fn exclude(mut self, section: DashboardSection) -> Self {
+        self.sections.remove(&section);
+        self
+    }
+
+    /// Build the [`DashboardOptions`].
+    pub fn build(self) -> DashboardOptions {
+        DashboardOptions {
+            enabled_sections: self.sections,
+        }
+    }
+}
+
 /// Comprehensive all-in-one character dashboard (올인원 캐릭터 종합 대시보드).
 ///
 /// Designed to provide all information required by modern MapleStory ranking &
@@ -1562,6 +2079,9 @@ pub struct CharacterDashboard {
     /// Guild basic info (길드명, 레벨, 길드마스터, 노블레스 스킬)
     /// Automatically looked up if the character belongs to a guild.
     pub guild: Option<crate::models::guild::GuildBasic>,
+    /// Diagnostic errors for individual sections that failed during aggregation.
+    #[serde(default, skip_serializing_if = "std::collections::HashMap::is_empty")]
+    pub errors: std::collections::HashMap<DashboardSection, DashboardSectionError>,
 }
 
 impl CharacterDashboard {
@@ -1679,5 +2199,15 @@ impl CharacterDashboard {
     /// Parsed AvatarCode if available from coordination.
     pub fn avatar_code(&self) -> Option<&crate::avatar::AvatarCode> {
         self.coordination.avatar_code.as_ref()
+    }
+
+    /// Returns `true` if any non-critical sections experienced errors during aggregation.
+    pub fn has_errors(&self) -> bool {
+        !self.errors.is_empty()
+    }
+
+    /// Returns diagnostic error information for a specific section, if it failed.
+    pub fn section_error(&self, section: DashboardSection) -> Option<&DashboardSectionError> {
+        self.errors.get(&section)
     }
 }

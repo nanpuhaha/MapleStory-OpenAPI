@@ -4,6 +4,7 @@
 use crate::{
     client::MapleStoryClient,
     error::{MapleStoryError, Result},
+    models::common::DateParam,
     models::guild::{GuildBasic, GuildId},
 };
 
@@ -47,13 +48,22 @@ impl MapleStoryClient {
 
     /// Retrieve only the `oguild_id` string for a guild.
     pub async fn get_oguild_id(&self, guild_name: &str, world_name: &str) -> Result<String> {
+        if let Some(cached_id) = self.identity_cache.get_oguild_id(guild_name, world_name).await {
+            tracing::debug!("OGuildID cache hit for '{}:{}'", guild_name, world_name);
+            return Ok(cached_id);
+        }
+
         let res = self.get_guild_id(guild_name, world_name).await?;
-        res.oguild_id.ok_or_else(|| {
+        let id = res.oguild_id.ok_or_else(|| {
             MapleStoryError::InvalidParameter(format!(
                 "Guild '{}' not found in world '{}'",
                 guild_name, world_name
             ))
-        })
+        })?;
+
+        self.identity_cache.set_oguild_id(guild_name, world_name, &id).await;
+
+        Ok(id)
     }
 
     /// Retrieve basic information of a guild using its `oguild_id`.
@@ -63,9 +73,14 @@ impl MapleStoryClient {
     /// # Arguments
     /// * `oguild_id` — unique open guild identifier
     /// * `date` — optional reference date `"YYYY-MM-DD"` (KST)
-    pub async fn get_guild_basic(&self, oguild_id: &str, date: Option<&str>) -> Result<GuildBasic> {
+    pub async fn get_guild_basic(
+        &self,
+        oguild_id: &str,
+        date: impl Into<DateParam>,
+    ) -> Result<GuildBasic> {
         let mut params = vec![("oguild_id", oguild_id.to_string())];
-        if let Some(d) = date {
+        let date_param = date.into();
+        if let Some(d) = date_param.as_deref() {
             params.push(("date", Self::validate_date(d)?));
         }
         self.get("/maplestory/v1/guild/basic", &params).await
@@ -88,9 +103,49 @@ impl MapleStoryClient {
         &self,
         guild_name: &str,
         world_name: &str,
-        date: Option<&str>,
+        date: impl Into<DateParam>,
     ) -> Result<GuildBasic> {
         let oguild_id = self.get_oguild_id(guild_name, world_name).await?;
         self.get_guild_basic(&oguild_id, date).await
+    }
+}
+
+// ─── GuildClient ─────────────────────────────────────────────────────────────
+
+/// Domain sub-client for Guild tag API endpoints.
+#[derive(Clone, Copy)]
+pub struct GuildClient<'a> {
+    pub(crate) client: &'a MapleStoryClient,
+}
+
+impl<'a> GuildClient<'a> {
+    /// Create a new `GuildClient` referencing a [`MapleStoryClient`].
+    pub fn new(client: &'a MapleStoryClient) -> Self {
+        Self { client }
+    }
+
+    /// Retrieve the guild identifier (oguild_id) by guild name and world name.
+    pub async fn get_id(&self, guild_name: &str, world_name: &str) -> Result<GuildId> {
+        self.client.get_guild_id(guild_name, world_name).await
+    }
+
+    /// Retrieve only the `oguild_id` string for a guild (consults identity cache).
+    pub async fn get_oguild_id(&self, guild_name: &str, world_name: &str) -> Result<String> {
+        self.client.get_oguild_id(guild_name, world_name).await
+    }
+
+    /// Retrieve basic information of a guild using its `oguild_id`.
+    pub async fn get_basic(&self, oguild_id: &str, date: impl Into<DateParam>) -> Result<GuildBasic> {
+        self.client.get_guild_basic(oguild_id, date).await
+    }
+
+    /// Retrieve basic information of a guild directly by its name and world.
+    pub async fn get_by_name(
+        &self,
+        guild_name: &str,
+        world_name: &str,
+        date: impl Into<DateParam>,
+    ) -> Result<GuildBasic> {
+        self.client.get_guild_by_name(guild_name, world_name, date).await
     }
 }

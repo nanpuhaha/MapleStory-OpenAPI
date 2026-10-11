@@ -14,10 +14,10 @@ use crate::{
         CharacterHyperStat, CharacterItemEquipment, CharacterLinkSkill, CharacterOcid,
         CharacterOtherStat, CharacterPetEquipment, CharacterPopularity, CharacterProfile,
         CharacterPropensity, CharacterSetEffect, CharacterSkill, CharacterStat,
-        CharacterSymbolEquipment, CharacterVMatrix, RingExchangeSkillEquipment,
-        RingReserveSkillEquipment,
+        CharacterSymbolEquipment, CharacterVMatrix, DashboardOptions, DashboardSection,
+        DashboardSectionError, RingExchangeSkillEquipment, RingReserveSkillEquipment,
     },
-    models::common::SkillGrade,
+    models::common::{DateParam, SkillGrade},
 };
 
 impl MapleStoryClient {
@@ -52,12 +52,9 @@ impl MapleStoryClient {
     /// Returns [`MapleStoryError::CharacterNotFound`] if the character does not
     /// exist or the OCID is empty.
     pub async fn get_ocid(&self, character_name: &str) -> Result<String> {
-        #[cfg(feature = "cache")]
-        if let Some(cache) = &self.ocid_cache {
-            if let Some(cached_ocid) = cache.get(character_name).await {
-                tracing::debug!("OCID cache hit for '{}'", character_name);
-                return Ok(cached_ocid);
-            }
+        if let Some(cached_ocid) = self.identity_cache.get_ocid(character_name).await {
+            tracing::debug!("OCID cache hit for '{}'", character_name);
+            return Ok(cached_ocid);
         }
 
         let result = self.get_character_id(character_name).await?;
@@ -67,12 +64,19 @@ impl MapleStoryClient {
                 name: character_name.to_string(),
             })?;
 
-        #[cfg(feature = "cache")]
-        if let Some(cache) = &self.ocid_cache {
-            cache.insert(character_name.to_string(), ocid.clone()).await;
-        }
+        self.identity_cache.set_ocid(character_name, &ocid).await;
 
         Ok(ocid)
+    }
+
+    /// Internal helper to resolve an OCID by character name and execute a closure with it.
+    async fn with_ocid<T, F, Fut>(&self, character_name: &str, f: F) -> Result<T>
+    where
+        F: FnOnce(String) -> Fut,
+        Fut: std::future::Future<Output = Result<T>>,
+    {
+        let ocid = self.get_ocid(character_name).await?;
+        f(ocid).await
     }
 
     // ─── Convenience: 닉네임 간편 조회 메서드군 ───────────────────────────────
@@ -80,14 +84,18 @@ impl MapleStoryClient {
     /// **Quick lookup by character name** — retrieves basic character info with a
     /// single method call.
     pub async fn get_character_by_name(&self, character_name: &str) -> Result<CharacterBasic> {
-        let ocid = self.get_ocid(character_name).await?;
-        self.get_character_basic(&ocid, None).await
+        self.with_ocid(character_name, |ocid| async move {
+            self.get_character_basic(&ocid, None).await
+        })
+        .await
     }
 
     /// Retrieve character comprehensive stats directly by character name.
     pub async fn get_character_stat_by_name(&self, character_name: &str) -> Result<CharacterStat> {
-        let ocid = self.get_ocid(character_name).await?;
-        self.get_character_stat(&ocid, None).await
+        self.with_ocid(character_name, |ocid| async move {
+            self.get_character_stat(&ocid, None).await
+        })
+        .await
     }
 
     /// Retrieve character equipped items directly by character name.
@@ -95,8 +103,10 @@ impl MapleStoryClient {
         &self,
         character_name: &str,
     ) -> Result<CharacterItemEquipment> {
-        let ocid = self.get_ocid(character_name).await?;
-        self.get_character_item_equipment(&ocid, None).await
+        self.with_ocid(character_name, |ocid| async move {
+            self.get_character_item_equipment(&ocid, None).await
+        })
+        .await
     }
 
     /// Retrieve character cash items directly by character name.
@@ -104,8 +114,10 @@ impl MapleStoryClient {
         &self,
         character_name: &str,
     ) -> Result<CharacterCashItemEquipment> {
-        let ocid = self.get_ocid(character_name).await?;
-        self.get_character_cashitem_equipment(&ocid, None).await
+        self.with_ocid(character_name, |ocid| async move {
+            self.get_character_cashitem_equipment(&ocid, None).await
+        })
+        .await
     }
 
     /// Retrieve character beauty (hair, face, skin) directly by character name.
@@ -113,8 +125,10 @@ impl MapleStoryClient {
         &self,
         character_name: &str,
     ) -> Result<CharacterBeautyEquipment> {
-        let ocid = self.get_ocid(character_name).await?;
-        self.get_character_beauty_equipment(&ocid, None).await
+        self.with_ocid(character_name, |ocid| async move {
+            self.get_character_beauty_equipment(&ocid, None).await
+        })
+        .await
     }
 
     /// Retrieve character popularity directly by character name.
@@ -122,8 +136,10 @@ impl MapleStoryClient {
         &self,
         character_name: &str,
     ) -> Result<CharacterPopularity> {
-        let ocid = self.get_ocid(character_name).await?;
-        self.get_character_popularity(&ocid, None).await
+        self.with_ocid(character_name, |ocid| async move {
+            self.get_character_popularity(&ocid, None).await
+        })
+        .await
     }
 
     /// Retrieve character Mu Lung Dojo record directly by character name.
@@ -131,8 +147,10 @@ impl MapleStoryClient {
         &self,
         character_name: &str,
     ) -> Result<CharacterDojang> {
-        let ocid = self.get_ocid(character_name).await?;
-        self.get_character_dojang(&ocid, None).await
+        self.with_ocid(character_name, |ocid| async move {
+            self.get_character_dojang(&ocid, None).await
+        })
+        .await
     }
 
     /// Retrieve character skills directly by character name.
@@ -141,8 +159,10 @@ impl MapleStoryClient {
         character_name: &str,
         grade: SkillGrade,
     ) -> Result<CharacterSkill> {
-        let ocid = self.get_ocid(character_name).await?;
-        self.get_character_skill(&ocid, grade, None).await
+        self.with_ocid(character_name, |ocid| async move {
+            self.get_character_skill(&ocid, grade, None).await
+        })
+        .await
     }
 
     // ─── Coordination & Outfit (코디 / 외형 합성 조회) ──────────────────────────
@@ -160,16 +180,18 @@ impl MapleStoryClient {
     pub async fn get_character_coordination(
         &self,
         ocid: &str,
-        date: Option<&str>,
+        date: impl Into<DateParam>,
     ) -> Result<CharacterCoordination> {
+        let date_param = date.into();
+        let date_ref = date_param.as_deref();
         let ((basic_res, beauty_res), (cash_res, equip_res)) = futures_util::future::join(
             futures_util::future::join(
-                self.get_character_basic(ocid, date),
-                self.get_character_beauty_equipment(ocid, date),
+                self.get_character_basic(ocid, date_ref),
+                self.get_character_beauty_equipment(ocid, date_ref),
             ),
             futures_util::future::join(
-                self.get_character_cashitem_equipment(ocid, date),
-                self.get_character_item_equipment(ocid, date),
+                self.get_character_cashitem_equipment(ocid, date_ref),
+                self.get_character_item_equipment(ocid, date_ref),
             ),
         )
         .await;
@@ -224,21 +246,23 @@ impl MapleStoryClient {
     pub async fn get_character_profile(
         &self,
         ocid: &str,
-        date: Option<&str>,
+        date: impl Into<DateParam>,
     ) -> Result<CharacterProfile> {
+        let date_param = date.into();
+        let date_ref = date_param.as_deref();
         let ((basic, stat), (equip, cash), (beauty, pop, dojang)) = futures_util::future::join3(
             futures_util::future::join(
-                self.get_character_basic(ocid, date),
-                self.get_character_stat(ocid, date),
+                self.get_character_basic(ocid, date_ref),
+                self.get_character_stat(ocid, date_ref),
             ),
             futures_util::future::join(
-                self.get_character_item_equipment(ocid, date),
-                self.get_character_cashitem_equipment(ocid, date),
+                self.get_character_item_equipment(ocid, date_ref),
+                self.get_character_cashitem_equipment(ocid, date_ref),
             ),
             futures_util::future::join3(
-                self.get_character_beauty_equipment(ocid, date),
-                self.get_character_popularity(ocid, date),
-                self.get_character_dojang(ocid, date),
+                self.get_character_beauty_equipment(ocid, date_ref),
+                self.get_character_popularity(ocid, date_ref),
+                self.get_character_dojang(ocid, date_ref),
             ),
         )
         .await;
@@ -274,24 +298,529 @@ impl MapleStoryClient {
         self.get_character_profile(&ocid, None).await
     }
 
-    /// Retrieve a comprehensive all-in-one character dashboard (올인원 캐릭터 종합 대시보드).
+    /// Retrieve a comprehensive all-in-one character dashboard using custom [`DashboardOptions`].
     ///
-    /// Fetches all specs, equipment, symbols, abilities, 6th HEXA matrix,
-    /// 5th V matrix, union, artifacts, and guild information concurrently.
-    ///
-    /// Non-critical or tier-dependent endpoints (like 6th job for low level chars,
-    /// or guild info for guildless chars) gracefully fall back to `None`.
-    pub async fn get_character_dashboard(
+    /// Allows callers to select specific sections, reducing network round-trips and
+    /// preserving rate limits. Diagnostic errors from non-critical endpoints are
+    /// recorded in [`CharacterDashboard::errors`].
+    pub async fn get_character_dashboard_with_options(
         &self,
         ocid: &str,
-        date: Option<&str>,
+        date: impl Into<DateParam>,
+        options: &DashboardOptions,
     ) -> Result<CharacterDashboard> {
+        let date_param = date.into();
+        let date = date_param.as_deref();
+        // Pipeline guild lookup: starts as soon as `basic` completes, running concurrently
+        // with other character endpoints.
+        let basic_and_guild_fut = async {
+            let basic_res = self.get_character_basic(ocid, date).await;
+            let guild_res = match &basic_res {
+                Ok(basic) if options.is_enabled(DashboardSection::Guild) => {
+                    match (
+                        basic.character_guild_name.as_deref(),
+                        basic.world_name.as_deref(),
+                    ) {
+                        (Some(guild_name), Some(world_name))
+                            if !guild_name.is_empty() && !world_name.is_empty() =>
+                        {
+                            Some(self.get_guild_by_name(guild_name, world_name, date).await)
+                        }
+                        _ => None,
+                    }
+                }
+                _ => None,
+            };
+            (basic_res, guild_res)
+        };
+
+        let stat_fut = async {
+            if options.is_enabled(DashboardSection::Stat) {
+                Some(self.get_character_stat(ocid, date).await)
+            } else {
+                None
+            }
+        };
+
+        let equip_fut = async {
+            if options.is_enabled(DashboardSection::ItemEquipment) {
+                Some(self.get_character_item_equipment(ocid, date).await)
+            } else {
+                None
+            }
+        };
+
+        let cash_fut = async {
+            if options.is_enabled(DashboardSection::CashItemEquipment) {
+                Some(self.get_character_cashitem_equipment(ocid, date).await)
+            } else {
+                None
+            }
+        };
+
+        let beauty_fut = async {
+            if options.is_enabled(DashboardSection::BeautyEquipment) {
+                Some(self.get_character_beauty_equipment(ocid, date).await)
+            } else {
+                None
+            }
+        };
+
+        let symbols_fut = async {
+            if options.is_enabled(DashboardSection::Symbols) {
+                Some(self.get_character_symbol_equipment(ocid, date).await)
+            } else {
+                None
+            }
+        };
+
+        let ability_fut = async {
+            if options.is_enabled(DashboardSection::Ability) {
+                Some(self.get_character_ability(ocid, date).await)
+            } else {
+                None
+            }
+        };
+
+        let hyper_stat_fut = async {
+            if options.is_enabled(DashboardSection::HyperStat) {
+                Some(self.get_character_hyper_stat(ocid, date).await)
+            } else {
+                None
+            }
+        };
+
+        let hexa_matrix_fut = async {
+            if options.is_enabled(DashboardSection::HexaMatrix) {
+                Some(self.get_character_hexamatrix(ocid, date).await)
+            } else {
+                None
+            }
+        };
+
+        let hexa_matrix_stat_fut = async {
+            if options.is_enabled(DashboardSection::HexaMatrixStat) {
+                Some(self.get_character_hexamatrix_stat(ocid, date).await)
+            } else {
+                None
+            }
+        };
+
+        let v_matrix_fut = async {
+            if options.is_enabled(DashboardSection::VMatrix) {
+                Some(self.get_character_vmatrix(ocid, date).await)
+            } else {
+                None
+            }
+        };
+
+        let set_effect_fut = async {
+            if options.is_enabled(DashboardSection::SetEffect) {
+                Some(self.get_character_set_effect(ocid, date).await)
+            } else {
+                None
+            }
+        };
+
+        let pet_fut = async {
+            if options.is_enabled(DashboardSection::PetEquipment) {
+                Some(self.get_character_pet_equipment(ocid, date).await)
+            } else {
+                None
+            }
+        };
+
+        let android_fut = async {
+            if options.is_enabled(DashboardSection::AndroidEquipment) {
+                Some(self.get_character_android_equipment(ocid, date).await)
+            } else {
+                None
+            }
+        };
+
+        let link_fut = async {
+            if options.is_enabled(DashboardSection::LinkSkill) {
+                Some(self.get_character_link_skill(ocid, date).await)
+            } else {
+                None
+            }
+        };
+
+        let propensity_fut = async {
+            if options.is_enabled(DashboardSection::Propensity) {
+                Some(self.get_character_propensity(ocid, date).await)
+            } else {
+                None
+            }
+        };
+
+        let popularity_fut = async {
+            if options.is_enabled(DashboardSection::Popularity) {
+                Some(self.get_character_popularity(ocid, date).await)
+            } else {
+                None
+            }
+        };
+
+        let dojang_fut = async {
+            if options.is_enabled(DashboardSection::Dojang) {
+                Some(self.get_character_dojang(ocid, date).await)
+            } else {
+                None
+            }
+        };
+
+        let union_fut = async {
+            if options.is_enabled(DashboardSection::Union) {
+                Some(self.get_user_union(ocid, date).await)
+            } else {
+                None
+            }
+        };
+
+        let union_artifact_fut = async {
+            if options.is_enabled(DashboardSection::UnionArtifact) {
+                Some(self.get_user_union_artifact(ocid, date).await)
+            } else {
+                None
+            }
+        };
+
         let (
+            (basic_res, guild_res),
+            stat_res,
+            equip_res,
+            cash_res,
+            beauty_res,
+            symbols_res,
+            ability_res,
+            hyper_stat_res,
+            hexa_matrix_res,
+            hexa_matrix_stat_res,
+            v_matrix_res,
+            set_effect_res,
+            pet_res,
+            android_res,
+            link_res,
+            propensity_res,
+            popularity_res,
+            dojang_res,
+            union_res,
+            union_artifact_res,
+        ) = futures_util::join!(
+            basic_and_guild_fut,
+            stat_fut,
+            equip_fut,
+            cash_fut,
+            beauty_fut,
+            symbols_fut,
+            ability_fut,
+            hyper_stat_fut,
+            hexa_matrix_fut,
+            hexa_matrix_stat_fut,
+            v_matrix_fut,
+            set_effect_fut,
+            pet_fut,
+            android_fut,
+            link_fut,
+            propensity_fut,
+            popularity_fut,
+            dojang_fut,
+            union_fut,
+            union_artifact_fut,
+        );
+
+        let basic = basic_res?;
+        let mut errors = std::collections::HashMap::new();
+
+        let stat = match stat_res {
+            Some(Ok(s)) => s,
+            Some(Err(e)) => {
+                errors.insert(
+                    DashboardSection::Stat,
+                    DashboardSectionError::from_error(DashboardSection::Stat, &e),
+                );
+                CharacterStat {
+                    date: None,
+                    character_class: basic.character_class.clone(),
+                    final_stat: None,
+                    remain_ap: None,
+                }
+            }
+            None => CharacterStat {
+                date: None,
+                character_class: basic.character_class.clone(),
+                final_stat: None,
+                remain_ap: None,
+            },
+        };
+
+        let item_equipment = match equip_res {
+            Some(Ok(eq)) => eq,
+            Some(Err(e)) => {
+                errors.insert(
+                    DashboardSection::ItemEquipment,
+                    DashboardSectionError::from_error(DashboardSection::ItemEquipment, &e),
+                );
+                CharacterItemEquipment {
+                    date: None,
+                    character_gender: None,
+                    character_class: basic.character_class.clone(),
+                    preset_no: None,
+                    item_equipment: None,
+                    item_equipment_preset_1: None,
+                    item_equipment_preset_2: None,
+                    item_equipment_preset_3: None,
+                    title: None,
+                    dragon_equipment: None,
+                    mechanic_equipment: None,
+                }
+            }
+            None => CharacterItemEquipment {
+                date: None,
+                character_gender: None,
+                character_class: basic.character_class.clone(),
+                preset_no: None,
+                item_equipment: None,
+                item_equipment_preset_1: None,
+                item_equipment_preset_2: None,
+                item_equipment_preset_3: None,
+                title: None,
+                dragon_equipment: None,
+                mechanic_equipment: None,
+            },
+        };
+
+        let cash_item_equipment = match cash_res {
+            Some(Ok(c)) => c,
+            Some(Err(e)) => {
+                errors.insert(
+                    DashboardSection::CashItemEquipment,
+                    DashboardSectionError::from_error(DashboardSection::CashItemEquipment, &e),
+                );
+                CharacterCashItemEquipment::default()
+            }
+            None => CharacterCashItemEquipment::default(),
+        };
+
+        let beauty_equipment = match beauty_res {
+            Some(Ok(b)) => b,
+            Some(Err(e)) => {
+                errors.insert(
+                    DashboardSection::BeautyEquipment,
+                    DashboardSectionError::from_error(DashboardSection::BeautyEquipment, &e),
+                );
+                CharacterBeautyEquipment::default()
+            }
+            None => CharacterBeautyEquipment::default(),
+        };
+
+        let coordination = CharacterCoordination::from_full_parts(
+            &basic,
+            &beauty_equipment,
+            &cash_item_equipment,
+            &item_equipment,
+        );
+
+        let symbols = match symbols_res {
+            Some(Ok(s)) => Some(s),
+            Some(Err(e)) => {
+                errors.insert(
+                    DashboardSection::Symbols,
+                    DashboardSectionError::from_error(DashboardSection::Symbols, &e),
+                );
+                None
+            }
+            None => None,
+        };
+
+        let ability = match ability_res {
+            Some(Ok(a)) => Some(a),
+            Some(Err(e)) => {
+                errors.insert(
+                    DashboardSection::Ability,
+                    DashboardSectionError::from_error(DashboardSection::Ability, &e),
+                );
+                None
+            }
+            None => None,
+        };
+
+        let hyper_stat = match hyper_stat_res {
+            Some(Ok(h)) => Some(h),
+            Some(Err(e)) => {
+                errors.insert(
+                    DashboardSection::HyperStat,
+                    DashboardSectionError::from_error(DashboardSection::HyperStat, &e),
+                );
+                None
+            }
+            None => None,
+        };
+
+        let hexa_matrix = match hexa_matrix_res {
+            Some(Ok(h)) => Some(h),
+            Some(Err(e)) => {
+                errors.insert(
+                    DashboardSection::HexaMatrix,
+                    DashboardSectionError::from_error(DashboardSection::HexaMatrix, &e),
+                );
+                None
+            }
+            None => None,
+        };
+
+        let hexa_matrix_stat = match hexa_matrix_stat_res {
+            Some(Ok(h)) => Some(h),
+            Some(Err(e)) => {
+                errors.insert(
+                    DashboardSection::HexaMatrixStat,
+                    DashboardSectionError::from_error(DashboardSection::HexaMatrixStat, &e),
+                );
+                None
+            }
+            None => None,
+        };
+
+        let v_matrix = match v_matrix_res {
+            Some(Ok(v)) => Some(v),
+            Some(Err(e)) => {
+                errors.insert(
+                    DashboardSection::VMatrix,
+                    DashboardSectionError::from_error(DashboardSection::VMatrix, &e),
+                );
+                None
+            }
+            None => None,
+        };
+
+        let set_effect = match set_effect_res {
+            Some(Ok(s)) => Some(s),
+            Some(Err(e)) => {
+                errors.insert(
+                    DashboardSection::SetEffect,
+                    DashboardSectionError::from_error(DashboardSection::SetEffect, &e),
+                );
+                None
+            }
+            None => None,
+        };
+
+        let pet_equipment = match pet_res {
+            Some(Ok(p)) => Some(p),
+            Some(Err(e)) => {
+                errors.insert(
+                    DashboardSection::PetEquipment,
+                    DashboardSectionError::from_error(DashboardSection::PetEquipment, &e),
+                );
+                None
+            }
+            None => None,
+        };
+
+        let android_equipment = match android_res {
+            Some(Ok(a)) => Some(a),
+            Some(Err(e)) => {
+                errors.insert(
+                    DashboardSection::AndroidEquipment,
+                    DashboardSectionError::from_error(DashboardSection::AndroidEquipment, &e),
+                );
+                None
+            }
+            None => None,
+        };
+
+        let link_skill = match link_res {
+            Some(Ok(l)) => Some(l),
+            Some(Err(e)) => {
+                errors.insert(
+                    DashboardSection::LinkSkill,
+                    DashboardSectionError::from_error(DashboardSection::LinkSkill, &e),
+                );
+                None
+            }
+            None => None,
+        };
+
+        let propensity = match propensity_res {
+            Some(Ok(p)) => Some(p),
+            Some(Err(e)) => {
+                errors.insert(
+                    DashboardSection::Propensity,
+                    DashboardSectionError::from_error(DashboardSection::Propensity, &e),
+                );
+                None
+            }
+            None => None,
+        };
+
+        let popularity = match popularity_res {
+            Some(Ok(p)) => Some(p),
+            Some(Err(e)) => {
+                errors.insert(
+                    DashboardSection::Popularity,
+                    DashboardSectionError::from_error(DashboardSection::Popularity, &e),
+                );
+                None
+            }
+            None => None,
+        };
+
+        let dojang = match dojang_res {
+            Some(Ok(d)) => Some(d),
+            Some(Err(e)) => {
+                errors.insert(
+                    DashboardSection::Dojang,
+                    DashboardSectionError::from_error(DashboardSection::Dojang, &e),
+                );
+                None
+            }
+            None => None,
+        };
+
+        let union = match union_res {
+            Some(Ok(u)) => Some(u),
+            Some(Err(e)) => {
+                errors.insert(
+                    DashboardSection::Union,
+                    DashboardSectionError::from_error(DashboardSection::Union, &e),
+                );
+                None
+            }
+            None => None,
+        };
+
+        let union_artifact = match union_artifact_res {
+            Some(Ok(u)) => Some(u),
+            Some(Err(e)) => {
+                errors.insert(
+                    DashboardSection::UnionArtifact,
+                    DashboardSectionError::from_error(DashboardSection::UnionArtifact, &e),
+                );
+                None
+            }
+            None => None,
+        };
+
+        let guild = match guild_res {
+            Some(Ok(g)) => Some(g),
+            Some(Err(e)) => {
+                errors.insert(
+                    DashboardSection::Guild,
+                    DashboardSectionError::from_error(DashboardSection::Guild, &e),
+                );
+                None
+            }
+            None => None,
+        };
+
+        Ok(CharacterDashboard {
             basic,
             stat,
-            equip,
-            cash,
-            beauty,
+            item_equipment,
+            cash_item_equipment,
+            beauty_equipment,
+            coordination,
             symbols,
             ability,
             hyper_stat,
@@ -299,84 +828,46 @@ impl MapleStoryClient {
             hexa_matrix_stat,
             v_matrix,
             set_effect,
-            pet,
-            android,
-            link,
+            pet_equipment,
+            android_equipment,
+            link_skill,
             propensity,
             popularity,
             dojang,
             union,
             union_artifact,
-        ) = futures_util::join!(
-            self.get_character_basic(ocid, date),
-            self.get_character_stat(ocid, date),
-            self.get_character_item_equipment(ocid, date),
-            self.get_character_cashitem_equipment(ocid, date),
-            self.get_character_beauty_equipment(ocid, date),
-            self.get_character_symbol_equipment(ocid, date),
-            self.get_character_ability(ocid, date),
-            self.get_character_hyper_stat(ocid, date),
-            self.get_character_hexamatrix(ocid, date),
-            self.get_character_hexamatrix_stat(ocid, date),
-            self.get_character_vmatrix(ocid, date),
-            self.get_character_set_effect(ocid, date),
-            self.get_character_pet_equipment(ocid, date),
-            self.get_character_android_equipment(ocid, date),
-            self.get_character_link_skill(ocid, date),
-            self.get_character_propensity(ocid, date),
-            self.get_character_popularity(ocid, date),
-            self.get_character_dojang(ocid, date),
-            self.get_user_union(ocid, date),
-            self.get_user_union_artifact(ocid, date),
-        );
-
-        let basic = basic?;
-        let stat = stat?;
-        let equip = equip?;
-        let cash = cash?;
-        let beauty = beauty?;
-
-        let coordination = CharacterCoordination::from_full_parts(&basic, &beauty, &cash, &equip);
-
-        // Fetch guild information if the character is in a guild
-        let guild = match (
-            basic.character_guild_name.as_deref(),
-            basic.world_name.as_deref(),
-        ) {
-            (Some(guild_name), Some(world_name))
-                if !guild_name.is_empty() && !world_name.is_empty() =>
-            {
-                self.get_guild_by_name(guild_name, world_name, date)
-                    .await
-                    .ok()
-            }
-            _ => None,
-        };
-
-        Ok(CharacterDashboard {
-            basic,
-            stat,
-            item_equipment: equip,
-            cash_item_equipment: cash,
-            beauty_equipment: beauty,
-            coordination,
-            symbols: symbols.ok(),
-            ability: ability.ok(),
-            hyper_stat: hyper_stat.ok(),
-            hexa_matrix: hexa_matrix.ok(),
-            hexa_matrix_stat: hexa_matrix_stat.ok(),
-            v_matrix: v_matrix.ok(),
-            set_effect: set_effect.ok(),
-            pet_equipment: pet.ok(),
-            android_equipment: android.ok(),
-            link_skill: link.ok(),
-            propensity: propensity.ok(),
-            popularity: popularity.ok(),
-            dojang: dojang.ok(),
-            union: union.ok(),
-            union_artifact: union_artifact.ok(),
             guild,
+            errors,
         })
+    }
+
+    /// Retrieve a comprehensive all-in-one character dashboard (올인원 캐릭터 종합 대시보드).
+    ///
+    /// Fetches all specs, equipment, symbols, abilities, 6th HEXA matrix,
+    /// 5th V matrix, union, artifacts, and guild information concurrently.
+    ///
+    /// Non-critical or tier-dependent endpoints (like 6th job for low level chars,
+    /// or guild info for guildless chars) gracefully fall back to `None`, with
+    /// failure details recorded in [`CharacterDashboard::errors`].
+    pub async fn get_character_dashboard(
+        &self,
+        ocid: &str,
+        date: impl Into<DateParam>,
+    ) -> Result<CharacterDashboard> {
+        self.get_character_dashboard_with_options(ocid, date, &DashboardOptions::all())
+            .await
+    }
+
+    /// Retrieve an all-in-one character dashboard with custom options directly by character name.
+    pub async fn get_character_dashboard_with_options_by_name(
+        &self,
+        character_name: &str,
+        date: impl Into<DateParam>,
+        options: &DashboardOptions,
+    ) -> Result<CharacterDashboard> {
+        let ocid = self.get_ocid(character_name).await?;
+        self.get_character_dashboard_with_options(&ocid, date, options)
+            .await
     }
 
     /// Retrieve a comprehensive all-in-one character dashboard directly by character name.
@@ -398,8 +889,12 @@ impl MapleStoryClient {
         &self,
         character_name: &str,
     ) -> Result<CharacterDashboard> {
-        let ocid = self.get_ocid(character_name).await?;
-        self.get_character_dashboard(&ocid, None).await
+        self.get_character_dashboard_with_options_by_name(
+            character_name,
+            None,
+            &DashboardOptions::all(),
+        )
+        .await
     }
 
     /// Fetches all frames of an animation preset for the given avatar code,
@@ -488,9 +983,9 @@ impl MapleStoryClient {
     pub async fn get_character_basic(
         &self,
         ocid: &str,
-        date: Option<&str>,
+        date: impl Into<DateParam>,
     ) -> Result<CharacterBasic> {
-        let params = build_params(ocid, date)?;
+        let params = build_params(ocid, date.into().as_deref())?;
         self.get("/maplestory/v1/character/basic", &params).await
     }
 
@@ -502,9 +997,9 @@ impl MapleStoryClient {
     pub async fn get_character_popularity(
         &self,
         ocid: &str,
-        date: Option<&str>,
+        date: impl Into<DateParam>,
     ) -> Result<CharacterPopularity> {
-        let params = build_params(ocid, date)?;
+        let params = build_params(ocid, date.into().as_deref())?;
         self.get("/maplestory/v1/character/popularity", &params)
             .await
     }
@@ -517,9 +1012,9 @@ impl MapleStoryClient {
     pub async fn get_character_stat(
         &self,
         ocid: &str,
-        date: Option<&str>,
+        date: impl Into<DateParam>,
     ) -> Result<CharacterStat> {
-        let params = build_params(ocid, date)?;
+        let params = build_params(ocid, date.into().as_deref())?;
         self.get("/maplestory/v1/character/stat", &params).await
     }
 
@@ -531,9 +1026,9 @@ impl MapleStoryClient {
     pub async fn get_character_hyper_stat(
         &self,
         ocid: &str,
-        date: Option<&str>,
+        date: impl Into<DateParam>,
     ) -> Result<CharacterHyperStat> {
-        let params = build_params(ocid, date)?;
+        let params = build_params(ocid, date.into().as_deref())?;
         self.get("/maplestory/v1/character/hyper-stat", &params)
             .await
     }
@@ -546,9 +1041,9 @@ impl MapleStoryClient {
     pub async fn get_character_propensity(
         &self,
         ocid: &str,
-        date: Option<&str>,
+        date: impl Into<DateParam>,
     ) -> Result<CharacterPropensity> {
-        let params = build_params(ocid, date)?;
+        let params = build_params(ocid, date.into().as_deref())?;
         self.get("/maplestory/v1/character/propensity", &params)
             .await
     }
@@ -561,9 +1056,9 @@ impl MapleStoryClient {
     pub async fn get_character_ability(
         &self,
         ocid: &str,
-        date: Option<&str>,
+        date: impl Into<DateParam>,
     ) -> Result<CharacterAbility> {
-        let params = build_params(ocid, date)?;
+        let params = build_params(ocid, date.into().as_deref())?;
         self.get("/maplestory/v1/character/ability", &params).await
     }
 
@@ -575,9 +1070,9 @@ impl MapleStoryClient {
     pub async fn get_character_item_equipment(
         &self,
         ocid: &str,
-        date: Option<&str>,
+        date: impl Into<DateParam>,
     ) -> Result<CharacterItemEquipment> {
-        let params = build_params(ocid, date)?;
+        let params = build_params(ocid, date.into().as_deref())?;
         self.get("/maplestory/v1/character/item-equipment", &params)
             .await
     }
@@ -590,9 +1085,9 @@ impl MapleStoryClient {
     pub async fn get_character_cashitem_equipment(
         &self,
         ocid: &str,
-        date: Option<&str>,
+        date: impl Into<DateParam>,
     ) -> Result<CharacterCashItemEquipment> {
-        let params = build_params(ocid, date)?;
+        let params = build_params(ocid, date.into().as_deref())?;
         self.get("/maplestory/v1/character/cashitem-equipment", &params)
             .await
     }
@@ -605,9 +1100,9 @@ impl MapleStoryClient {
     pub async fn get_character_symbol_equipment(
         &self,
         ocid: &str,
-        date: Option<&str>,
+        date: impl Into<DateParam>,
     ) -> Result<CharacterSymbolEquipment> {
-        let params = build_params(ocid, date)?;
+        let params = build_params(ocid, date.into().as_deref())?;
         self.get("/maplestory/v1/character/symbol-equipment", &params)
             .await
     }
@@ -620,9 +1115,9 @@ impl MapleStoryClient {
     pub async fn get_character_set_effect(
         &self,
         ocid: &str,
-        date: Option<&str>,
+        date: impl Into<DateParam>,
     ) -> Result<CharacterSetEffect> {
-        let params = build_params(ocid, date)?;
+        let params = build_params(ocid, date.into().as_deref())?;
         self.get("/maplestory/v1/character/set-effect", &params)
             .await
     }
@@ -635,9 +1130,9 @@ impl MapleStoryClient {
     pub async fn get_character_beauty_equipment(
         &self,
         ocid: &str,
-        date: Option<&str>,
+        date: impl Into<DateParam>,
     ) -> Result<CharacterBeautyEquipment> {
-        let params = build_params(ocid, date)?;
+        let params = build_params(ocid, date.into().as_deref())?;
         self.get("/maplestory/v1/character/beauty-equipment", &params)
             .await
     }
@@ -650,9 +1145,9 @@ impl MapleStoryClient {
     pub async fn get_character_android_equipment(
         &self,
         ocid: &str,
-        date: Option<&str>,
+        date: impl Into<DateParam>,
     ) -> Result<CharacterAndroidEquipment> {
-        let params = build_params(ocid, date)?;
+        let params = build_params(ocid, date.into().as_deref())?;
         self.get("/maplestory/v1/character/android-equipment", &params)
             .await
     }
@@ -665,9 +1160,9 @@ impl MapleStoryClient {
     pub async fn get_character_pet_equipment(
         &self,
         ocid: &str,
-        date: Option<&str>,
+        date: impl Into<DateParam>,
     ) -> Result<CharacterPetEquipment> {
-        let params = build_params(ocid, date)?;
+        let params = build_params(ocid, date.into().as_deref())?;
         self.get("/maplestory/v1/character/pet-equipment", &params)
             .await
     }
@@ -697,9 +1192,9 @@ impl MapleStoryClient {
         &self,
         ocid: &str,
         grade: SkillGrade,
-        date: Option<&str>,
+        date: impl Into<DateParam>,
     ) -> Result<CharacterSkill> {
-        let mut params = build_params(ocid, date)?;
+        let mut params = build_params(ocid, date.into().as_deref())?;
         params.push(("character_skill_grade", grade.to_string()));
         self.get("/maplestory/v1/character/skill", &params).await
     }
@@ -712,9 +1207,9 @@ impl MapleStoryClient {
     pub async fn get_character_link_skill(
         &self,
         ocid: &str,
-        date: Option<&str>,
+        date: impl Into<DateParam>,
     ) -> Result<CharacterLinkSkill> {
-        let params = build_params(ocid, date)?;
+        let params = build_params(ocid, date.into().as_deref())?;
         self.get("/maplestory/v1/character/link-skill", &params)
             .await
     }
@@ -727,9 +1222,9 @@ impl MapleStoryClient {
     pub async fn get_character_vmatrix(
         &self,
         ocid: &str,
-        date: Option<&str>,
+        date: impl Into<DateParam>,
     ) -> Result<CharacterVMatrix> {
-        let params = build_params(ocid, date)?;
+        let params = build_params(ocid, date.into().as_deref())?;
         self.get("/maplestory/v1/character/vmatrix", &params).await
     }
 
@@ -741,9 +1236,9 @@ impl MapleStoryClient {
     pub async fn get_character_hexamatrix(
         &self,
         ocid: &str,
-        date: Option<&str>,
+        date: impl Into<DateParam>,
     ) -> Result<CharacterHexaMatrix> {
-        let params = build_params(ocid, date)?;
+        let params = build_params(ocid, date.into().as_deref())?;
         self.get("/maplestory/v1/character/hexamatrix", &params)
             .await
     }
@@ -756,9 +1251,9 @@ impl MapleStoryClient {
     pub async fn get_character_hexamatrix_stat(
         &self,
         ocid: &str,
-        date: Option<&str>,
+        date: impl Into<DateParam>,
     ) -> Result<CharacterHexaMatrixStat> {
-        let params = build_params(ocid, date)?;
+        let params = build_params(ocid, date.into().as_deref())?;
         self.get("/maplestory/v1/character/hexamatrix-stat", &params)
             .await
     }
@@ -771,9 +1266,9 @@ impl MapleStoryClient {
     pub async fn get_character_dojang(
         &self,
         ocid: &str,
-        date: Option<&str>,
+        date: impl Into<DateParam>,
     ) -> Result<CharacterDojang> {
-        let params = build_params(ocid, date)?;
+        let params = build_params(ocid, date.into().as_deref())?;
         self.get("/maplestory/v1/character/dojang", &params).await
     }
 
@@ -787,9 +1282,9 @@ impl MapleStoryClient {
     pub async fn get_character_other_stat(
         &self,
         ocid: &str,
-        date: Option<&str>,
+        date: impl Into<DateParam>,
     ) -> Result<CharacterOtherStat> {
-        let params = build_params(ocid, date)?;
+        let params = build_params(ocid, date.into().as_deref())?;
         self.get("/maplestory/v1/character/other-stat", &params)
             .await
     }
@@ -804,9 +1299,9 @@ impl MapleStoryClient {
     pub async fn get_character_ring_exchange_skill_equipment(
         &self,
         ocid: &str,
-        date: Option<&str>,
+        date: impl Into<DateParam>,
     ) -> Result<RingExchangeSkillEquipment> {
-        let params = build_params(ocid, date)?;
+        let params = build_params(ocid, date.into().as_deref())?;
         self.get(
             "/maplestory/v1/character/ring-exchange-skill-equipment",
             &params,
@@ -824,9 +1319,9 @@ impl MapleStoryClient {
     pub async fn get_character_ring_reserve_skill_equipment(
         &self,
         ocid: &str,
-        date: Option<&str>,
+        date: impl Into<DateParam>,
     ) -> Result<RingReserveSkillEquipment> {
-        let params = build_params(ocid, date)?;
+        let params = build_params(ocid, date.into().as_deref())?;
         self.get(
             "/maplestory/v1/character/ring-reserve-skill-equipment",
             &params,
@@ -844,4 +1339,196 @@ fn build_params(ocid: &str, date: Option<&str>) -> Result<Vec<(&'static str, Str
         params.push(("date", MapleStoryClient::validate_date(d)?));
     }
     Ok(params)
+}
+
+// ─── CharacterClient ─────────────────────────────────────────────────────────
+
+/// Domain sub-client for Character tag API endpoints.
+#[derive(Clone, Copy)]
+pub struct CharacterClient<'a> {
+    pub(crate) client: &'a MapleStoryClient,
+}
+
+impl<'a> CharacterClient<'a> {
+    /// Create a new `CharacterClient` referencing a [`MapleStoryClient`].
+    pub fn new(client: &'a MapleStoryClient) -> Self {
+        Self { client }
+    }
+
+    /// Look up a character's OCID by name.
+    pub async fn get_id(&self, character_name: &str) -> Result<CharacterOcid> {
+        self.client.get_character_id(character_name).await
+    }
+
+    /// Get only the OCID string for a character name (consults identity cache).
+    pub async fn get_ocid(&self, character_name: &str) -> Result<String> {
+        self.client.get_ocid(character_name).await
+    }
+
+    /// Retrieve basic information of a character.
+    pub async fn get_basic(&self, ocid: &str, date: impl Into<DateParam>) -> Result<CharacterBasic> {
+        self.client.get_character_basic(ocid, date).await
+    }
+
+    /// Retrieve popularity of a character.
+    pub async fn get_popularity(&self, ocid: &str, date: impl Into<DateParam>) -> Result<CharacterPopularity> {
+        self.client.get_character_popularity(ocid, date).await
+    }
+
+    /// Retrieve comprehensive stat information of a character.
+    pub async fn get_stat(&self, ocid: &str, date: impl Into<DateParam>) -> Result<CharacterStat> {
+        self.client.get_character_stat(ocid, date).await
+    }
+
+    /// Retrieve hyper stat information of a character.
+    pub async fn get_hyper_stat(&self, ocid: &str, date: impl Into<DateParam>) -> Result<CharacterHyperStat> {
+        self.client.get_character_hyper_stat(ocid, date).await
+    }
+
+    /// Retrieve propensity information of a character.
+    pub async fn get_propensity(&self, ocid: &str, date: impl Into<DateParam>) -> Result<CharacterPropensity> {
+        self.client.get_character_propensity(ocid, date).await
+    }
+
+    /// Retrieve ability information of a character.
+    pub async fn get_ability(&self, ocid: &str, date: impl Into<DateParam>) -> Result<CharacterAbility> {
+        self.client.get_character_ability(ocid, date).await
+    }
+
+    /// Retrieve item equipment information of a character.
+    pub async fn get_item_equipment(&self, ocid: &str, date: impl Into<DateParam>) -> Result<CharacterItemEquipment> {
+        self.client.get_character_item_equipment(ocid, date).await
+    }
+
+    /// Retrieve cash item equipment information of a character.
+    pub async fn get_cashitem_equipment(&self, ocid: &str, date: impl Into<DateParam>) -> Result<CharacterCashItemEquipment> {
+        self.client.get_character_cashitem_equipment(ocid, date).await
+    }
+
+    /// Retrieve symbol equipment information of a character.
+    pub async fn get_symbol_equipment(&self, ocid: &str, date: impl Into<DateParam>) -> Result<CharacterSymbolEquipment> {
+        self.client.get_character_symbol_equipment(ocid, date).await
+    }
+
+    /// Retrieve set effect information of a character.
+    pub async fn get_set_effect(&self, ocid: &str, date: impl Into<DateParam>) -> Result<CharacterSetEffect> {
+        self.client.get_character_set_effect(ocid, date).await
+    }
+
+    /// Retrieve beauty (hair, face, skin) equipment information of a character.
+    pub async fn get_beauty_equipment(&self, ocid: &str, date: impl Into<DateParam>) -> Result<CharacterBeautyEquipment> {
+        self.client.get_character_beauty_equipment(ocid, date).await
+    }
+
+    /// Retrieve android equipment information of a character.
+    pub async fn get_android_equipment(&self, ocid: &str, date: impl Into<DateParam>) -> Result<CharacterAndroidEquipment> {
+        self.client.get_character_android_equipment(ocid, date).await
+    }
+
+    /// Retrieve pet equipment information of a character.
+    pub async fn get_pet_equipment(&self, ocid: &str, date: impl Into<DateParam>) -> Result<CharacterPetEquipment> {
+        self.client.get_character_pet_equipment(ocid, date).await
+    }
+
+    /// Retrieve skill information for a specific grade of a character.
+    pub async fn get_skill(&self, ocid: &str, skill_grade: SkillGrade, date: impl Into<DateParam>) -> Result<CharacterSkill> {
+        self.client.get_character_skill(ocid, skill_grade, date).await
+    }
+
+    /// Retrieve link skill information of a character.
+    pub async fn get_link_skill(&self, ocid: &str, date: impl Into<DateParam>) -> Result<CharacterLinkSkill> {
+        self.client.get_character_link_skill(ocid, date).await
+    }
+
+    /// Retrieve V-Matrix core information of a character.
+    pub async fn get_vmatrix(&self, ocid: &str, date: impl Into<DateParam>) -> Result<CharacterVMatrix> {
+        self.client.get_character_vmatrix(ocid, date).await
+    }
+
+    /// Retrieve HEXA Matrix core information of a character.
+    pub async fn get_hexamatrix(&self, ocid: &str, date: impl Into<DateParam>) -> Result<CharacterHexaMatrix> {
+        self.client.get_character_hexamatrix(ocid, date).await
+    }
+
+    /// Retrieve HEXA Matrix stat node information of a character.
+    pub async fn get_hexamatrix_stat(&self, ocid: &str, date: impl Into<DateParam>) -> Result<CharacterHexaMatrixStat> {
+        self.client.get_character_hexamatrix_stat(ocid, date).await
+    }
+
+    /// Retrieve Mu Lung Dojang best record of a character.
+    pub async fn get_dojang(&self, ocid: &str, date: impl Into<DateParam>) -> Result<CharacterDojang> {
+        self.client.get_character_dojang(ocid, date).await
+    }
+
+    /// Retrieve other stats of a character.
+    pub async fn get_other_stat(&self, ocid: &str, date: impl Into<DateParam>) -> Result<CharacterOtherStat> {
+        self.client.get_character_other_stat(ocid, date).await
+    }
+
+    /// Retrieve ring exchange skill equipment information.
+    pub async fn get_ring_exchange_skill_equipment(&self, ocid: &str, date: impl Into<DateParam>) -> Result<RingExchangeSkillEquipment> {
+        self.client.get_character_ring_exchange_skill_equipment(ocid, date).await
+    }
+
+    /// Retrieve ring reserve skill equipment information.
+    pub async fn get_ring_reserve_skill_equipment(&self, ocid: &str, date: impl Into<DateParam>) -> Result<RingReserveSkillEquipment> {
+        self.client.get_character_ring_reserve_skill_equipment(ocid, date).await
+    }
+
+    /// Retrieve synthesized coordination model of a character.
+    pub async fn get_coordination(&self, ocid: &str, date: impl Into<DateParam>) -> Result<CharacterCoordination> {
+        self.client.get_character_coordination(ocid, date).await
+    }
+
+    /// Retrieve synthesized coordination model directly by character name.
+    pub async fn get_coordination_by_name(&self, character_name: &str) -> Result<CharacterCoordination> {
+        self.client.get_character_coordination_by_name(character_name).await
+    }
+
+    /// Retrieve basic information of a character directly by character name.
+    pub async fn get_by_name(&self, character_name: &str) -> Result<CharacterBasic> {
+        self.client.get_character_by_name(character_name).await
+    }
+
+    /// Retrieve profile information of a character.
+    pub async fn get_profile(&self, ocid: &str, date: impl Into<DateParam>) -> Result<CharacterProfile> {
+        self.client.get_character_profile(ocid, date).await
+    }
+
+    /// Retrieve profile information directly by character name.
+    pub async fn get_profile_by_name(&self, character_name: &str) -> Result<CharacterProfile> {
+        self.client.get_character_profile_by_name(character_name).await
+    }
+
+    /// Retrieve character dashboard with default options.
+    pub async fn get_dashboard(&self, ocid: &str, date: impl Into<DateParam>) -> Result<CharacterDashboard> {
+        self.client.get_character_dashboard(ocid, date).await
+    }
+
+    /// Retrieve character dashboard with configurable section masking.
+    pub async fn get_dashboard_with_options(
+        &self,
+        ocid: &str,
+        date: impl Into<DateParam>,
+        options: &DashboardOptions,
+    ) -> Result<CharacterDashboard> {
+        self.client.get_character_dashboard_with_options(ocid, date, options).await
+    }
+
+    /// Retrieve character dashboard directly by character name.
+    pub async fn get_dashboard_by_name(&self, character_name: &str) -> Result<CharacterDashboard> {
+        self.client.get_character_dashboard_by_name(character_name).await
+    }
+
+    /// Retrieve character dashboard directly by character name with options.
+    pub async fn get_dashboard_with_options_by_name(
+        &self,
+        character_name: &str,
+        date: impl Into<DateParam>,
+        options: &DashboardOptions,
+    ) -> Result<CharacterDashboard> {
+        self.client
+            .get_character_dashboard_with_options_by_name(character_name, date, options)
+            .await
+    }
 }

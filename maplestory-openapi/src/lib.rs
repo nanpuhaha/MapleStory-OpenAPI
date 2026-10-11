@@ -53,13 +53,36 @@ pub use avatar::{
     AnimationFrame, AnimationPreset, AvatarAction, AvatarCode, AvatarEmotion, AvatarLookQuery,
     WeaponMotion,
 };
-pub use client::{MapleStoryClient, MapleStoryClientBuilder};
+pub use client::{
+    BattlePracticeClient, BoxFuture, CharacterClient, GuildClient, HistoryClient, IdentityCache,
+    MapleStoryClient, MapleStoryClientBuilder, NoopIdentityCache, NoticeClient, RankingClient,
+    SchedulerClient, UnionClient, UserClient, DEFAULT_BASE_URL, MIN_DATE,
+};
 pub use error::{MapleStoryError, Result};
+pub use models::battle_practice::{
+    BattlePracticeCharacterInfo, BattlePracticeResult, ReplayId, SkillTimeline,
+};
 pub use models::character::{
     CharacterAppearance, CharacterBasic, CharacterBeautyEquipment, CharacterCashItemEquipment,
     CharacterCoordination, CharacterDashboard, CharacterDojang, CharacterItemEquipment,
-    CharacterOcid, CharacterPopularity, CharacterProfile, CharacterStat, VisibleEquipItem,
+    CharacterOcid, CharacterPopularity, CharacterProfile, CharacterStat, DashboardOptions,
+    DashboardSection, DashboardSectionError, ItemEquipmentDetail, ParsedPotentialOption, StatType,
+    VisibleEquipItem,
 };
-pub use models::common::SkillGrade;
+pub use models::common::{DateParam, MapleDate, SkillGrade};
 pub use models::guild::{GuildBasic, GuildId, GuildSkill};
-pub use models::union::{UserUnion, UserUnionArtifact, UserUnionRaider};
+pub use models::history::{
+    CubeHistory, PotentialHistory, SoulPotentialHistory, StarforceHistory,
+};
+pub use models::notice::{
+    CashshopNoticeDetail, CashshopNoticeList, EventNoticeDetail, EventNoticeList, NoticeDetail,
+    NoticeList, UpdateNoticeDetail, UpdateNoticeList,
+};
+pub use models::ranking::{
+    AchievementRanking, AchievementRankingQuery, DojangRanking, DojangRankingQuery, GuildRanking,
+    GuildRankingQuery, OverallRanking, OverallRankingQuery, TheSeedRanking, TheSeedRankingQuery,
+    UnionRanking, UnionRankingQuery,
+};
+pub use models::scheduler::CharacterStateResponse;
+pub use models::union::{UserUnion, UserUnionArtifact, UserUnionChampion, UserUnionRaider};
+pub use models::user::User;

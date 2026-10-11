@@ -1,10 +1,30 @@
 // src/client/mod.rs
 //! HTTP client implementation for MapleStory OpenAPI.
 
+pub mod cache;
+pub use cache::{BoxFuture, IdentityCache, NoopIdentityCache};
+#[cfg(feature = "cache")]
+pub use cache::MokaIdentityCache;
+
+mod battle_practice;
 mod character;
 mod guild;
+mod history;
+mod notice;
+mod ranking;
+mod scheduler;
 mod union;
 mod user;
+
+pub use battle_practice::BattlePracticeClient;
+pub use character::CharacterClient;
+pub use guild::GuildClient;
+pub use history::HistoryClient;
+pub use notice::NoticeClient;
+pub use ranking::RankingClient;
+pub use scheduler::SchedulerClient;
+pub use union::UnionClient;
+pub use user::UserClient;
 
 use reqwest::{
     header::{HeaderMap, HeaderValue},
@@ -22,6 +42,9 @@ pub const DEFAULT_BASE_URL: &str = "https://open.api.nexon.com";
 /// The name of the API key header.
 const API_KEY_HEADER: &str = "x-nxopen-api-key";
 
+/// The name of the legacy API key header.
+const LEGACY_API_KEY_HEADER: &str = "x-nxopen-legacy-api-key";
+
 /// The minimum data availability date.
 pub const MIN_DATE: &str = "2023-12-21";
 
@@ -38,12 +61,15 @@ pub const MIN_DATE: &str = "2023-12-21";
 ///     .build()
 ///     .unwrap();
 /// ```
-#[derive(Debug, Default)]
+#[derive(Default)]
 pub struct MapleStoryClientBuilder {
     api_key: Option<String>,
     base_url: Option<String>,
     timeout_secs: Option<u64>,
     custom_client: Option<Client>,
+    max_concurrency: Option<usize>,
+    max_retries: Option<u32>,
+    custom_identity_cache: Option<std::sync::Arc<dyn IdentityCache>>,
     #[cfg(feature = "cache")]
     cache_enabled: bool,
     #[cfg(feature = "cache")]
@@ -60,6 +86,9 @@ impl MapleStoryClientBuilder {
             base_url: None,
             timeout_secs: None,
             custom_client: None,
+            max_concurrency: None,
+            max_retries: None,
+            custom_identity_cache: None,
             #[cfg(feature = "cache")]
             cache_enabled: true,
             #[cfg(feature = "cache")]
@@ -67,6 +96,12 @@ impl MapleStoryClientBuilder {
             #[cfg(feature = "cache")]
             cache_capacity: None,
         }
+    }
+
+    /// Supply a custom [`IdentityCache`] implementation (e.g. distributed Redis cache).
+    pub fn identity_cache(mut self, cache: std::sync::Arc<dyn IdentityCache>) -> Self {
+        self.custom_identity_cache = Some(cache);
+        self
     }
 
     /// Set the API key (required).
@@ -115,6 +150,38 @@ impl MapleStoryClientBuilder {
     pub fn cache_capacity(mut self, capacity: u64) -> Self {
         self.cache_capacity = Some(capacity);
         self
+    }
+
+    /// Set the maximum number of concurrent in-flight HTTP requests (default: 10).
+    pub fn max_concurrency(mut self, limit: usize) -> Self {
+        self.max_concurrency = Some(limit);
+        self
+    }
+
+    /// Set the maximum number of retry attempts for 429 and transient 5xx errors (default: 3).
+    pub fn max_retries(mut self, retries: u32) -> Self {
+        self.max_retries = Some(retries);
+        self
+    }
+
+    /// Enable or disable retries for 429 and transient 5xx errors.
+    ///
+    /// When disabled (`false`), `max_retries` is set to 0. When enabled (`true`),
+    /// defaults to 3 retries unless previously configured.
+    pub fn enable_retries(mut self, enabled: bool) -> Self {
+        if enabled {
+            if self.max_retries.is_none() || self.max_retries == Some(0) {
+                self.max_retries = Some(3);
+            }
+        } else {
+            self.max_retries = Some(0);
+        }
+        self
+    }
+
+    /// Alias for [`enable_retries`](Self::enable_retries).
+    pub fn retry(self, enabled: bool) -> Self {
+        self.enable_retries(enabled)
     }
 
     /// Build the [`MapleStoryClient`].
@@ -167,28 +234,40 @@ impl MapleStoryClientBuilder {
         }
         let base_url = base_url.as_str().trim_end_matches('/').to_string();
 
-        #[cfg(feature = "cache")]
-        let ocid_cache = if self.cache_enabled {
-            let ttl = self
-                .cache_ttl
-                .unwrap_or_else(|| std::time::Duration::from_secs(24 * 3600));
-            let capacity = self.cache_capacity.unwrap_or(10_000);
-            Some(
-                moka::future::Cache::builder()
-                    .max_capacity(capacity)
-                    .time_to_live(ttl)
-                    .build(),
-            )
+        let identity_cache: std::sync::Arc<dyn IdentityCache> = if let Some(custom) = self.custom_identity_cache {
+            custom
         } else {
-            None
+            #[cfg(feature = "cache")]
+            {
+                if self.cache_enabled {
+                    let ttl = self
+                        .cache_ttl
+                        .unwrap_or_else(|| std::time::Duration::from_secs(24 * 3600));
+                    let capacity = self.cache_capacity.unwrap_or(10_000);
+                    std::sync::Arc::new(MokaIdentityCache::new(capacity, ttl))
+                } else {
+                    std::sync::Arc::new(NoopIdentityCache)
+                }
+            }
+            #[cfg(not(feature = "cache"))]
+            {
+                std::sync::Arc::new(NoopIdentityCache)
+            }
         };
+
+        let max_concurrency = self.max_concurrency.unwrap_or(10).max(1);
+        let max_retries = self.max_retries.unwrap_or(3);
+        let concurrency_limiter =
+            std::sync::Arc::new(tokio::sync::Semaphore::new(max_concurrency));
 
         Ok(MapleStoryClient {
             http: http_client,
             base_url,
             api_key,
-            #[cfg(feature = "cache")]
-            ocid_cache,
+            max_concurrency,
+            max_retries,
+            concurrency_limiter,
+            identity_cache,
         })
     }
 }
@@ -203,16 +282,82 @@ impl MapleStoryClientBuilder {
 /// # Thread Safety
 /// `MapleStoryClient` is `Clone` and can be shared across threads safely — it
 /// wraps a [`reqwest::Client`] which is internally `Arc`-backed.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct MapleStoryClient {
     http: Client,
     base_url: String,
     api_key: String,
-    #[cfg(feature = "cache")]
-    pub(crate) ocid_cache: Option<moka::future::Cache<String, String>>,
+    max_concurrency: usize,
+    max_retries: u32,
+    concurrency_limiter: std::sync::Arc<tokio::sync::Semaphore>,
+    pub(crate) identity_cache: std::sync::Arc<dyn IdentityCache>,
 }
 
 impl MapleStoryClient {
+    /// Returns the active identity cache instance.
+    pub fn identity_cache(&self) -> &std::sync::Arc<dyn IdentityCache> {
+        &self.identity_cache
+    }
+    /// Returns the maximum number of concurrent in-flight HTTP requests allowed.
+    pub fn max_concurrency(&self) -> usize {
+        self.max_concurrency
+    }
+
+    /// Returns the maximum number of retry attempts on rate limit or transient server errors.
+    pub fn max_retries(&self) -> u32 {
+        self.max_retries
+    }
+
+    /// Returns the current number of available concurrency permits.
+    pub fn available_concurrency_permits(&self) -> usize {
+        self.concurrency_limiter.available_permits()
+    }
+
+    /// Access character domain methods via [`CharacterClient`].
+    pub fn character(&self) -> CharacterClient<'_> {
+        CharacterClient::new(self)
+    }
+
+    /// Access guild domain methods via [`GuildClient`].
+    pub fn guild(&self) -> GuildClient<'_> {
+        GuildClient::new(self)
+    }
+
+    /// Access union domain methods via [`UnionClient`].
+    pub fn union(&self) -> UnionClient<'_> {
+        UnionClient::new(self)
+    }
+
+    /// Access ranking domain methods via [`RankingClient`].
+    pub fn ranking(&self) -> RankingClient<'_> {
+        RankingClient::new(self)
+    }
+
+    /// Access history domain methods via [`HistoryClient`].
+    pub fn history(&self) -> HistoryClient<'_> {
+        HistoryClient::new(self)
+    }
+
+    /// Access notice domain methods via [`NoticeClient`].
+    pub fn notice(&self) -> NoticeClient<'_> {
+        NoticeClient::new(self)
+    }
+
+    /// Access user and account domain methods via [`UserClient`].
+    pub fn user(&self) -> UserClient<'_> {
+        UserClient::new(self)
+    }
+
+    /// Access battle practice domain methods via [`BattlePracticeClient`].
+    pub fn battle_practice(&self) -> BattlePracticeClient<'_> {
+        BattlePracticeClient::new(self)
+    }
+
+    /// Access scheduler domain methods via [`SchedulerClient`].
+    pub fn scheduler(&self) -> SchedulerClient<'_> {
+        SchedulerClient::new(self)
+    }
+
     /// Create a builder for configuring the client.
     pub fn builder() -> MapleStoryClientBuilder {
         MapleStoryClientBuilder::new()
@@ -253,35 +398,74 @@ impl MapleStoryClient {
         Self::new(key)
     }
 
-    /// Internal helper — performs a GET request and deserializes the response.
-    pub(crate) async fn get<T: DeserializeOwned>(
+    /// Internal helper — performs a GET request with custom header and deserializes the response.
+    pub(crate) async fn get_with_header<T: DeserializeOwned>(
         &self,
         path: &str,
         params: &[(&str, String)],
+        header_name: &str,
+        header_val: &str,
     ) -> Result<T> {
         let url = format!("{}{}", self.base_url, path);
+        let mut attempts = 0;
 
-        tracing::debug!("GET {} {:?}", url, params);
+        loop {
+            attempts += 1;
 
-        let response = self
-            .http
-            .get(&url)
-            .header(API_KEY_HEADER, &self.api_key)
-            .query(params)
-            .send()
-            .await
-            .map_err(MapleStoryError::Request)?;
-
-        let status = response.status();
-
-        if status.is_success() {
-            response
-                .json::<T>()
+            let _permit = self
+                .concurrency_limiter
+                .acquire()
                 .await
-                .map_err(|e| MapleStoryError::ParseError(e.to_string()))
-        } else {
-            // Try to parse the API error body
+                .map_err(|e| MapleStoryError::Other(format!("Concurrency limiter error: {}", e)))?;
+
+            tracing::debug!("GET {} {:?} (attempt {})", url, params, attempts);
+
+            let response_result = self
+                .http
+                .get(&url)
+                .header(header_name, header_val)
+                .query(params)
+                .send()
+                .await;
+
+            // Release permit before any retry wait
+            drop(_permit);
+
+            let response = match response_result {
+                Ok(resp) => resp,
+                Err(err) if attempts <= self.max_retries && (err.is_timeout() || err.is_connect()) => {
+                    let delay = calculate_backoff_delay(attempts, None);
+                    tokio::time::sleep(delay).await;
+                    continue;
+                }
+                Err(err) => return Err(MapleStoryError::Request(err)),
+            };
+
+            let status = response.status();
+
+            if status.is_success() {
+                return response
+                    .json::<T>()
+                    .await
+                    .map_err(|e| MapleStoryError::ParseError(e.to_string()));
+            }
+
             let status_code = status.as_u16();
+
+            // Retry on 429 (rate-limited) or 503/500 if attempts remain
+            if attempts <= self.max_retries && matches!(status_code, 429 | 500 | 503) {
+                let retry_after_secs = response
+                    .headers()
+                    .get("retry-after")
+                    .and_then(|h| h.to_str().ok())
+                    .and_then(|s| s.parse::<u64>().ok());
+
+                let delay = calculate_backoff_delay(attempts, retry_after_secs);
+                tokio::time::sleep(delay).await;
+                continue;
+            }
+
+            // Parse final API error body
             let body = response.text().await.unwrap_or_else(|_| "{}".to_string());
 
             let api_error = serde_json::from_str::<ApiErrorResponse>(&body).ok();
@@ -294,7 +478,7 @@ impl MapleStoryClient {
                 .map(|response| response.error.message.clone())
                 .unwrap_or(body);
 
-            Err(match status_code {
+            return Err(match status_code {
                 401 => MapleStoryError::AuthenticationFailed { code, message },
                 403 => MapleStoryError::Forbidden { code, message },
                 429 => MapleStoryError::RateLimited {
@@ -309,34 +493,106 @@ impl MapleStoryClient {
                     message,
                     status: status_code,
                 },
-            })
+            });
         }
     }
 
-    /// Validate a real calendar date and return it as `YYYY-MM-DD`.
-    pub(crate) fn validate_date(date: &str) -> Result<String> {
-        // Simple length + dash position check
-        let bytes = date.as_bytes();
-        if bytes.len() == 10
-            && bytes[4] == b'-'
-            && bytes[7] == b'-'
-            && bytes[..4].iter().all(|b| b.is_ascii_digit())
-            && bytes[5..7].iter().all(|b| b.is_ascii_digit())
-            && bytes[8..].iter().all(|b| b.is_ascii_digit())
-        {
-            let year = date[..4].parse::<i32>().ok();
-            let month = date[5..7].parse::<u32>().ok();
-            let day = date[8..10].parse::<u32>().ok();
-            if let (Some(year), Some(month), Some(day)) = (year, month, day) {
-                if year > 0 && chrono::NaiveDate::from_ymd_opt(year, month, day).is_some() {
-                    return Ok(date.to_string());
-                }
-            }
-        }
-        Err(MapleStoryError::InvalidDate {
-            date: date.to_string(),
-        })
+    /// Internal helper — performs a GET request with standard API key header and deserializes the response.
+    pub(crate) async fn get<T: DeserializeOwned>(
+        &self,
+        path: &str,
+        params: &[(&str, String)],
+    ) -> Result<T> {
+        self.get_with_header(path, params, API_KEY_HEADER, &self.api_key).await
     }
+
+    /// Validate a calendar date and return it as `YYYY-MM-DD`.
+    ///
+    /// Validates:
+    /// - Format matches `YYYY-MM-DD` and is a valid calendar date.
+    /// - Date >= [`MapleDate::MIN_DATE`] (`2023-12-21`).
+    /// - Date <= latest available date in KST (rejects future dates).
+    ///
+    /// # Errors
+    /// Returns [`MapleStoryError::InvalidDate`] if the date format or calendar date is invalid.
+    /// Returns [`MapleStoryError::DateOutOfRange`] if the date is earlier than `2023-12-21`
+    /// or later than the latest available date in KST.
+    pub fn validate_date(date: &str) -> Result<String> {
+        let bytes = date.as_bytes();
+        if bytes.len() != 10
+            || bytes[4] != b'-'
+            || bytes[7] != b'-'
+            || !bytes[..4].iter().all(|b| b.is_ascii_digit())
+            || !bytes[5..7].iter().all(|b| b.is_ascii_digit())
+            || !bytes[8..].iter().all(|b| b.is_ascii_digit())
+        {
+            return Err(MapleStoryError::InvalidDate {
+                date: date.to_string(),
+            });
+        }
+
+        let year = date[..4].parse::<i32>().map_err(|_| MapleStoryError::InvalidDate {
+            date: date.to_string(),
+        })?;
+        let month = date[5..7].parse::<u32>().map_err(|_| MapleStoryError::InvalidDate {
+            date: date.to_string(),
+        })?;
+        let day = date[8..10].parse::<u32>().map_err(|_| MapleStoryError::InvalidDate {
+            date: date.to_string(),
+        })?;
+
+        if year <= 0 {
+            return Err(MapleStoryError::InvalidDate {
+                date: date.to_string(),
+            });
+        }
+
+        let parsed = match chrono::NaiveDate::from_ymd_opt(year, month, day) {
+            Some(d) => d,
+            None => {
+                return Err(MapleStoryError::InvalidDate {
+                    date: date.to_string(),
+                });
+            }
+        };
+
+        let min_date = chrono::NaiveDate::from_ymd_opt(2023, 12, 21).unwrap();
+        if parsed < min_date {
+            return Err(MapleStoryError::DateOutOfRange {
+                date: date.to_string(),
+                min_date: crate::models::common::MapleDate::MIN_DATE.to_string(),
+            });
+        }
+
+        let kst_today = chrono::Utc::now()
+            .with_timezone(&chrono::FixedOffset::east_opt(9 * 3600).unwrap())
+            .date_naive();
+        if parsed > kst_today {
+            return Err(MapleStoryError::DateOutOfRange {
+                date: date.to_string(),
+                min_date: crate::models::common::MapleDate::MIN_DATE.to_string(),
+            });
+        }
+
+        Ok(date.to_string())
+    }
+}
+
+/// Calculate randomized exponential backoff delay with full jitter.
+fn calculate_backoff_delay(attempts: u32, retry_after_secs: Option<u64>) -> std::time::Duration {
+    if let Some(secs) = retry_after_secs {
+        return std::time::Duration::from_millis(secs.saturating_mul(1000).max(50));
+    }
+
+    let base_ms = (100u64).saturating_mul(1 << (attempts.saturating_sub(1)).min(6));
+    let entropy = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.subsec_nanos() as u64)
+        .unwrap_or(0);
+    let max_jitter = (base_ms / 2).max(50);
+    let jitter = entropy % max_jitter;
+
+    std::time::Duration::from_millis(base_ms + jitter)
 }
 
 #[cfg(test)]

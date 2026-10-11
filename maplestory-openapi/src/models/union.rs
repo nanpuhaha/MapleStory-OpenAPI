@@ -143,3 +143,151 @@ pub struct UnionArtifactCrystal {
     /// Option 3 name
     pub crystal_option_name_3: Option<String>,
 }
+
+impl UserUnionArtifact {
+    /// Returns true if the artifact currently has active effects.
+    ///
+    /// If crystals are present, at least one crystal must not be expired.
+    pub fn is_active(&self) -> bool {
+        if let Some(crystals) = self.union_artifact_crystal.as_deref() {
+            if !crystals.is_empty() {
+                return crystals.iter().any(|c| !c.is_expired());
+            }
+        }
+        true
+    }
+
+    /// Returns an iterator over non-empty, active artifact effects.
+    ///
+    /// Yields an empty iterator if all artifact crystals are expired.
+    pub fn active_effects(&self) -> impl Iterator<Item = &UnionArtifactEffect> {
+        let active = self.is_active();
+        self.union_artifact_effect
+            .as_deref()
+            .unwrap_or(&[])
+            .iter()
+            .filter(move |e| active && e.name.as_ref().map(|s| !s.trim().is_empty()).unwrap_or(false))
+    }
+
+    /// Returns all crystals whose validity flag is expired ("1") or expiration timestamp has passed.
+    pub fn expired_crystals(&self) -> Vec<&UnionArtifactCrystal> {
+        self.union_artifact_crystal
+            .as_deref()
+            .unwrap_or(&[])
+            .iter()
+            .filter(|c| c.is_expired())
+            .collect()
+    }
+
+    /// Returns all active crystals.
+    pub fn active_crystals(&self) -> Vec<&UnionArtifactCrystal> {
+        self.union_artifact_crystal
+            .as_deref()
+            .unwrap_or(&[])
+            .iter()
+            .filter(|c| !c.is_expired())
+            .collect()
+    }
+
+    /// Parse and summarize active bonus numbers across all active artifact effects.
+    ///
+    /// Correctly parses multi-word stat names and filters out expired artifact effects.
+    ///
+    /// E.g.
+    /// - `"올스탯 150 증가"` -> `{"올스탯": 150.0}`
+    /// - `"공격력/마력 30 증가"` -> `{"공격력": 30.0, "마력": 30.0}`
+    /// - `"보스 몬스터 공격 시 데미지 15.00% 증가"` -> `{"보스 몬스터 공격 시 데미지": 15.0}`
+    pub fn total_artifact_stats(&self) -> std::collections::HashMap<String, f64> {
+        let mut totals = std::collections::HashMap::new();
+
+        for effect in self.active_effects() {
+            if let Some(desc) = effect.name.as_deref() {
+                // Split multiple clauses by comma: e.g. "올스탯 150 증가, 공격력/마력 30 증가"
+                for part in desc.split(',') {
+                    let clause = part.trim();
+                    if clause.is_empty() {
+                        continue;
+                    }
+                    let cleaned = clause.trim_end_matches("증가").trim_end_matches("감소").trim();
+                    if let Some(last_space) = cleaned.rfind(' ') {
+                        let stat_name = cleaned[..last_space].trim();
+                        let num_part = cleaned[last_space + 1..].trim();
+                        let num_str = num_part.trim_end_matches('%').trim_end_matches('초');
+                        if let Ok(val) = num_str.parse::<f64>() {
+                            if stat_name == "공격력/마력" {
+                                *totals.entry("공격력".to_string()).or_insert(0.0) += val;
+                                *totals.entry("마력".to_string()).or_insert(0.0) += val;
+                            } else if !stat_name.is_empty() {
+                                *totals.entry(stat_name.to_string()).or_insert(0.0) += val;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        totals
+    }
+}
+
+impl UnionArtifactCrystal {
+    /// Returns true if this crystal is expired according to its `validity_flag` ("1")
+    /// or if its `date_expire` timestamp has already passed.
+    pub fn is_expired(&self) -> bool {
+        if self.validity_flag.as_deref() == Some("1") {
+            return true;
+        }
+
+        if let Some(date_str) = self.date_expire.as_deref() {
+            if let Ok(expire_dt) = chrono::DateTime::parse_from_rfc3339(date_str) {
+                if expire_dt.to_utc() < chrono::Utc::now() {
+                    return true;
+                }
+            } else if let Ok(expire_date) = chrono::NaiveDate::parse_from_str(date_str, "%Y-%m-%d") {
+                let kst_today = chrono::Utc::now()
+                    .with_timezone(&chrono::FixedOffset::east_opt(9 * 3600).unwrap())
+                    .date_naive();
+                if expire_date < kst_today {
+                    return true;
+                }
+            }
+        }
+
+        false
+    }
+}
+
+// ─── Union Champion ──────────────────────────────────────────────────────────
+
+/// Response from `GET /maplestory/v1/user/union-champion`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UserUnionChampion {
+    /// Query reference date (KST)
+    pub date: Option<String>,
+    /// Union champion list
+    pub union_champion: Option<Vec<UnionChampionInfo>>,
+    /// Champion badge total effects
+    pub champion_badge_total_info: Option<Vec<UnionChampionBadgeInfo>>,
+}
+
+/// A Union champion entry.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UnionChampionInfo {
+    /// Champion character name
+    pub champion_name: Option<String>,
+    /// Champion slot index
+    pub champion_slot: Option<i64>,
+    /// Champion grade
+    pub champion_grade: Option<String>,
+    /// Champion character class
+    pub champion_class: Option<String>,
+    /// Champion badge info
+    pub champion_badge_info: Option<Vec<UnionChampionBadgeInfo>>,
+}
+
+/// Union champion badge effect information.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UnionChampionBadgeInfo {
+    /// Badge stat / effect description
+    pub stat: Option<String>,
+}
