@@ -97,6 +97,53 @@ impl JsMapleStoryClient {
 
         Ok(gif_bytes.into())
     }
+
+    /// Retrieve guild basic information by guild name and world name.
+    #[napi]
+    pub async fn get_guild_basic(
+        &self,
+        guild_name: String,
+        world_name: String,
+        date: Option<String>,
+    ) -> Result<serde_json::Value> {
+        let guild = self
+            .inner
+            .get_guild_by_name(&guild_name, &world_name, date.as_deref())
+            .await
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        serde_json::to_value(&guild).map_err(|e| Error::from_reason(e.to_string()))
+    }
+
+    /// Retrieve Union information by character name.
+    #[napi]
+    pub async fn get_user_union(
+        &self,
+        character_name: String,
+        date: Option<String>,
+    ) -> Result<serde_json::Value> {
+        let ocid = self
+            .inner
+            .get_ocid(&character_name)
+            .await
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        let union_data = self
+            .inner
+            .get_user_union(&ocid, date.as_deref())
+            .await
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        serde_json::to_value(&union_data).map_err(|e| Error::from_reason(e.to_string()))
+    }
+
+    /// Retrieve notice list.
+    #[napi]
+    pub async fn get_notice_list(&self) -> Result<serde_json::Value> {
+        let notices = self
+            .inner
+            .get_notice_list()
+            .await
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        serde_json::to_value(&notices).map_err(|e| Error::from_reason(e.to_string()))
+    }
 }
 
 #[napi(js_name = "AvatarCode")]

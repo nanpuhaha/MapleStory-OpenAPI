@@ -139,6 +139,74 @@ impl PyMapleStoryClient {
             Python::with_gil(|py| Ok(PyBytes::new_bound(py, &gif_bytes).into_any().unbind()))
         })
     }
+
+    /// Retrieve guild basic information by guild name and world name.
+    #[pyo3(signature = (guild_name, world_name, date = None))]
+    pub fn get_guild_basic<'py>(
+        &self,
+        py: Python<'py>,
+        guild_name: String,
+        world_name: String,
+        date: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = self.inner.clone();
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            let guild = client
+                .get_guild_by_name(&guild_name, &world_name, date.as_deref())
+                .await
+                .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))?;
+
+            Python::with_gil(|py| {
+                pythonize(py, &guild)
+                    .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
+                    .map(|obj| obj.into_any().unbind())
+            })
+        })
+    }
+
+    /// Retrieve Union information by character name.
+    #[pyo3(signature = (character_name, date = None))]
+    pub fn get_user_union<'py>(
+        &self,
+        py: Python<'py>,
+        character_name: String,
+        date: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = self.inner.clone();
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            let ocid = client
+                .get_ocid(&character_name)
+                .await
+                .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))?;
+            let union_data = client
+                .get_user_union(&ocid, date.as_deref())
+                .await
+                .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))?;
+
+            Python::with_gil(|py| {
+                pythonize(py, &union_data)
+                    .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
+                    .map(|obj| obj.into_any().unbind())
+            })
+        })
+    }
+
+    /// Retrieve notice list.
+    pub fn get_notice_list<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let client = self.inner.clone();
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            let notices = client
+                .get_notice_list()
+                .await
+                .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))?;
+
+            Python::with_gil(|py| {
+                pythonize(py, &notices)
+                    .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
+                    .map(|obj| obj.into_any().unbind())
+            })
+        })
+    }
 }
 
 /// Python wrapper for 1024-character AvatarCode.
