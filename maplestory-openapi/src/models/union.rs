@@ -228,6 +228,20 @@ impl UserUnionArtifact {
 
         totals
     }
+
+    /// Parse and summarize active bonus numbers across all active artifact effects,
+    /// keyed by the strongly-typed [`StatType`](crate::models::character::StatType) domain enum.
+    pub fn total_artifact_stats_typed(
+        &self,
+    ) -> std::collections::HashMap<crate::models::character::StatType, f64> {
+        use crate::models::character::StatType;
+        let mut typed_totals = std::collections::HashMap::new();
+        for (stat_name, val) in self.total_artifact_stats() {
+            let st = StatType::from_stat_name(&stat_name).unwrap_or(StatType::Other);
+            *typed_totals.entry(st).or_insert(0.0) += val;
+        }
+        typed_totals
+    }
 }
 
 impl UnionArtifactCrystal {

@@ -320,6 +320,52 @@ impl StatType {
             StatType::Other => "기타",
         }
     }
+
+    /// Classify a Korean or English MapleStory stat name into a [`StatType`].
+    pub fn from_stat_name(stat_name: &str) -> Option<Self> {
+        let stat_name = stat_name.trim();
+        if stat_name == "STR" || stat_name == "힘" {
+            Some(StatType::Str)
+        } else if stat_name == "DEX" || stat_name == "민첩" {
+            Some(StatType::Dex)
+        } else if stat_name == "INT" || stat_name == "지력" {
+            Some(StatType::Int)
+        } else if stat_name == "LUK" || stat_name == "행운" {
+            Some(StatType::Luk)
+        } else if stat_name == "올스탯" {
+            Some(StatType::AllStat)
+        } else if stat_name == "최대 HP" || stat_name == "HP" {
+            Some(StatType::MaxHp)
+        } else if stat_name == "최대 MP" || stat_name == "MP" {
+            Some(StatType::MaxMp)
+        } else if stat_name == "공격력" {
+            Some(StatType::AttackPower)
+        } else if stat_name == "마력" {
+            Some(StatType::MagicPower)
+        } else if stat_name == "방어력" {
+            Some(StatType::Armor)
+        } else if stat_name.contains("보스") && stat_name.contains("데미지") {
+            Some(StatType::BossDamage)
+        } else if stat_name.contains("방어율") && stat_name.contains("무시") {
+            Some(StatType::IgnoreMonsterArmor)
+        } else if stat_name == "데미지" {
+            Some(StatType::Damage)
+        } else if stat_name.contains("크리티컬") && stat_name.contains("데미지") {
+            Some(StatType::CriticalDamage)
+        } else if stat_name.contains("크리티컬") && stat_name.contains("확률") {
+            Some(StatType::CriticalRate)
+        } else if stat_name.contains("아이템")
+            && (stat_name.contains("드롭") || stat_name.contains("획득"))
+        {
+            Some(StatType::ItemDropRate)
+        } else if stat_name.contains("메소") && stat_name.contains("획득") {
+            Some(StatType::MesoDropRate)
+        } else if stat_name.contains("재사용") && stat_name.contains("대기시간") {
+            Some(StatType::CooldownReduction)
+        } else {
+            None
+        }
+    }
 }
 
 impl std::fmt::Display for StatType {
@@ -362,46 +408,7 @@ impl ParsedPotentialOption {
             (trimmed[..idx].trim(), trimmed[idx + 1..].trim())
         };
 
-        // Match StatType
-        let stat_type = if stat_name == "STR" || stat_name == "힘" {
-            StatType::Str
-        } else if stat_name == "DEX" || stat_name == "민첩" {
-            StatType::Dex
-        } else if stat_name == "INT" || stat_name == "지력" {
-            StatType::Int
-        } else if stat_name == "LUK" || stat_name == "행운" {
-            StatType::Luk
-        } else if stat_name == "올스탯" {
-            StatType::AllStat
-        } else if stat_name == "최대 HP" || stat_name == "HP" {
-            StatType::MaxHp
-        } else if stat_name == "최대 MP" || stat_name == "MP" {
-            StatType::MaxMp
-        } else if stat_name == "공격력" {
-            StatType::AttackPower
-        } else if stat_name == "마력" {
-            StatType::MagicPower
-        } else if stat_name == "방어력" {
-            StatType::Armor
-        } else if stat_name.contains("보스") && stat_name.contains("데미지") {
-            StatType::BossDamage
-        } else if stat_name.contains("방어율") && stat_name.contains("무시") {
-            StatType::IgnoreMonsterArmor
-        } else if stat_name == "데미지" {
-            StatType::Damage
-        } else if stat_name.contains("크리티컬") && stat_name.contains("데미지") {
-            StatType::CriticalDamage
-        } else if stat_name.contains("크리티컬") && stat_name.contains("확률") {
-            StatType::CriticalRate
-        } else if stat_name.contains("아이템") && (stat_name.contains("드롭") || stat_name.contains("획득")) {
-            StatType::ItemDropRate
-        } else if stat_name.contains("메소") && stat_name.contains("획득") {
-            StatType::MesoDropRate
-        } else if stat_name.contains("재사용") && stat_name.contains("대기시간") {
-            StatType::CooldownReduction
-        } else {
-            return None;
-        };
+        let stat_type = StatType::from_stat_name(stat_name)?;
 
         // Parse value & percentage
         if stat_type == StatType::CooldownReduction {
@@ -454,19 +461,9 @@ impl ItemEquipmentDetail {
         self.potential_option_1.as_deref().and_then(ParsedPotentialOption::parse)
     }
 
-    /// Alias for [`potential_option_1_parsed`](Self::potential_option_1_parsed).
-    pub fn potential_1_parsed(&self) -> Option<ParsedPotentialOption> {
-        self.potential_option_1_parsed()
-    }
-
     /// Parsed main potential line 2.
     pub fn potential_option_2_parsed(&self) -> Option<ParsedPotentialOption> {
         self.potential_option_2.as_deref().and_then(ParsedPotentialOption::parse)
-    }
-
-    /// Alias for [`potential_option_2_parsed`](Self::potential_option_2_parsed).
-    pub fn potential_2_parsed(&self) -> Option<ParsedPotentialOption> {
-        self.potential_option_2_parsed()
     }
 
     /// Parsed main potential line 3.
@@ -474,19 +471,9 @@ impl ItemEquipmentDetail {
         self.potential_option_3.as_deref().and_then(ParsedPotentialOption::parse)
     }
 
-    /// Alias for [`potential_option_3_parsed`](Self::potential_option_3_parsed).
-    pub fn potential_3_parsed(&self) -> Option<ParsedPotentialOption> {
-        self.potential_option_3_parsed()
-    }
-
     /// Parsed additional potential line 1.
     pub fn additional_potential_option_1_parsed(&self) -> Option<ParsedPotentialOption> {
         self.additional_potential_option_1.as_deref().and_then(ParsedPotentialOption::parse)
-    }
-
-    /// Alias for [`additional_potential_option_1_parsed`](Self::additional_potential_option_1_parsed).
-    pub fn additional_potential_1_parsed(&self) -> Option<ParsedPotentialOption> {
-        self.additional_potential_option_1_parsed()
     }
 
     /// Parsed additional potential line 2.
@@ -494,19 +481,9 @@ impl ItemEquipmentDetail {
         self.additional_potential_option_2.as_deref().and_then(ParsedPotentialOption::parse)
     }
 
-    /// Alias for [`additional_potential_option_2_parsed`](Self::additional_potential_option_2_parsed).
-    pub fn additional_potential_2_parsed(&self) -> Option<ParsedPotentialOption> {
-        self.additional_potential_option_2_parsed()
-    }
-
     /// Parsed additional potential line 3.
     pub fn additional_potential_option_3_parsed(&self) -> Option<ParsedPotentialOption> {
         self.additional_potential_option_3.as_deref().and_then(ParsedPotentialOption::parse)
-    }
-
-    /// Alias for [`additional_potential_option_3_parsed`](Self::additional_potential_option_3_parsed).
-    pub fn additional_potential_3_parsed(&self) -> Option<ParsedPotentialOption> {
-        self.additional_potential_option_3_parsed()
     }
 
     /// All parsed main potential lines.

@@ -1049,6 +1049,7 @@ fn test_maple_date_latest_available_and_kst_refresh() {
 
 #[test]
 fn test_maple_date_validation_boundaries() {
+    use chrono::{Duration, Utc};
     use maplestory_openapi::error::MapleStoryError;
     use maplestory_openapi::MapleStoryClient;
 
@@ -1062,6 +1063,17 @@ fn test_maple_date_validation_boundaries() {
     let err_before_min = MapleStoryClient::validate_date("2023-12-20");
     assert!(matches!(
         err_before_min,
+        Err(MapleStoryError::DateOutOfRange { .. })
+    ));
+
+    // Today's KST date must fail because daily snapshots only exist up to latest_available()
+    let kst_today = (Utc::now() + Duration::hours(9))
+        .date_naive()
+        .format("%Y-%m-%d")
+        .to_string();
+    let err_today = MapleStoryClient::validate_date(&kst_today);
+    assert!(matches!(
+        err_today,
         Err(MapleStoryError::DateOutOfRange { .. })
     ));
 
@@ -1206,6 +1218,7 @@ fn test_equipment_potential_parser_and_total_stat() {
 
 #[test]
 fn test_union_artifact_helpers() {
+    use maplestory_openapi::models::character::StatType;
     use maplestory_openapi::models::union::{
         UnionArtifactCrystal, UnionArtifactEffect, UserUnionArtifact,
     };
@@ -1273,13 +1286,20 @@ fn test_union_artifact_helpers() {
     assert!(expired_names.contains(&"크리스탈 : 파랑"));
     assert!(expired_names.contains(&"크리스탈 : 보라"));
 
-    // 3. total_artifact_stats aggregates numeric values
+    // 3. total_artifact_stats and total_artifact_stats_typed aggregate numeric values
     let stats = artifact.total_artifact_stats();
     assert_eq!(stats.get("올스탯").copied(), Some(150.0));
     assert_eq!(stats.get("공격력").copied(), Some(30.0));
     assert_eq!(stats.get("마력").copied(), Some(30.0));
     assert_eq!(stats.get("보스 몬스터 공격 시 데미지").copied(), Some(15.0));
     assert_eq!(stats.get("크리티컬 데미지").copied(), Some(2.4));
+
+    let typed_stats = artifact.total_artifact_stats_typed();
+    assert_eq!(typed_stats.get(&StatType::AllStat).copied(), Some(150.0));
+    assert_eq!(typed_stats.get(&StatType::AttackPower).copied(), Some(30.0));
+    assert_eq!(typed_stats.get(&StatType::MagicPower).copied(), Some(30.0));
+    assert_eq!(typed_stats.get(&StatType::BossDamage).copied(), Some(15.0));
+    assert_eq!(typed_stats.get(&StatType::CriticalDamage).copied(), Some(2.4));
 
     // 4. When all crystals are expired, is_active is false and active_effects is empty
     let fully_expired_artifact = UserUnionArtifact {
@@ -1592,7 +1612,7 @@ async fn test_history_auto_paginating_stream() {
         .build()
         .unwrap();
 
-    let mut stream = client.history().get_starforce_stream(10, None);
+    let mut stream = client.history().get_starforce_history_stream(10, None);
     let mut collected = Vec::new();
     while let Some(item_res) = stream.next().await {
         let entry = item_res.unwrap();
@@ -1622,6 +1642,19 @@ async fn test_guild_profile_and_account_summary_aggregators() {
                 ]
             }"#;
             (200, body.to_string(), None)
+        } else if req_text.contains("/maplestory/v1/character/list") {
+            let body = r#"{
+                "account_list": [
+                    {
+                        "account_id": "acc-1",
+                        "character_list": [
+                            {"ocid": "ocid-hero1", "character_name": "영웅1", "character_level": 285},
+                            {"ocid": "ocid-sub1", "character_name": "부캐1", "character_level": 230}
+                        ]
+                    }
+                ]
+            }"#;
+            (200, body.to_string(), None)
         } else if req_text.contains("/maplestory/v1/id") {
             if req_text.contains("character_name=%EA%B8%B8%EB%93%9C%EC%9B%901") || req_text.contains("character_name=길드원1") {
                 (200, r#"{"ocid":"ocid-1"}"#.to_string(), None)
@@ -1634,21 +1667,16 @@ async fn test_guild_profile_and_account_summary_aggregators() {
             } else {
                 (200, r#"{"character_name":"길드원2","character_level":270}"#.to_string(), None)
             }
-        } else if req_text.contains("/maplestory/v1/character/list") {
-            let body = r#"{
-                "account_list": [
-                    {
-                        "account_id": "acc-1",
-                        "character_list": [
-                            {"character_name": "영웅1", "character_level": 285},
-                            {"character_name": "부캐1", "character_level": 230}
-                        ]
-                    }
-                ]
-            }"#;
-            (200, body.to_string(), None)
+        } else if req_text.contains("/maplestory/v1/character/stat") {
+            if req_text.contains("ocid=ocid-1") {
+                (200, r#"{"final_stat":[{"stat_name":"전투력","stat_value":"200000000"}]}"#.to_string(), None)
+            } else {
+                (200, r#"{"final_stat":[{"stat_name":"전투력","stat_value":"100000000"}]}"#.to_string(), None)
+            }
         } else if req_text.contains("/maplestory/v1/user/achievement") {
             (200, r#"{"achievement_point": 12500}"#.to_string(), None)
+        } else if req_text.contains("/maplestory/v1/user/union") {
+            (200, r#"{"union_level": 9000, "union_grade": "그랜드 마스터 유니온 3"}"#.to_string(), None)
         } else {
             (200, r#"{}"#.to_string(), None)
         }
@@ -1672,6 +1700,9 @@ async fn test_guild_profile_and_account_summary_aggregators() {
     assert_eq!(guild_profile.noblesse_skills.len(), 2);
     assert_eq!(guild_profile.fetched_member_count(), 2);
     assert_eq!(guild_profile.average_member_level(), Some(275.0));
+    assert_eq!(guild_profile.total_member_combat_power(), 300_000_000);
+    assert_eq!(guild_profile.average_member_combat_power(), Some(150_000_000.0));
+    assert_eq!(guild_profile.max_member_combat_power(), Some(200_000_000));
 
     // 2. AccountSummary testing
     let account_summary = client.user().get_account_summary(None).await.unwrap();
@@ -1681,6 +1712,12 @@ async fn test_guild_profile_and_account_summary_aggregators() {
         Some("영웅1")
     );
     assert_eq!(account_summary.achievement_points(), Some(12500));
+    assert_eq!(account_summary.main_character_union_level(), Some(9000));
+    assert_eq!(
+        account_summary.main_character_union_grade(),
+        Some("그랜드 마스터 유니온 3")
+    );
 
     server_task.abort();
 }
+

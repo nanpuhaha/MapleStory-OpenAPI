@@ -70,7 +70,7 @@ pub use models::character::{
     VisibleEquipItem,
 };
 pub use models::common::{DateParam, MapleDate, SkillGrade};
-pub use models::guild::{GuildBasic, GuildId, GuildSkill};
+pub use models::guild::{GuildBasic, GuildId, GuildProfile, GuildSkill};
 pub use models::history::{
     CubeHistory, PotentialHistory, SoulPotentialHistory, StarforceHistory,
 };
@@ -85,4 +85,4 @@ pub use models::ranking::{
 };
 pub use models::scheduler::CharacterStateResponse;
 pub use models::union::{UserUnion, UserUnionArtifact, UserUnionChampion, UserUnionRaider};
-pub use models::user::User;
+pub use models::user::{AccountSummary, User};

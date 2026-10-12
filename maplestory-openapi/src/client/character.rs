@@ -985,8 +985,7 @@ impl MapleStoryClient {
         ocid: &str,
         date: impl Into<DateParam>,
     ) -> Result<CharacterBasic> {
-        let params = build_params(ocid, date.into().as_deref())?;
-        self.get("/maplestory/v1/character/basic", &params).await
+        self.character().get_basic(ocid, date).await
     }
 
     // ─── Popularity ──────────────────────────────────────────────────────────
@@ -999,9 +998,7 @@ impl MapleStoryClient {
         ocid: &str,
         date: impl Into<DateParam>,
     ) -> Result<CharacterPopularity> {
-        let params = build_params(ocid, date.into().as_deref())?;
-        self.get("/maplestory/v1/character/popularity", &params)
-            .await
+        self.character().get_popularity(ocid, date).await
     }
 
     // ─── Stat ────────────────────────────────────────────────────────────────
@@ -1014,8 +1011,7 @@ impl MapleStoryClient {
         ocid: &str,
         date: impl Into<DateParam>,
     ) -> Result<CharacterStat> {
-        let params = build_params(ocid, date.into().as_deref())?;
-        self.get("/maplestory/v1/character/stat", &params).await
+        self.character().get_stat(ocid, date).await
     }
 
     // ─── Hyper Stat ──────────────────────────────────────────────────────────
@@ -1028,9 +1024,7 @@ impl MapleStoryClient {
         ocid: &str,
         date: impl Into<DateParam>,
     ) -> Result<CharacterHyperStat> {
-        let params = build_params(ocid, date.into().as_deref())?;
-        self.get("/maplestory/v1/character/hyper-stat", &params)
-            .await
+        self.character().get_hyper_stat(ocid, date).await
     }
 
     // ─── Propensity ──────────────────────────────────────────────────────────
@@ -1043,9 +1037,7 @@ impl MapleStoryClient {
         ocid: &str,
         date: impl Into<DateParam>,
     ) -> Result<CharacterPropensity> {
-        let params = build_params(ocid, date.into().as_deref())?;
-        self.get("/maplestory/v1/character/propensity", &params)
-            .await
+        self.character().get_propensity(ocid, date).await
     }
 
     // ─── Ability ─────────────────────────────────────────────────────────────
@@ -1058,8 +1050,7 @@ impl MapleStoryClient {
         ocid: &str,
         date: impl Into<DateParam>,
     ) -> Result<CharacterAbility> {
-        let params = build_params(ocid, date.into().as_deref())?;
-        self.get("/maplestory/v1/character/ability", &params).await
+        self.character().get_ability(ocid, date).await
     }
 
     // ─── Item Equipment ───────────────────────────────────────────────────────
@@ -1072,9 +1063,7 @@ impl MapleStoryClient {
         ocid: &str,
         date: impl Into<DateParam>,
     ) -> Result<CharacterItemEquipment> {
-        let params = build_params(ocid, date.into().as_deref())?;
-        self.get("/maplestory/v1/character/item-equipment", &params)
-            .await
+        self.character().get_item_equipment(ocid, date).await
     }
 
     // ─── Cash Item Equipment ─────────────────────────────────────────────────
@@ -1087,9 +1076,7 @@ impl MapleStoryClient {
         ocid: &str,
         date: impl Into<DateParam>,
     ) -> Result<CharacterCashItemEquipment> {
-        let params = build_params(ocid, date.into().as_deref())?;
-        self.get("/maplestory/v1/character/cashitem-equipment", &params)
-            .await
+        self.character().get_cashitem_equipment(ocid, date).await
     }
 
     // ─── Symbol Equipment ─────────────────────────────────────────────────────
@@ -1102,9 +1089,7 @@ impl MapleStoryClient {
         ocid: &str,
         date: impl Into<DateParam>,
     ) -> Result<CharacterSymbolEquipment> {
-        let params = build_params(ocid, date.into().as_deref())?;
-        self.get("/maplestory/v1/character/symbol-equipment", &params)
-            .await
+        self.character().get_symbol_equipment(ocid, date).await
     }
 
     // ─── Set Effect ───────────────────────────────────────────────────────────
@@ -1117,9 +1102,7 @@ impl MapleStoryClient {
         ocid: &str,
         date: impl Into<DateParam>,
     ) -> Result<CharacterSetEffect> {
-        let params = build_params(ocid, date.into().as_deref())?;
-        self.get("/maplestory/v1/character/set-effect", &params)
-            .await
+        self.character().get_set_effect(ocid, date).await
     }
 
     // ─── Beauty Equipment ─────────────────────────────────────────────────────
@@ -1132,9 +1115,7 @@ impl MapleStoryClient {
         ocid: &str,
         date: impl Into<DateParam>,
     ) -> Result<CharacterBeautyEquipment> {
-        let params = build_params(ocid, date.into().as_deref())?;
-        self.get("/maplestory/v1/character/beauty-equipment", &params)
-            .await
+        self.character().get_beauty_equipment(ocid, date).await
     }
 
     // ─── Android Equipment ────────────────────────────────────────────────────
@@ -1147,9 +1128,7 @@ impl MapleStoryClient {
         ocid: &str,
         date: impl Into<DateParam>,
     ) -> Result<CharacterAndroidEquipment> {
-        let params = build_params(ocid, date.into().as_deref())?;
-        self.get("/maplestory/v1/character/android-equipment", &params)
-            .await
+        self.character().get_android_equipment(ocid, date).await
     }
 
     // ─── Pet Equipment ────────────────────────────────────────────────────────
@@ -1162,9 +1141,7 @@ impl MapleStoryClient {
         ocid: &str,
         date: impl Into<DateParam>,
     ) -> Result<CharacterPetEquipment> {
-        let params = build_params(ocid, date.into().as_deref())?;
-        self.get("/maplestory/v1/character/pet-equipment", &params)
-            .await
+        self.character().get_pet_equipment(ocid, date).await
     }
 
     // ─── Skill ───────────────────────────────────────────────────────────────
@@ -1194,9 +1171,7 @@ impl MapleStoryClient {
         grade: SkillGrade,
         date: impl Into<DateParam>,
     ) -> Result<CharacterSkill> {
-        let mut params = build_params(ocid, date.into().as_deref())?;
-        params.push(("character_skill_grade", grade.to_string()));
-        self.get("/maplestory/v1/character/skill", &params).await
+        self.character().get_skill(ocid, grade, date).await
     }
 
     // ─── Link Skill ───────────────────────────────────────────────────────────
@@ -1209,9 +1184,7 @@ impl MapleStoryClient {
         ocid: &str,
         date: impl Into<DateParam>,
     ) -> Result<CharacterLinkSkill> {
-        let params = build_params(ocid, date.into().as_deref())?;
-        self.get("/maplestory/v1/character/link-skill", &params)
-            .await
+        self.character().get_link_skill(ocid, date).await
     }
 
     // ─── V Matrix ─────────────────────────────────────────────────────────────
@@ -1224,8 +1197,7 @@ impl MapleStoryClient {
         ocid: &str,
         date: impl Into<DateParam>,
     ) -> Result<CharacterVMatrix> {
-        let params = build_params(ocid, date.into().as_deref())?;
-        self.get("/maplestory/v1/character/vmatrix", &params).await
+        self.character().get_vmatrix(ocid, date).await
     }
 
     // ─── HEXA Matrix ──────────────────────────────────────────────────────────
@@ -1238,9 +1210,7 @@ impl MapleStoryClient {
         ocid: &str,
         date: impl Into<DateParam>,
     ) -> Result<CharacterHexaMatrix> {
-        let params = build_params(ocid, date.into().as_deref())?;
-        self.get("/maplestory/v1/character/hexamatrix", &params)
-            .await
+        self.character().get_hexamatrix(ocid, date).await
     }
 
     // ─── HEXA Matrix Stat ─────────────────────────────────────────────────────
@@ -1253,9 +1223,7 @@ impl MapleStoryClient {
         ocid: &str,
         date: impl Into<DateParam>,
     ) -> Result<CharacterHexaMatrixStat> {
-        let params = build_params(ocid, date.into().as_deref())?;
-        self.get("/maplestory/v1/character/hexamatrix-stat", &params)
-            .await
+        self.character().get_hexamatrix_stat(ocid, date).await
     }
 
     // ─── Dojang ───────────────────────────────────────────────────────────────
@@ -1268,8 +1236,7 @@ impl MapleStoryClient {
         ocid: &str,
         date: impl Into<DateParam>,
     ) -> Result<CharacterDojang> {
-        let params = build_params(ocid, date.into().as_deref())?;
-        self.get("/maplestory/v1/character/dojang", &params).await
+        self.character().get_dojang(ocid, date).await
     }
 
     // ─── Other Stat ───────────────────────────────────────────────────────────
@@ -1284,9 +1251,7 @@ impl MapleStoryClient {
         ocid: &str,
         date: impl Into<DateParam>,
     ) -> Result<CharacterOtherStat> {
-        let params = build_params(ocid, date.into().as_deref())?;
-        self.get("/maplestory/v1/character/other-stat", &params)
-            .await
+        self.character().get_other_stat(ocid, date).await
     }
 
     // ─── Ring Exchange ────────────────────────────────────────────────────────
@@ -1301,12 +1266,9 @@ impl MapleStoryClient {
         ocid: &str,
         date: impl Into<DateParam>,
     ) -> Result<RingExchangeSkillEquipment> {
-        let params = build_params(ocid, date.into().as_deref())?;
-        self.get(
-            "/maplestory/v1/character/ring-exchange-skill-equipment",
-            &params,
-        )
-        .await
+        self.character()
+            .get_ring_exchange_skill_equipment(ocid, date)
+            .await
     }
 
     // ─── Ring Reserve ─────────────────────────────────────────────────────────
@@ -1321,12 +1283,9 @@ impl MapleStoryClient {
         ocid: &str,
         date: impl Into<DateParam>,
     ) -> Result<RingReserveSkillEquipment> {
-        let params = build_params(ocid, date.into().as_deref())?;
-        self.get(
-            "/maplestory/v1/character/ring-reserve-skill-equipment",
-            &params,
-        )
-        .await
+        self.character()
+            .get_ring_reserve_skill_equipment(ocid, date)
+            .await
     }
 }
 
@@ -1367,122 +1326,285 @@ impl<'a> CharacterClient<'a> {
 
     /// Retrieve basic information of a character.
     pub async fn get_basic(&self, ocid: &str, date: impl Into<DateParam>) -> Result<CharacterBasic> {
-        self.client.get_character_basic(ocid, date).await
+        let params = build_params(ocid, date.into().as_deref())?;
+        self.client
+            .get("/maplestory/v1/character/basic", &params)
+            .await
     }
 
     /// Retrieve popularity of a character.
-    pub async fn get_popularity(&self, ocid: &str, date: impl Into<DateParam>) -> Result<CharacterPopularity> {
-        self.client.get_character_popularity(ocid, date).await
+    pub async fn get_popularity(
+        &self,
+        ocid: &str,
+        date: impl Into<DateParam>,
+    ) -> Result<CharacterPopularity> {
+        let params = build_params(ocid, date.into().as_deref())?;
+        self.client
+            .get("/maplestory/v1/character/popularity", &params)
+            .await
     }
 
     /// Retrieve comprehensive stat information of a character.
     pub async fn get_stat(&self, ocid: &str, date: impl Into<DateParam>) -> Result<CharacterStat> {
-        self.client.get_character_stat(ocid, date).await
+        let params = build_params(ocid, date.into().as_deref())?;
+        self.client
+            .get("/maplestory/v1/character/stat", &params)
+            .await
     }
 
     /// Retrieve hyper stat information of a character.
-    pub async fn get_hyper_stat(&self, ocid: &str, date: impl Into<DateParam>) -> Result<CharacterHyperStat> {
-        self.client.get_character_hyper_stat(ocid, date).await
+    pub async fn get_hyper_stat(
+        &self,
+        ocid: &str,
+        date: impl Into<DateParam>,
+    ) -> Result<CharacterHyperStat> {
+        let params = build_params(ocid, date.into().as_deref())?;
+        self.client
+            .get("/maplestory/v1/character/hyper-stat", &params)
+            .await
     }
 
     /// Retrieve propensity information of a character.
-    pub async fn get_propensity(&self, ocid: &str, date: impl Into<DateParam>) -> Result<CharacterPropensity> {
-        self.client.get_character_propensity(ocid, date).await
+    pub async fn get_propensity(
+        &self,
+        ocid: &str,
+        date: impl Into<DateParam>,
+    ) -> Result<CharacterPropensity> {
+        let params = build_params(ocid, date.into().as_deref())?;
+        self.client
+            .get("/maplestory/v1/character/propensity", &params)
+            .await
     }
 
     /// Retrieve ability information of a character.
-    pub async fn get_ability(&self, ocid: &str, date: impl Into<DateParam>) -> Result<CharacterAbility> {
-        self.client.get_character_ability(ocid, date).await
+    pub async fn get_ability(
+        &self,
+        ocid: &str,
+        date: impl Into<DateParam>,
+    ) -> Result<CharacterAbility> {
+        let params = build_params(ocid, date.into().as_deref())?;
+        self.client
+            .get("/maplestory/v1/character/ability", &params)
+            .await
     }
 
     /// Retrieve item equipment information of a character.
-    pub async fn get_item_equipment(&self, ocid: &str, date: impl Into<DateParam>) -> Result<CharacterItemEquipment> {
-        self.client.get_character_item_equipment(ocid, date).await
+    pub async fn get_item_equipment(
+        &self,
+        ocid: &str,
+        date: impl Into<DateParam>,
+    ) -> Result<CharacterItemEquipment> {
+        let params = build_params(ocid, date.into().as_deref())?;
+        self.client
+            .get("/maplestory/v1/character/item-equipment", &params)
+            .await
     }
 
     /// Retrieve cash item equipment information of a character.
-    pub async fn get_cashitem_equipment(&self, ocid: &str, date: impl Into<DateParam>) -> Result<CharacterCashItemEquipment> {
-        self.client.get_character_cashitem_equipment(ocid, date).await
+    pub async fn get_cashitem_equipment(
+        &self,
+        ocid: &str,
+        date: impl Into<DateParam>,
+    ) -> Result<CharacterCashItemEquipment> {
+        let params = build_params(ocid, date.into().as_deref())?;
+        self.client
+            .get("/maplestory/v1/character/cashitem-equipment", &params)
+            .await
     }
 
     /// Retrieve symbol equipment information of a character.
-    pub async fn get_symbol_equipment(&self, ocid: &str, date: impl Into<DateParam>) -> Result<CharacterSymbolEquipment> {
-        self.client.get_character_symbol_equipment(ocid, date).await
+    pub async fn get_symbol_equipment(
+        &self,
+        ocid: &str,
+        date: impl Into<DateParam>,
+    ) -> Result<CharacterSymbolEquipment> {
+        let params = build_params(ocid, date.into().as_deref())?;
+        self.client
+            .get("/maplestory/v1/character/symbol-equipment", &params)
+            .await
     }
 
     /// Retrieve set effect information of a character.
-    pub async fn get_set_effect(&self, ocid: &str, date: impl Into<DateParam>) -> Result<CharacterSetEffect> {
-        self.client.get_character_set_effect(ocid, date).await
+    pub async fn get_set_effect(
+        &self,
+        ocid: &str,
+        date: impl Into<DateParam>,
+    ) -> Result<CharacterSetEffect> {
+        let params = build_params(ocid, date.into().as_deref())?;
+        self.client
+            .get("/maplestory/v1/character/set-effect", &params)
+            .await
     }
 
     /// Retrieve beauty (hair, face, skin) equipment information of a character.
-    pub async fn get_beauty_equipment(&self, ocid: &str, date: impl Into<DateParam>) -> Result<CharacterBeautyEquipment> {
-        self.client.get_character_beauty_equipment(ocid, date).await
+    pub async fn get_beauty_equipment(
+        &self,
+        ocid: &str,
+        date: impl Into<DateParam>,
+    ) -> Result<CharacterBeautyEquipment> {
+        let params = build_params(ocid, date.into().as_deref())?;
+        self.client
+            .get("/maplestory/v1/character/beauty-equipment", &params)
+            .await
     }
 
     /// Retrieve android equipment information of a character.
-    pub async fn get_android_equipment(&self, ocid: &str, date: impl Into<DateParam>) -> Result<CharacterAndroidEquipment> {
-        self.client.get_character_android_equipment(ocid, date).await
+    pub async fn get_android_equipment(
+        &self,
+        ocid: &str,
+        date: impl Into<DateParam>,
+    ) -> Result<CharacterAndroidEquipment> {
+        let params = build_params(ocid, date.into().as_deref())?;
+        self.client
+            .get("/maplestory/v1/character/android-equipment", &params)
+            .await
     }
 
     /// Retrieve pet equipment information of a character.
-    pub async fn get_pet_equipment(&self, ocid: &str, date: impl Into<DateParam>) -> Result<CharacterPetEquipment> {
-        self.client.get_character_pet_equipment(ocid, date).await
+    pub async fn get_pet_equipment(
+        &self,
+        ocid: &str,
+        date: impl Into<DateParam>,
+    ) -> Result<CharacterPetEquipment> {
+        let params = build_params(ocid, date.into().as_deref())?;
+        self.client
+            .get("/maplestory/v1/character/pet-equipment", &params)
+            .await
     }
 
     /// Retrieve skill information for a specific grade of a character.
-    pub async fn get_skill(&self, ocid: &str, skill_grade: SkillGrade, date: impl Into<DateParam>) -> Result<CharacterSkill> {
-        self.client.get_character_skill(ocid, skill_grade, date).await
+    pub async fn get_skill(
+        &self,
+        ocid: &str,
+        skill_grade: SkillGrade,
+        date: impl Into<DateParam>,
+    ) -> Result<CharacterSkill> {
+        let mut params = build_params(ocid, date.into().as_deref())?;
+        params.push(("character_skill_grade", skill_grade.to_string()));
+        self.client
+            .get("/maplestory/v1/character/skill", &params)
+            .await
     }
 
     /// Retrieve link skill information of a character.
-    pub async fn get_link_skill(&self, ocid: &str, date: impl Into<DateParam>) -> Result<CharacterLinkSkill> {
-        self.client.get_character_link_skill(ocid, date).await
+    pub async fn get_link_skill(
+        &self,
+        ocid: &str,
+        date: impl Into<DateParam>,
+    ) -> Result<CharacterLinkSkill> {
+        let params = build_params(ocid, date.into().as_deref())?;
+        self.client
+            .get("/maplestory/v1/character/link-skill", &params)
+            .await
     }
 
     /// Retrieve V-Matrix core information of a character.
-    pub async fn get_vmatrix(&self, ocid: &str, date: impl Into<DateParam>) -> Result<CharacterVMatrix> {
-        self.client.get_character_vmatrix(ocid, date).await
+    pub async fn get_vmatrix(
+        &self,
+        ocid: &str,
+        date: impl Into<DateParam>,
+    ) -> Result<CharacterVMatrix> {
+        let params = build_params(ocid, date.into().as_deref())?;
+        self.client
+            .get("/maplestory/v1/character/vmatrix", &params)
+            .await
     }
 
     /// Retrieve HEXA Matrix core information of a character.
-    pub async fn get_hexamatrix(&self, ocid: &str, date: impl Into<DateParam>) -> Result<CharacterHexaMatrix> {
-        self.client.get_character_hexamatrix(ocid, date).await
+    pub async fn get_hexamatrix(
+        &self,
+        ocid: &str,
+        date: impl Into<DateParam>,
+    ) -> Result<CharacterHexaMatrix> {
+        let params = build_params(ocid, date.into().as_deref())?;
+        self.client
+            .get("/maplestory/v1/character/hexamatrix", &params)
+            .await
     }
 
     /// Retrieve HEXA Matrix stat node information of a character.
-    pub async fn get_hexamatrix_stat(&self, ocid: &str, date: impl Into<DateParam>) -> Result<CharacterHexaMatrixStat> {
-        self.client.get_character_hexamatrix_stat(ocid, date).await
+    pub async fn get_hexamatrix_stat(
+        &self,
+        ocid: &str,
+        date: impl Into<DateParam>,
+    ) -> Result<CharacterHexaMatrixStat> {
+        let params = build_params(ocid, date.into().as_deref())?;
+        self.client
+            .get("/maplestory/v1/character/hexamatrix-stat", &params)
+            .await
     }
 
     /// Retrieve Mu Lung Dojang best record of a character.
-    pub async fn get_dojang(&self, ocid: &str, date: impl Into<DateParam>) -> Result<CharacterDojang> {
-        self.client.get_character_dojang(ocid, date).await
+    pub async fn get_dojang(
+        &self,
+        ocid: &str,
+        date: impl Into<DateParam>,
+    ) -> Result<CharacterDojang> {
+        let params = build_params(ocid, date.into().as_deref())?;
+        self.client
+            .get("/maplestory/v1/character/dojang", &params)
+            .await
     }
 
     /// Retrieve other stats of a character.
-    pub async fn get_other_stat(&self, ocid: &str, date: impl Into<DateParam>) -> Result<CharacterOtherStat> {
-        self.client.get_character_other_stat(ocid, date).await
+    pub async fn get_other_stat(
+        &self,
+        ocid: &str,
+        date: impl Into<DateParam>,
+    ) -> Result<CharacterOtherStat> {
+        let params = build_params(ocid, date.into().as_deref())?;
+        self.client
+            .get("/maplestory/v1/character/other-stat", &params)
+            .await
     }
 
     /// Retrieve ring exchange skill equipment information.
-    pub async fn get_ring_exchange_skill_equipment(&self, ocid: &str, date: impl Into<DateParam>) -> Result<RingExchangeSkillEquipment> {
-        self.client.get_character_ring_exchange_skill_equipment(ocid, date).await
+    pub async fn get_ring_exchange_skill_equipment(
+        &self,
+        ocid: &str,
+        date: impl Into<DateParam>,
+    ) -> Result<RingExchangeSkillEquipment> {
+        let params = build_params(ocid, date.into().as_deref())?;
+        self.client
+            .get(
+                "/maplestory/v1/character/ring-exchange-skill-equipment",
+                &params,
+            )
+            .await
     }
 
     /// Retrieve ring reserve skill equipment information.
-    pub async fn get_ring_reserve_skill_equipment(&self, ocid: &str, date: impl Into<DateParam>) -> Result<RingReserveSkillEquipment> {
-        self.client.get_character_ring_reserve_skill_equipment(ocid, date).await
+    pub async fn get_ring_reserve_skill_equipment(
+        &self,
+        ocid: &str,
+        date: impl Into<DateParam>,
+    ) -> Result<RingReserveSkillEquipment> {
+        let params = build_params(ocid, date.into().as_deref())?;
+        self.client
+            .get(
+                "/maplestory/v1/character/ring-reserve-skill-equipment",
+                &params,
+            )
+            .await
     }
 
     /// Retrieve synthesized coordination model of a character.
-    pub async fn get_coordination(&self, ocid: &str, date: impl Into<DateParam>) -> Result<CharacterCoordination> {
+    pub async fn get_coordination(
+        &self,
+        ocid: &str,
+        date: impl Into<DateParam>,
+    ) -> Result<CharacterCoordination> {
         self.client.get_character_coordination(ocid, date).await
     }
 
     /// Retrieve synthesized coordination model directly by character name.
-    pub async fn get_coordination_by_name(&self, character_name: &str) -> Result<CharacterCoordination> {
-        self.client.get_character_coordination_by_name(character_name).await
+    pub async fn get_coordination_by_name(
+        &self,
+        character_name: &str,
+    ) -> Result<CharacterCoordination> {
+        self.client
+            .get_character_coordination_by_name(character_name)
+            .await
     }
 
     /// Retrieve basic information of a character directly by character name.
@@ -1491,17 +1613,27 @@ impl<'a> CharacterClient<'a> {
     }
 
     /// Retrieve profile information of a character.
-    pub async fn get_profile(&self, ocid: &str, date: impl Into<DateParam>) -> Result<CharacterProfile> {
+    pub async fn get_profile(
+        &self,
+        ocid: &str,
+        date: impl Into<DateParam>,
+    ) -> Result<CharacterProfile> {
         self.client.get_character_profile(ocid, date).await
     }
 
     /// Retrieve profile information directly by character name.
     pub async fn get_profile_by_name(&self, character_name: &str) -> Result<CharacterProfile> {
-        self.client.get_character_profile_by_name(character_name).await
+        self.client
+            .get_character_profile_by_name(character_name)
+            .await
     }
 
     /// Retrieve character dashboard with default options.
-    pub async fn get_dashboard(&self, ocid: &str, date: impl Into<DateParam>) -> Result<CharacterDashboard> {
+    pub async fn get_dashboard(
+        &self,
+        ocid: &str,
+        date: impl Into<DateParam>,
+    ) -> Result<CharacterDashboard> {
         self.client.get_character_dashboard(ocid, date).await
     }
 
@@ -1512,12 +1644,16 @@ impl<'a> CharacterClient<'a> {
         date: impl Into<DateParam>,
         options: &DashboardOptions,
     ) -> Result<CharacterDashboard> {
-        self.client.get_character_dashboard_with_options(ocid, date, options).await
+        self.client
+            .get_character_dashboard_with_options(ocid, date, options)
+            .await
     }
 
     /// Retrieve character dashboard directly by character name.
     pub async fn get_dashboard_by_name(&self, character_name: &str) -> Result<CharacterDashboard> {
-        self.client.get_character_dashboard_by_name(character_name).await
+        self.client
+            .get_character_dashboard_by_name(character_name)
+            .await
     }
 
     /// Retrieve character dashboard directly by character name with options.
@@ -1532,3 +1668,4 @@ impl<'a> CharacterClient<'a> {
             .await
     }
 }
+

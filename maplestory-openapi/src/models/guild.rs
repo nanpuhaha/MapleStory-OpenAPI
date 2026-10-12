@@ -84,7 +84,7 @@ impl GuildBasic {
 /// Comprehensive aggregated guild profile.
 ///
 /// Contains basic guild information, Noblesse skill analysis,
-/// and optionally detailed basic information for guild members.
+/// and optionally detailed basic information and combat power statistics for guild members.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GuildProfile {
     /// Basic guild information
@@ -95,9 +95,28 @@ pub struct GuildProfile {
     pub noblesse_skills: Vec<GuildSkill>,
     /// Detailed basic info of fetched guild members (if requested)
     pub members: Vec<crate::models::character::CharacterBasic>,
+    /// Combat powers of fetched active guild members (if requested)
+    pub member_combat_powers: Vec<i64>,
 }
 
 impl GuildProfile {
+    /// Construct a `GuildProfile` from `GuildBasic`, optional member basic profiles, and member combat powers.
+    pub fn from_basic(
+        basic: GuildBasic,
+        members: Vec<crate::models::character::CharacterBasic>,
+        member_combat_powers: Vec<i64>,
+    ) -> Self {
+        let total_noblesse_points = basic.total_noblesse_points();
+        let noblesse_skills = basic.guild_noblesse_skill.clone().unwrap_or_default();
+        Self {
+            basic,
+            total_noblesse_points,
+            noblesse_skills,
+            members,
+            member_combat_powers,
+        }
+    }
+
     /// Returns the number of members whose character profiles were successfully fetched.
     pub fn fetched_member_count(&self) -> usize {
         self.members.len()
@@ -105,12 +124,36 @@ impl GuildProfile {
 
     /// Average level of fetched members.
     pub fn average_member_level(&self) -> Option<f64> {
-        let levels: Vec<i64> = self.members.iter().filter_map(|m| m.character_level).collect();
+        let levels: Vec<i64> = self
+            .members
+            .iter()
+            .filter_map(|m| m.character_level)
+            .collect();
         if levels.is_empty() {
             None
         } else {
             let sum: i64 = levels.iter().sum();
             Some(sum as f64 / levels.len() as f64)
         }
+    }
+
+    /// Total combat power across fetched guild members.
+    pub fn total_member_combat_power(&self) -> i64 {
+        self.member_combat_powers.iter().sum()
+    }
+
+    /// Average combat power across fetched guild members.
+    pub fn average_member_combat_power(&self) -> Option<f64> {
+        if self.member_combat_powers.is_empty() {
+            None
+        } else {
+            let sum: i64 = self.member_combat_powers.iter().sum();
+            Some(sum as f64 / self.member_combat_powers.len() as f64)
+        }
+    }
+
+    /// Highest combat power among fetched guild members.
+    pub fn max_member_combat_power(&self) -> Option<i64> {
+        self.member_combat_powers.iter().copied().max()
     }
 }

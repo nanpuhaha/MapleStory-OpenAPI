@@ -83,16 +83,31 @@ pub struct User {
 /// Comprehensive aggregated account summary.
 ///
 /// Combines the account's character roster, achievement statistics,
-/// and primary character information.
+/// and main character Union progression.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AccountSummary {
     /// Characters belonging to the account
     pub character_list: CharacterList,
     /// Achievement statistics for the account
     pub achievement: Option<Achievement>,
+    /// Union statistics for the main (highest-level) character
+    pub union: Option<crate::models::union::UserUnion>,
 }
 
 impl AccountSummary {
+    /// Construct an `AccountSummary` from its constituent responses.
+    pub fn from_parts(
+        character_list: CharacterList,
+        achievement: Option<Achievement>,
+        union: Option<crate::models::union::UserUnion>,
+    ) -> Self {
+        Self {
+            character_list,
+            achievement,
+            union,
+        }
+    }
+
     /// Total count of characters across all worlds and accounts.
     pub fn total_character_count(&self) -> usize {
         self.character_list
@@ -120,5 +135,15 @@ impl AccountSummary {
     /// Total achievement score if available.
     pub fn achievement_points(&self) -> Option<i64> {
         self.achievement.as_ref().and_then(|a| a.achievement_point)
+    }
+
+    /// Union level of the main (highest-level) character if available.
+    pub fn main_character_union_level(&self) -> Option<i64> {
+        self.union.as_ref().and_then(|u| u.union_level)
+    }
+
+    /// Union grade of the main (highest-level) character if available.
+    pub fn main_character_union_grade(&self) -> Option<&str> {
+        self.union.as_ref().and_then(|u| u.union_grade.as_deref())
     }
 }

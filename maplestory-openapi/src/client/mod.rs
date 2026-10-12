@@ -564,10 +564,10 @@ impl MapleStoryClient {
             });
         }
 
-        let kst_today = chrono::Utc::now()
-            .with_timezone(&chrono::FixedOffset::east_opt(9 * 3600).unwrap())
-            .date_naive();
-        if parsed > kst_today {
+        let latest_available = crate::models::common::MapleDate::latest_available()
+            .to_naive_date()
+            .unwrap();
+        if parsed > latest_available {
             return Err(MapleStoryError::DateOutOfRange {
                 date: date.to_string(),
                 min_date: crate::models::common::MapleDate::MIN_DATE.to_string(),

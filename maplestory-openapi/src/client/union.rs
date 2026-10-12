@@ -8,120 +8,12 @@ use crate::{
     models::union::{UserUnion, UserUnionArtifact, UserUnionChampion, UserUnionRaider},
 };
 
-impl MapleStoryClient {
-    /// Retrieve Union basic information for a character's account.
-    ///
-    /// Corresponds to `GET /maplestory/v1/user/union`.
-    ///
-    /// # Arguments
-    /// * `ocid` — character identifier
-    /// * `date` — optional reference date `"YYYY-MM-DD"` (KST)
-    pub async fn get_user_union(
-        &self,
-        ocid: &str,
-        date: impl Into<DateParam>,
-    ) -> Result<UserUnion> {
-        let mut params = vec![("ocid", ocid.to_string())];
-        let date_param = date.into();
-        if let Some(d) = date_param.as_deref() {
-            params.push(("date", Self::validate_date(d)?));
-        }
-        self.get("/maplestory/v1/user/union", &params).await
+fn build_union_params(ocid: &str, date: DateParam) -> Result<Vec<(&'static str, String)>> {
+    let mut params = vec![("ocid", ocid.to_string())];
+    if let Some(d) = date.as_deref() {
+        params.push(("date", MapleStoryClient::validate_date(d)?));
     }
-
-    /// Retrieve Union basic information directly by character name.
-    pub async fn get_user_union_by_name(&self, character_name: &str) -> Result<UserUnion> {
-        let ocid = self.get_ocid(character_name).await?;
-        self.get_user_union(&ocid, None).await
-    }
-
-    /// Retrieve Union Raider (공격대) board and stat information.
-    ///
-    /// Corresponds to `GET /maplestory/v1/user/union-raider`.
-    ///
-    /// # Arguments
-    /// * `ocid` — character identifier
-    /// * `date` — optional reference date `"YYYY-MM-DD"` (KST)
-    pub async fn get_user_union_raider(
-        &self,
-        ocid: &str,
-        date: impl Into<DateParam>,
-    ) -> Result<UserUnionRaider> {
-        let mut params = vec![("ocid", ocid.to_string())];
-        let date_param = date.into();
-        if let Some(d) = date_param.as_deref() {
-            params.push(("date", Self::validate_date(d)?));
-        }
-        self.get("/maplestory/v1/user/union-raider", &params).await
-    }
-
-    /// Retrieve Union Raider information directly by character name.
-    pub async fn get_user_union_raider_by_name(
-        &self,
-        character_name: &str,
-    ) -> Result<UserUnionRaider> {
-        let ocid = self.get_ocid(character_name).await?;
-        self.get_user_union_raider(&ocid, None).await
-    }
-
-    /// Retrieve Union Artifact information.
-    ///
-    /// Corresponds to `GET /maplestory/v1/user/union-artifact`.
-    ///
-    /// # Arguments
-    /// * `ocid` — character identifier
-    /// * `date` — optional reference date `"YYYY-MM-DD"` (KST)
-    pub async fn get_user_union_artifact(
-        &self,
-        ocid: &str,
-        date: impl Into<DateParam>,
-    ) -> Result<UserUnionArtifact> {
-        let mut params = vec![("ocid", ocid.to_string())];
-        let date_param = date.into();
-        if let Some(d) = date_param.as_deref() {
-            params.push(("date", Self::validate_date(d)?));
-        }
-        self.get("/maplestory/v1/user/union-artifact", &params)
-            .await
-    }
-
-    /// Retrieve Union Artifact information directly by character name.
-    pub async fn get_user_union_artifact_by_name(
-        &self,
-        character_name: &str,
-    ) -> Result<UserUnionArtifact> {
-        let ocid = self.get_ocid(character_name).await?;
-        self.get_user_union_artifact(&ocid, None).await
-    }
-
-    /// Retrieve Union Champion information.
-    ///
-    /// Corresponds to `GET /maplestory/v1/user/union-champion`.
-    ///
-    /// # Arguments
-    /// * `ocid` — character identifier
-    /// * `date` — optional reference date `"YYYY-MM-DD"` (KST)
-    pub async fn get_user_union_champion(
-        &self,
-        ocid: &str,
-        date: impl Into<DateParam>,
-    ) -> Result<UserUnionChampion> {
-        let mut params = vec![("ocid", ocid.to_string())];
-        let date_param = date.into();
-        if let Some(d) = date_param.as_deref() {
-            params.push(("date", Self::validate_date(d)?));
-        }
-        self.get("/maplestory/v1/user/union-champion", &params).await
-    }
-
-    /// Retrieve Union Champion information directly by character name.
-    pub async fn get_user_union_champion_by_name(
-        &self,
-        character_name: &str,
-    ) -> Result<UserUnionChampion> {
-        let ocid = self.get_ocid(character_name).await?;
-        self.get_user_union_champion(&ocid, None).await
-    }
+    Ok(params)
 }
 
 // ─── UnionClient ─────────────────────────────────────────────────────────────
@@ -140,41 +32,142 @@ impl<'a> UnionClient<'a> {
 
     /// Retrieve Union basic information for a character's account.
     pub async fn get_union(&self, ocid: &str, date: impl Into<DateParam>) -> Result<UserUnion> {
-        self.client.get_user_union(ocid, date).await
+        let params = build_union_params(ocid, date.into())?;
+        self.client.get("/maplestory/v1/user/union", &params).await
     }
 
     /// Retrieve Union basic information directly by character name.
     pub async fn get_by_name(&self, character_name: &str) -> Result<UserUnion> {
-        self.client.get_user_union_by_name(character_name).await
+        let ocid = self.client.get_ocid(character_name).await?;
+        self.get_union(&ocid, None).await
     }
 
     /// Retrieve Union Raider board and stat information.
-    pub async fn get_raider(&self, ocid: &str, date: impl Into<DateParam>) -> Result<UserUnionRaider> {
-        self.client.get_user_union_raider(ocid, date).await
+    pub async fn get_raider(
+        &self,
+        ocid: &str,
+        date: impl Into<DateParam>,
+    ) -> Result<UserUnionRaider> {
+        let params = build_union_params(ocid, date.into())?;
+        self.client
+            .get("/maplestory/v1/user/union-raider", &params)
+            .await
     }
 
     /// Retrieve Union Raider information directly by character name.
     pub async fn get_raider_by_name(&self, character_name: &str) -> Result<UserUnionRaider> {
-        self.client.get_user_union_raider_by_name(character_name).await
+        let ocid = self.client.get_ocid(character_name).await?;
+        self.get_raider(&ocid, None).await
     }
 
     /// Retrieve Union Artifact information.
-    pub async fn get_artifact(&self, ocid: &str, date: impl Into<DateParam>) -> Result<UserUnionArtifact> {
-        self.client.get_user_union_artifact(ocid, date).await
+    pub async fn get_artifact(
+        &self,
+        ocid: &str,
+        date: impl Into<DateParam>,
+    ) -> Result<UserUnionArtifact> {
+        let params = build_union_params(ocid, date.into())?;
+        self.client
+            .get("/maplestory/v1/user/union-artifact", &params)
+            .await
     }
 
     /// Retrieve Union Artifact information directly by character name.
     pub async fn get_artifact_by_name(&self, character_name: &str) -> Result<UserUnionArtifact> {
-        self.client.get_user_union_artifact_by_name(character_name).await
+        let ocid = self.client.get_ocid(character_name).await?;
+        self.get_artifact(&ocid, None).await
     }
 
     /// Retrieve Union Champion information.
-    pub async fn get_champion(&self, ocid: &str, date: impl Into<DateParam>) -> Result<UserUnionChampion> {
-        self.client.get_user_union_champion(ocid, date).await
+    pub async fn get_champion(
+        &self,
+        ocid: &str,
+        date: impl Into<DateParam>,
+    ) -> Result<UserUnionChampion> {
+        let params = build_union_params(ocid, date.into())?;
+        self.client
+            .get("/maplestory/v1/user/union-champion", &params)
+            .await
     }
 
     /// Retrieve Union Champion information directly by character name.
     pub async fn get_champion_by_name(&self, character_name: &str) -> Result<UserUnionChampion> {
-        self.client.get_user_union_champion_by_name(character_name).await
+        let ocid = self.client.get_ocid(character_name).await?;
+        self.get_champion(&ocid, None).await
+    }
+}
+
+impl MapleStoryClient {
+    /// Retrieve Union basic information for a character's account.
+    ///
+    /// Corresponds to `GET /maplestory/v1/user/union`.
+    pub async fn get_user_union(
+        &self,
+        ocid: &str,
+        date: impl Into<DateParam>,
+    ) -> Result<UserUnion> {
+        self.union().get_union(ocid, date).await
+    }
+
+    /// Retrieve Union basic information directly by character name.
+    pub async fn get_user_union_by_name(&self, character_name: &str) -> Result<UserUnion> {
+        self.union().get_by_name(character_name).await
+    }
+
+    /// Retrieve Union Raider (공격대) board and stat information.
+    ///
+    /// Corresponds to `GET /maplestory/v1/user/union-raider`.
+    pub async fn get_user_union_raider(
+        &self,
+        ocid: &str,
+        date: impl Into<DateParam>,
+    ) -> Result<UserUnionRaider> {
+        self.union().get_raider(ocid, date).await
+    }
+
+    /// Retrieve Union Raider information directly by character name.
+    pub async fn get_user_union_raider_by_name(
+        &self,
+        character_name: &str,
+    ) -> Result<UserUnionRaider> {
+        self.union().get_raider_by_name(character_name).await
+    }
+
+    /// Retrieve Union Artifact information.
+    ///
+    /// Corresponds to `GET /maplestory/v1/user/union-artifact`.
+    pub async fn get_user_union_artifact(
+        &self,
+        ocid: &str,
+        date: impl Into<DateParam>,
+    ) -> Result<UserUnionArtifact> {
+        self.union().get_artifact(ocid, date).await
+    }
+
+    /// Retrieve Union Artifact information directly by character name.
+    pub async fn get_user_union_artifact_by_name(
+        &self,
+        character_name: &str,
+    ) -> Result<UserUnionArtifact> {
+        self.union().get_artifact_by_name(character_name).await
+    }
+
+    /// Retrieve Union Champion information.
+    ///
+    /// Corresponds to `GET /maplestory/v1/user/union-champion`.
+    pub async fn get_user_union_champion(
+        &self,
+        ocid: &str,
+        date: impl Into<DateParam>,
+    ) -> Result<UserUnionChampion> {
+        self.union().get_champion(ocid, date).await
+    }
+
+    /// Retrieve Union Champion information directly by character name.
+    pub async fn get_user_union_champion_by_name(
+        &self,
+        character_name: &str,
+    ) -> Result<UserUnionChampion> {
+        self.union().get_champion_by_name(character_name).await
     }
 }

@@ -1,10 +1,17 @@
 use maplestory_openapi::{
     AnimationPreset, AvatarAction, AvatarCode as CoreAvatarCode, AvatarEmotion, AvatarLookQuery,
-    MapleStoryClient as CoreClient, WeaponMotion,
+    DojangRankingQuery, GuildRankingQuery, MapleStoryClient as CoreClient, OverallRankingQuery,
+    UnionRankingQuery, WeaponMotion,
 };
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 use std::sync::Arc;
+
+macro_rules! to_js_value {
+    ($val:expr) => {
+        serde_json::to_value($val).map_err(|e| Error::from_reason(e.to_string()))
+    };
+}
 
 #[napi(js_name = "MapleStoryClient")]
 pub struct JsMapleStoryClient {
@@ -32,7 +39,7 @@ impl JsMapleStoryClient {
             .get_character_dashboard_by_name(&character_name)
             .await
             .map_err(|e| Error::from_reason(e.to_string()))?;
-        serde_json::to_value(&dash).map_err(|e| Error::from_reason(e.to_string()))
+        to_js_value!(&dash)
     }
 
     /// Retrieve character basic profile information.
@@ -43,7 +50,7 @@ impl JsMapleStoryClient {
             .get_character_by_name(&character_name)
             .await
             .map_err(|e| Error::from_reason(e.to_string()))?;
-        serde_json::to_value(&basic).map_err(|e| Error::from_reason(e.to_string()))
+        to_js_value!(&basic)
     }
 
     /// Retrieve character coordination look with synthesized visible items.
@@ -57,7 +64,7 @@ impl JsMapleStoryClient {
             .get_character_coordination_by_name(&character_name)
             .await
             .map_err(|e| Error::from_reason(e.to_string()))?;
-        serde_json::to_value(&look).map_err(|e| Error::from_reason(e.to_string()))
+        to_js_value!(&look)
     }
 
     /// Render an animated GIF directly by character name.
@@ -98,6 +105,8 @@ impl JsMapleStoryClient {
         Ok(gif_bytes.into())
     }
 
+    // ─── Guild ───────────────────────────────────────────────────────────────
+
     /// Retrieve guild basic information by guild name and world name.
     #[napi]
     pub async fn get_guild_basic(
@@ -108,11 +117,31 @@ impl JsMapleStoryClient {
     ) -> Result<serde_json::Value> {
         let guild = self
             .inner
-            .get_guild_by_name(&guild_name, &world_name, date.as_deref())
+            .guild()
+            .get_by_name(&guild_name, &world_name, date.as_deref())
             .await
             .map_err(|e| Error::from_reason(e.to_string()))?;
-        serde_json::to_value(&guild).map_err(|e| Error::from_reason(e.to_string()))
+        to_js_value!(&guild)
     }
+
+    /// Retrieve aggregated guild profile by guild name and world name.
+    #[napi]
+    pub async fn get_guild_profile(
+        &self,
+        guild_name: String,
+        world_name: String,
+        date: Option<String>,
+    ) -> Result<serde_json::Value> {
+        let profile = self
+            .inner
+            .guild()
+            .get_profile(&guild_name, &world_name, date.as_deref())
+            .await
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        to_js_value!(&profile)
+    }
+
+    // ─── Union ───────────────────────────────────────────────────────────────
 
     /// Retrieve Union information by character name.
     #[napi]
@@ -128,21 +157,308 @@ impl JsMapleStoryClient {
             .map_err(|e| Error::from_reason(e.to_string()))?;
         let union_data = self
             .inner
-            .get_user_union(&ocid, date.as_deref())
+            .union()
+            .get_union(&ocid, date.as_deref())
             .await
             .map_err(|e| Error::from_reason(e.to_string()))?;
-        serde_json::to_value(&union_data).map_err(|e| Error::from_reason(e.to_string()))
+        to_js_value!(&union_data)
     }
+
+    /// Retrieve Union artifact information by character name.
+    #[napi]
+    pub async fn get_user_union_artifact(
+        &self,
+        character_name: String,
+        date: Option<String>,
+    ) -> Result<serde_json::Value> {
+        let ocid = self
+            .inner
+            .get_ocid(&character_name)
+            .await
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        let artifact = self
+            .inner
+            .union()
+            .get_artifact(&ocid, date.as_deref())
+            .await
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        to_js_value!(&artifact)
+    }
+
+    /// Retrieve Union raider information by character name.
+    #[napi]
+    pub async fn get_user_union_raider(
+        &self,
+        character_name: String,
+        date: Option<String>,
+    ) -> Result<serde_json::Value> {
+        let ocid = self
+            .inner
+            .get_ocid(&character_name)
+            .await
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        let raider = self
+            .inner
+            .union()
+            .get_raider(&ocid, date.as_deref())
+            .await
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        to_js_value!(&raider)
+    }
+
+    // ─── Ranking ─────────────────────────────────────────────────────────────
+
+    /// Retrieve overall ranking.
+    #[napi]
+    pub async fn get_overall_ranking(
+        &self,
+        date: Option<String>,
+        world_name: Option<String>,
+        world_type: Option<i32>,
+        class_name: Option<String>,
+        ocid: Option<String>,
+        page: Option<u32>,
+    ) -> Result<serde_json::Value> {
+        let query = OverallRankingQuery {
+            date: date.as_deref(),
+            world_name: world_name.as_deref(),
+            world_type,
+            class: class_name.as_deref(),
+            ocid: ocid.as_deref(),
+            page,
+        };
+        let ranking = self
+            .inner
+            .ranking()
+            .get_overall(query)
+            .await
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        to_js_value!(&ranking)
+    }
+
+    /// Retrieve Union ranking.
+    #[napi]
+    pub async fn get_union_ranking(
+        &self,
+        date: Option<String>,
+        world_name: Option<String>,
+        ocid: Option<String>,
+        page: Option<u32>,
+    ) -> Result<serde_json::Value> {
+        let query = UnionRankingQuery {
+            date: date.as_deref(),
+            world_name: world_name.as_deref(),
+            ocid: ocid.as_deref(),
+            page,
+        };
+        let ranking = self
+            .inner
+            .ranking()
+            .get_union(query)
+            .await
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        to_js_value!(&ranking)
+    }
+
+    /// Retrieve guild ranking.
+    #[napi]
+    pub async fn get_guild_ranking(
+        &self,
+        ranking_type: Option<u32>,
+        date: Option<String>,
+        world_name: Option<String>,
+        guild_name: Option<String>,
+        page: Option<u32>,
+    ) -> Result<serde_json::Value> {
+        let query = GuildRankingQuery {
+            date: date.as_deref(),
+            ranking_type: ranking_type.unwrap_or(0),
+            world_name: world_name.as_deref(),
+            guild_name: guild_name.as_deref(),
+            page,
+        };
+        let ranking = self
+            .inner
+            .ranking()
+            .get_guild(query)
+            .await
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        to_js_value!(&ranking)
+    }
+
+    /// Retrieve Mu Lung Dojang ranking.
+    #[napi]
+    pub async fn get_dojang_ranking(
+        &self,
+        difficulty: Option<u32>,
+        date: Option<String>,
+        world_name: Option<String>,
+        class_name: Option<String>,
+        ocid: Option<String>,
+        page: Option<u32>,
+    ) -> Result<serde_json::Value> {
+        let query = DojangRankingQuery {
+            date: date.as_deref(),
+            difficulty: difficulty.unwrap_or(1),
+            world_name: world_name.as_deref(),
+            class: class_name.as_deref(),
+            ocid: ocid.as_deref(),
+            page,
+        };
+        let ranking = self
+            .inner
+            .ranking()
+            .get_dojang(query)
+            .await
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        to_js_value!(&ranking)
+    }
+
+    // ─── History ─────────────────────────────────────────────────────────────
+
+    /// Retrieve starforce enhancement history.
+    #[napi]
+    pub async fn get_starforce_history(
+        &self,
+        count: u32,
+        date: Option<String>,
+        cursor: Option<String>,
+    ) -> Result<serde_json::Value> {
+        let hist = self
+            .inner
+            .history()
+            .get_starforce(count, date.as_deref(), cursor.as_deref())
+            .await
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        to_js_value!(&hist)
+    }
+
+    /// Retrieve potential reset history.
+    #[napi]
+    pub async fn get_potential_history(
+        &self,
+        count: u32,
+        date: Option<String>,
+        cursor: Option<String>,
+    ) -> Result<serde_json::Value> {
+        let hist = self
+            .inner
+            .history()
+            .get_potential(count, date.as_deref(), cursor.as_deref())
+            .await
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        to_js_value!(&hist)
+    }
+
+    /// Retrieve cube usage history.
+    #[napi]
+    pub async fn get_cube_history(
+        &self,
+        count: u32,
+        date: Option<String>,
+        cursor: Option<String>,
+    ) -> Result<serde_json::Value> {
+        let hist = self
+            .inner
+            .history()
+            .get_cube(count, date.as_deref(), cursor.as_deref())
+            .await
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        to_js_value!(&hist)
+    }
+
+    /// Retrieve soul potential history.
+    #[napi]
+    pub async fn get_soul_potential_history(
+        &self,
+        count: u32,
+        date: Option<String>,
+        cursor: Option<String>,
+    ) -> Result<serde_json::Value> {
+        let hist = self
+            .inner
+            .history()
+            .get_soul_potential(count, date.as_deref(), cursor.as_deref())
+            .await
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        to_js_value!(&hist)
+    }
+
+    // ─── Notice & User & Scheduler ───────────────────────────────────────────
 
     /// Retrieve notice list.
     #[napi]
     pub async fn get_notice_list(&self) -> Result<serde_json::Value> {
         let notices = self
             .inner
+            .notice()
             .get_notice_list()
             .await
             .map_err(|e| Error::from_reason(e.to_string()))?;
-        serde_json::to_value(&notices).map_err(|e| Error::from_reason(e.to_string()))
+        to_js_value!(&notices)
+    }
+
+    /// Retrieve update notice list.
+    #[napi]
+    pub async fn get_update_notice_list(&self) -> Result<serde_json::Value> {
+        let notices = self
+            .inner
+            .notice()
+            .get_update_notice_list()
+            .await
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        to_js_value!(&notices)
+    }
+
+    /// Retrieve event notice list.
+    #[napi]
+    pub async fn get_event_notice_list(&self) -> Result<serde_json::Value> {
+        let notices = self
+            .inner
+            .notice()
+            .get_event_notice_list()
+            .await
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        to_js_value!(&notices)
+    }
+
+    /// Retrieve cashshop notice list.
+    #[napi]
+    pub async fn get_cashshop_notice_list(&self) -> Result<serde_json::Value> {
+        let notices = self
+            .inner
+            .notice()
+            .get_cashshop_notice_list()
+            .await
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        to_js_value!(&notices)
+    }
+
+    /// Retrieve account summary across worlds.
+    #[napi]
+    pub async fn get_account_summary(&self) -> Result<serde_json::Value> {
+        let summary = self
+            .inner
+            .user()
+            .get_account_summary(None)
+            .await
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        to_js_value!(&summary)
+    }
+
+    /// Retrieve scheduler character state by character name.
+    #[napi]
+    pub async fn get_scheduler_character_state(
+        &self,
+        character_name: String,
+    ) -> Result<serde_json::Value> {
+        let state = self
+            .inner
+            .scheduler()
+            .get_character_state_by_name(&character_name)
+            .await
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        to_js_value!(&state)
     }
 }
 
