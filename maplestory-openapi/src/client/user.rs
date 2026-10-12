@@ -99,6 +99,26 @@ impl MapleStoryClient {
         )
         .await
     }
+
+    /// Retrieve an aggregated summary of the account (roster and achievements).
+    pub async fn get_account_summary(
+        &self,
+        date: impl Into<crate::models::common::DateParam>,
+    ) -> Result<crate::models::user::AccountSummary> {
+        let (character_list_res, achievement_res) = futures_util::future::join(
+            self.get_character_list(),
+            self.get_achievement(date),
+        )
+        .await;
+
+        let character_list = character_list_res?;
+        let achievement = achievement_res.ok();
+
+        Ok(crate::models::user::AccountSummary {
+            character_list,
+            achievement,
+        })
+    }
 }
 
 // ─── UserClient ──────────────────────────────────────────────────────────────
@@ -133,5 +153,13 @@ impl<'a> UserClient<'a> {
     /// Retrieve the account identifier (ouid) using a legacy API key.
     pub async fn get_ouid_with_legacy_key(&self, legacy_api_key: &str) -> Result<User> {
         self.client.get_ouid_with_legacy_key(legacy_api_key).await
+    }
+
+    /// Retrieve an aggregated summary of the account (roster and achievements).
+    pub async fn get_account_summary(
+        &self,
+        date: impl Into<crate::models::common::DateParam>,
+    ) -> Result<crate::models::user::AccountSummary> {
+        self.client.get_account_summary(date).await
     }
 }

@@ -78,3 +78,39 @@ impl GuildBasic {
             .unwrap_or(false)
     }
 }
+
+// ─── Guild Profile (종합 길드 프로필) ──────────────────────────────────────────
+
+/// Comprehensive aggregated guild profile.
+///
+/// Contains basic guild information, Noblesse skill analysis,
+/// and optionally detailed basic information for guild members.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GuildProfile {
+    /// Basic guild information
+    pub basic: GuildBasic,
+    /// Total Noblesse skill points
+    pub total_noblesse_points: i64,
+    /// Active Noblesse skills
+    pub noblesse_skills: Vec<GuildSkill>,
+    /// Detailed basic info of fetched guild members (if requested)
+    pub members: Vec<crate::models::character::CharacterBasic>,
+}
+
+impl GuildProfile {
+    /// Returns the number of members whose character profiles were successfully fetched.
+    pub fn fetched_member_count(&self) -> usize {
+        self.members.len()
+    }
+
+    /// Average level of fetched members.
+    pub fn average_member_level(&self) -> Option<f64> {
+        let levels: Vec<i64> = self.members.iter().filter_map(|m| m.character_level).collect();
+        if levels.is_empty() {
+            None
+        } else {
+            let sum: i64 = levels.iter().sum();
+            Some(sum as f64 / levels.len() as f64)
+        }
+    }
+}

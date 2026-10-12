@@ -77,3 +77,48 @@ pub struct User {
     /// Account identifier (ouid)
     pub ouid: Option<String>,
 }
+
+// ─── Account Summary (종합 계정 요약) ──────────────────────────────────────────
+
+/// Comprehensive aggregated account summary.
+///
+/// Combines the account's character roster, achievement statistics,
+/// and primary character information.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AccountSummary {
+    /// Characters belonging to the account
+    pub character_list: CharacterList,
+    /// Achievement statistics for the account
+    pub achievement: Option<Achievement>,
+}
+
+impl AccountSummary {
+    /// Total count of characters across all worlds and accounts.
+    pub fn total_character_count(&self) -> usize {
+        self.character_list
+            .account_list
+            .as_deref()
+            .unwrap_or(&[])
+            .iter()
+            .filter_map(|acc| acc.character_list.as_deref())
+            .map(|list| list.len())
+            .sum()
+    }
+
+    /// Finds the highest level character in the account roster.
+    pub fn highest_level_character(&self) -> Option<&CharacterListItem> {
+        self.character_list
+            .account_list
+            .as_deref()
+            .unwrap_or(&[])
+            .iter()
+            .filter_map(|acc| acc.character_list.as_deref())
+            .flatten()
+            .max_by_key(|c| c.character_level.unwrap_or(0))
+    }
+
+    /// Total achievement score if available.
+    pub fn achievement_points(&self) -> Option<i64> {
+        self.achievement.as_ref().and_then(|a| a.achievement_point)
+    }
+}

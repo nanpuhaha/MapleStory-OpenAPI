@@ -4,8 +4,8 @@
 
 **Blocked by:** None
 
-**Status:** todo
+**Status:** done
 
-- [ ] Add `GuildProfile` model and `client.guild().get_guild_profile(&self, guild_name: &str, world_name: &str)` that aggregates guild basic info, noblesse stats, and optionally concurrent basic info of guild members.
-- [ ] Add `AccountSummary` model combining `client.user().get_character_list()`, `client.user().get_achievement()`, and main character union levels.
-- [ ] Provide test mocks and verify error tolerance on partial member lookup failures.
+- [x] Add `GuildProfile` model and `client.guild().get_guild_profile(&self, guild_name: &str, world_name: &str)` that aggregates guild basic info, noblesse stats, and optionally concurrent basic info of guild members.
+- [x] Add `AccountSummary` model combining `client.user().get_character_list()`, `client.user().get_achievement()`, and main character union levels.
+- [x] Provide test mocks and verify error tolerance on partial member lookup failures.

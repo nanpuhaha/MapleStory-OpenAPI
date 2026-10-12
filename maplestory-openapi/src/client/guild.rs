@@ -99,6 +99,7 @@ impl MapleStoryClient {
     /// println!("Guild Lv: {:?}, Master: {:?}", guild.guild_level, guild.guild_master_name);
     /// # });
     /// ```
+    /// Convenience method: Retrieve basic information of a guild directly by its name and world.
     pub async fn get_guild_by_name(
         &self,
         guild_name: &str,
@@ -107,6 +108,52 @@ impl MapleStoryClient {
     ) -> Result<GuildBasic> {
         let oguild_id = self.get_oguild_id(guild_name, world_name).await?;
         self.get_guild_basic(&oguild_id, date).await
+    }
+
+    /// Retrieve an aggregated guild profile including Noblesse skills and basic guild details.
+    pub async fn get_guild_profile(
+        &self,
+        guild_name: &str,
+        world_name: &str,
+        date: impl Into<DateParam>,
+    ) -> Result<crate::models::guild::GuildProfile> {
+        self.get_guild_profile_with_members(guild_name, world_name, date, false)
+            .await
+    }
+
+    /// Retrieve an aggregated guild profile, optionally fetching member profiles concurrently.
+    pub async fn get_guild_profile_with_members(
+        &self,
+        guild_name: &str,
+        world_name: &str,
+        date: impl Into<DateParam>,
+        fetch_members: bool,
+    ) -> Result<crate::models::guild::GuildProfile> {
+        let date_param = date.into();
+        let date_ref = date_param.as_deref();
+        let basic = self.get_guild_by_name(guild_name, world_name, date_ref).await?;
+
+        let total_noblesse_points = basic.total_noblesse_points();
+        let noblesse_skills = basic.guild_noblesse_skill.clone().unwrap_or_default();
+
+        let mut members = Vec::new();
+        if fetch_members {
+            if let Some(member_names) = basic.guild_member.as_deref() {
+                let futures = member_names.iter().map(|name| {
+                    let client = self;
+                    async move { client.get_character_by_name(name).await.ok() }
+                });
+                let results = futures_util::future::join_all(futures).await;
+                members = results.into_iter().flatten().collect();
+            }
+        }
+
+        Ok(crate::models::guild::GuildProfile {
+            basic,
+            total_noblesse_points,
+            noblesse_skills,
+            members,
+        })
     }
 }
 
@@ -147,5 +194,28 @@ impl<'a> GuildClient<'a> {
         date: impl Into<DateParam>,
     ) -> Result<GuildBasic> {
         self.client.get_guild_by_name(guild_name, world_name, date).await
+    }
+
+    /// Retrieve an aggregated guild profile including Noblesse skills and basic guild details.
+    pub async fn get_profile(
+        &self,
+        guild_name: &str,
+        world_name: &str,
+        date: impl Into<DateParam>,
+    ) -> Result<crate::models::guild::GuildProfile> {
+        self.client.get_guild_profile(guild_name, world_name, date).await
+    }
+
+    /// Retrieve an aggregated guild profile, optionally fetching member profiles concurrently.
+    pub async fn get_profile_with_members(
+        &self,
+        guild_name: &str,
+        world_name: &str,
+        date: impl Into<DateParam>,
+        fetch_members: bool,
+    ) -> Result<crate::models::guild::GuildProfile> {
+        self.client
+            .get_guild_profile_with_members(guild_name, world_name, date, fetch_members)
+            .await
     }
 }

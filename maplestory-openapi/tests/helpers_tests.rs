@@ -1602,3 +1602,85 @@ async fn test_history_auto_paginating_stream() {
     assert_eq!(collected, vec!["sf_item_1", "sf_item_2"]);
     server_task.abort();
 }
+
+#[tokio::test]
+async fn test_guild_profile_and_account_summary_aggregators() {
+    use maplestory_openapi::MapleStoryClient;
+
+    let (base_url, server_task) = spawn_mock_server(|req_text| {
+        if req_text.contains("/maplestory/v1/guild/id") {
+            (200, r#"{"oguild_id":"mock-oguild"}"#.to_string(), None)
+        } else if req_text.contains("/maplestory/v1/guild/basic") {
+            let body = r#"{
+                "guild_name": "테스트길드",
+                "world_name": "스카니아",
+                "guild_level": 25,
+                "guild_member": ["길드원1", "길드원2"],
+                "guild_noblesse_skill": [
+                    {"skill_name": "보스 킬러", "skill_level": 15},
+                    {"skill_name": "방어율 무시", "skill_level": 15}
+                ]
+            }"#;
+            (200, body.to_string(), None)
+        } else if req_text.contains("/maplestory/v1/id") {
+            if req_text.contains("character_name=%EA%B8%B8%EB%93%9C%EC%9B%901") || req_text.contains("character_name=길드원1") {
+                (200, r#"{"ocid":"ocid-1"}"#.to_string(), None)
+            } else {
+                (200, r#"{"ocid":"ocid-2"}"#.to_string(), None)
+            }
+        } else if req_text.contains("/maplestory/v1/character/basic") {
+            if req_text.contains("ocid=ocid-1") {
+                (200, r#"{"character_name":"길드원1","character_level":280}"#.to_string(), None)
+            } else {
+                (200, r#"{"character_name":"길드원2","character_level":270}"#.to_string(), None)
+            }
+        } else if req_text.contains("/maplestory/v1/character/list") {
+            let body = r#"{
+                "account_list": [
+                    {
+                        "account_id": "acc-1",
+                        "character_list": [
+                            {"character_name": "영웅1", "character_level": 285},
+                            {"character_name": "부캐1", "character_level": 230}
+                        ]
+                    }
+                ]
+            }"#;
+            (200, body.to_string(), None)
+        } else if req_text.contains("/maplestory/v1/user/achievement") {
+            (200, r#"{"achievement_point": 12500}"#.to_string(), None)
+        } else {
+            (200, r#"{}"#.to_string(), None)
+        }
+    })
+    .await;
+
+    let client = MapleStoryClient::builder()
+        .api_key("test-key")
+        .base_url(base_url)
+        .build()
+        .unwrap();
+
+    // 1. GuildProfile testing
+    let guild_profile = client
+        .guild()
+        .get_profile_with_members("테스트길드", "스카니아", None, true)
+        .await
+        .unwrap();
+
+    assert_eq!(guild_profile.total_noblesse_points, 30);
+    assert_eq!(guild_profile.noblesse_skills.len(), 2);
+    assert_eq!(guild_profile.fetched_member_count(), 2);
+    assert_eq!(guild_profile.average_member_level(), Some(275.0));
+
+    // 2. AccountSummary testing
+    let account_summary = client.user().get_account_summary(None).await.unwrap();
+    assert_eq!(account_summary.total_character_count(), 2);
+    assert_eq!(
+        account_summary.highest_level_character().and_then(|c| c.character_name.as_deref()),
+        Some("영웅1")
+    );
+    assert_eq!(account_summary.achievement_points(), Some(12500));
+
+    server_task.abort();
+}
