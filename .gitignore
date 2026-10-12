@@ -41,3 +41,20 @@ bin/
 **/bin/
 obj/
 **/obj/
+
+# Local scratch & media artifacts
+action_downloads/
+citizen_alert_parts/
+video_ref/
+docs/animations/
+docs/character-animations.md
+*.mp4
+test_info.apng
+look_code.txt
+download_action_files.py
+generate_gifs.py
+scripts/check_endpoints.py
+scripts/dump_schemas.py
+scripts/inspect_missing.py
+scripts/list_schemas.py
+
