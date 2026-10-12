@@ -4,8 +4,8 @@
 
 **Blocked by:** None
 
-**Status:** todo
+**Status:** done
 
-- [ ] Enrich `tests/live_api_tests.rs` with comprehensive test coverage across character dashboard, union artifact, set effects, guild, ranking, and history endpoints when `NEXON_API_KEY` is set.
-- [ ] Add VCR / cassette recording or offline fixture replay fallback for GitHub Actions CI runs without live secrets.
-- [ ] Ensure all 2026 NEXON OpenAPI spec schema updates match deserialization models without missing fields or unexpected deserialization errors.
+- [x] Enrich `tests/live_api_tests.rs` with comprehensive test coverage across character dashboard, union artifact, set effects, guild, ranking, and history endpoints when `NEXON_API_KEY` is set.
+- [x] Add VCR / cassette recording or offline fixture replay fallback for GitHub Actions CI runs without live secrets.
+- [x] Ensure all 2026 NEXON OpenAPI spec schema updates match deserialization models without missing fields or unexpected deserialization errors.

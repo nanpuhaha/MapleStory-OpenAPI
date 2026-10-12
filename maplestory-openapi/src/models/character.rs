@@ -352,14 +352,15 @@ impl ParsedPotentialOption {
             return None;
         }
 
-        // Split by ':'
-        let parts: Vec<&str> = trimmed.splitn(2, ':').collect();
-        if parts.len() != 2 {
-            return None;
-        }
-
-        let stat_name = parts[0].trim();
-        let val_part = parts[1].trim();
+        // Split by ':' if present, or before '+' / '-' sign, or at the last space
+        let (stat_name, val_part) = if let Some(idx) = trimmed.find(':') {
+            (trimmed[..idx].trim(), trimmed[idx + 1..].trim())
+        } else if let Some(idx) = trimmed.rfind(['+', '-']) {
+            (trimmed[..idx].trim(), trimmed[idx..].trim())
+        } else {
+            let idx = trimmed.rfind(' ')?;
+            (trimmed[..idx].trim(), trimmed[idx + 1..].trim())
+        };
 
         // Match StatType
         let stat_type = if stat_name == "STR" || stat_name == "힘" {

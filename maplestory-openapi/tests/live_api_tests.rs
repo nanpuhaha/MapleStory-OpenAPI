@@ -130,3 +130,148 @@ async fn test_live_lookup_and_coordination_for_target_characters() {
         }
     }
 }
+
+#[tokio::test]
+async fn test_live_guild_and_profile() {
+    let client = match setup_client() {
+        Some(c) => c,
+        None => return,
+    };
+
+    println!("\n=== Live Test: Guild & GuildProfile ===");
+    let guild_profile = client
+        .guild()
+        .get_profile("온앤온", "스카니아", None)
+        .await
+        .expect("failed to get guild profile");
+
+    assert_eq!(guild_profile.basic.guild_name.as_deref(), Some("온앤온"));
+    assert_eq!(guild_profile.basic.world_name.as_deref(), Some("스카니아"));
+    println!(
+        "  Guild: {} (Lv.{}, Master: {:?}, Noblesse: {}p)",
+        guild_profile.basic.guild_name.as_deref().unwrap_or(""),
+        guild_profile.basic.guild_level.unwrap_or(0),
+        guild_profile.basic.guild_master_name,
+        guild_profile.total_noblesse_points
+    );
+    assert!(guild_profile.total_noblesse_points > 0);
+    assert!(!guild_profile.noblesse_skills.is_empty());
+}
+
+#[tokio::test]
+async fn test_live_union_and_artifact() {
+    let client = match setup_client() {
+        Some(c) => c,
+        None => return,
+    };
+
+    println!("\n=== Live Test: Union & Union Artifact ===");
+    let union_info = client
+        .union()
+        .get_by_name("온앤온")
+        .await
+        .expect("failed to get union info");
+
+    let union_level = union_info.union_level.unwrap_or(0);
+    println!("  Union Level: {}", union_level);
+    assert!(union_level > 0);
+
+    let artifact = client
+        .union()
+        .get_artifact_by_name("온앤온")
+        .await
+        .expect("failed to get union artifact info");
+
+    let active_effects_count = artifact.active_effects().count();
+    let stats = artifact.total_artifact_stats();
+    println!(
+        "  Union Artifact Active Effects: {}, Parsed Stat Categories: {}",
+        active_effects_count,
+        stats.len()
+    );
+    assert!(active_effects_count > 0);
+}
+
+#[tokio::test]
+async fn test_live_equipment_and_set_effects() {
+    let client = match setup_client() {
+        Some(c) => c,
+        None => return,
+    };
+
+    println!("\n=== Live Test: Item Equipment & Set Effects ===");
+    let equip = client
+        .get_character_item_equipment_by_name("온앤온")
+        .await
+        .expect("failed to get item equipment");
+
+    let items = equip.item_equipment.unwrap_or_default();
+    assert!(!items.is_empty());
+    println!("  Equipment item count: {}", items.len());
+
+    // Verify potential parsing on equipped items
+    let mut parsed_potential_count = 0;
+    for item in &items {
+        if let Some(opt1) = item.potential_option_1.as_deref() {
+            println!("    Item '{}' has potential_1: {:?}", item.item_name.as_deref().unwrap_or(""), opt1);
+        }
+        let parsed_lines = item.all_potential_options_parsed();
+        if !parsed_lines.is_empty() {
+            parsed_potential_count += 1;
+        }
+    }
+    println!("  Items with parsed potential lines: {}", parsed_potential_count);
+    assert!(parsed_potential_count > 0);
+
+    let ocid = client
+        .get_ocid("온앤온")
+        .await
+        .expect("failed to get ocid");
+    let set_effects = client
+        .get_character_set_effect(&ocid, None)
+        .await
+        .expect("failed to get set effects");
+
+    let sets = set_effects.set_effect.unwrap_or_default();
+    println!("  Active set effect count: {}", sets.len());
+    for s in &sets {
+        println!("    - Set: {:?}", s.set_name);
+    }
+}
+
+#[tokio::test]
+async fn test_live_rankings_and_notices() {
+    let client = match setup_client() {
+        Some(c) => c,
+        None => return,
+    };
+
+    println!("\n=== Live Test: Overall Ranking & Notices ===");
+    use maplestory_openapi::models::ranking::OverallRankingQuery;
+    let ranking_date = (chrono::Utc::now() + chrono::Duration::hours(9) - chrono::Duration::days(2))
+        .format("%Y-%m-%d")
+        .to_string();
+    let ranking = client
+        .ranking()
+        .get_overall(OverallRankingQuery {
+            date: Some(&ranking_date),
+            page: Some(1),
+            ..Default::default()
+        })
+        .await
+        .expect("failed to fetch overall ranking");
+
+    let rank_list = ranking.ranking.unwrap_or_default();
+    assert!(!rank_list.is_empty());
+    println!("  Top 1 overall rank: {:?}", rank_list[0].character_name);
+
+    let notices = client
+        .notice()
+        .get_notice_list()
+        .await
+        .expect("failed to fetch notice list");
+
+    let notice_items = notices.notice.unwrap_or_default();
+    assert!(!notice_items.is_empty());
+    println!("  Latest notice title: {:?}", notice_items[0].title);
+}
