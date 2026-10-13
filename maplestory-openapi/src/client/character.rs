@@ -9,11 +9,11 @@ use crate::{
     error::{MapleStoryError, Result},
     models::character::{
         CharacterAbility, CharacterAndroidEquipment, CharacterAppearance, CharacterBasic,
-        CharacterBeautyEquipment, CharacterCashItemEquipment, CharacterCoordination,
-        CharacterDashboard, CharacterDojang, CharacterHexaMatrix, CharacterHexaMatrixStat,
-        CharacterHyperStat, CharacterItemEquipment, CharacterLinkSkill, CharacterOcid,
-        CharacterOtherStat, CharacterPetEquipment, CharacterPopularity, CharacterProfile,
-        CharacterPropensity, CharacterSetEffect, CharacterSkill, CharacterStat,
+        CharacterBeautyEquipment, CharacterCashItemEquipment, CharacterCombatAnalytics,
+        CharacterCoordination, CharacterDashboard, CharacterDojang, CharacterHexaMatrix,
+        CharacterHexaMatrixStat, CharacterHyperStat, CharacterItemEquipment, CharacterLinkSkill,
+        CharacterOcid, CharacterOtherStat, CharacterPetEquipment, CharacterPopularity,
+        CharacterProfile, CharacterPropensity, CharacterSetEffect, CharacterSkill, CharacterStat,
         CharacterSymbolEquipment, CharacterVMatrix, DashboardOptions, DashboardSection,
         DashboardSectionError, RingExchangeSkillEquipment, RingReserveSkillEquipment,
     },
@@ -296,6 +296,15 @@ impl MapleStoryClient {
     ) -> Result<CharacterProfile> {
         let ocid = self.get_ocid(character_name).await?;
         self.get_character_profile(&ocid, None).await
+    }
+
+    /// Retrieve combat power analytics and boss multiplier estimations directly by character name.
+    pub async fn get_character_combat_analytics_by_name(
+        &self,
+        character_name: &str,
+    ) -> Result<CharacterCombatAnalytics> {
+        let dash = self.get_character_dashboard_by_name(character_name).await?;
+        Ok(dash.combat_analytics())
     }
 
     /// Retrieve a comprehensive all-in-one character dashboard using custom [`DashboardOptions`].
@@ -1669,6 +1678,26 @@ impl<'a> CharacterClient<'a> {
     ) -> Result<CharacterDashboard> {
         self.client
             .get_character_dashboard_with_options_by_name(character_name, date, options)
+            .await
+    }
+
+    /// Retrieve combat analytics of a character by OCID.
+    pub async fn get_combat_analytics(
+        &self,
+        ocid: &str,
+        date: impl Into<DateParam>,
+    ) -> Result<CharacterCombatAnalytics> {
+        let dash = self.get_dashboard(ocid, date).await?;
+        Ok(dash.combat_analytics())
+    }
+
+    /// Retrieve combat analytics directly by character name.
+    pub async fn get_combat_analytics_by_name(
+        &self,
+        character_name: &str,
+    ) -> Result<CharacterCombatAnalytics> {
+        self.client
+            .get_character_combat_analytics_by_name(character_name)
             .await
     }
 }

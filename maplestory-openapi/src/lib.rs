@@ -64,12 +64,12 @@ pub use models::battle_practice::{
 };
 pub use models::character::{
     AbilityInfo, CharacterAbility, CharacterAppearance, CharacterBasic, CharacterBeautyEquipment,
-    CharacterCashItemEquipment, CharacterCoordination, CharacterDashboard, CharacterDojang,
-    CharacterHexaMatrix, CharacterHexaMatrixStat, CharacterHyperStat, CharacterItemEquipment,
-    CharacterOcid, CharacterPopularity, CharacterProfile, CharacterStat, CharacterVMatrix,
-    DashboardOptions, DashboardSection, DashboardSectionError, HexaCoreEquipment, HexaStatCore,
-    HyperStatEntry, ItemEquipmentDetail, ParsedPotentialOption, StatType, VCoreEquipment,
-    VisibleEquipItem,
+    CharacterCashItemEquipment, CharacterCombatAnalytics, CharacterCoordination,
+    CharacterDashboard, CharacterDojang, CharacterHexaMatrix, CharacterHexaMatrixStat,
+    CharacterHyperStat, CharacterItemEquipment, CharacterOcid, CharacterPopularity,
+    CharacterProfile, CharacterStat, CharacterVMatrix, DashboardOptions, DashboardSection,
+    DashboardSectionError, HexaCoreEquipment, HexaStatCore, HyperStatEntry, ItemEquipmentDetail,
+    ParsedPotentialOption, StatType, VCoreEquipment, VisibleEquipItem,
 };
 pub use models::common::{DateParam, MapleDate, SkillGrade};
 pub use models::guild::{GuildBasic, GuildId, GuildProfile, GuildSkill};

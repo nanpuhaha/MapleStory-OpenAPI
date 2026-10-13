@@ -400,6 +400,7 @@ async fn main() {
 | **편의 기능** | `get_character_item_equipment_by_name(name)` | — | 닉네임 한방 장착 장비 조회 |
 | **편의 기능** | `get_character_coordination_by_name(name)` | — | **닉네임 한방 최종 코디/외형 합성 조회** |
 | **편의 기능** | `get_character_profile_by_name(name)` | — | **닉네임 한방 전체 종합 프로필 병렬 조회** |
+| **편의 기능** | `get_character_combat_analytics_by_name(name)` | — | **보스 방어율 관통 실대미지 및 전투 스펙 심화 분석 (`CharacterCombatAnalytics`)** |
 | **편의 기능** | `get_guild_profile(name, world, date)` | — | **길드 기본 정보 + 길드원 스펙 병렬 종합 조회 (`GuildProfile`)** |
 | **편의 기능** | `get_account_summary(date)` | — | **계정 내 전체 캐릭터 목록 + 업적 종합 요약 (`AccountSummary`)** |
 | **User** | `get_character_list()` | `GET /maplestory/v1/character/list` | 계정 캐릭터 목록 |

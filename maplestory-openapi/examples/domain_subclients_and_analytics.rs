@@ -166,5 +166,28 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
+    // 6. 전투 스펙 및 보스 방어율 관통/대미지 배율 심화 분석 (CharacterCombatAnalytics)
+    if let Ok(combat) = char_api.get_combat_analytics(&ocid, None).await {
+        println!("\n⚔️ [전투 스펙 및 보스 방어율 관통 분석 (CombatAnalytics)]");
+        println!(
+            "  - 300% 방어율 보스 실대미지 비율: {:.1}%",
+            combat.effective_damage_multiplier_300() * 100.0
+        );
+        println!(
+            "  - 380% 익스트림 보스 실대미지 비율: {:.1}%",
+            combat.effective_damage_multiplier_380() * 100.0
+        );
+        println!(
+            "  - 보공+뎀 총합 배율: {:.2}x, 크리티컬 대미지 배율: {:.2}x",
+            combat.total_damage_factor(),
+            combat.critical_damage_factor()
+        );
+        println!(
+            "  - 전투력 기준 예상 무릉 층수: {}층 (기록된 최고 층수: {:?}층)",
+            combat.estimated_dojang_floor(),
+            combat.dojang_best_floor
+        );
+    }
+
     Ok(())
 }

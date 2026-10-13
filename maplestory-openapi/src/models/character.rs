@@ -2196,6 +2196,112 @@ impl CharacterDashboard {
     pub fn section_error(&self, section: DashboardSection) -> Option<&DashboardSectionError> {
         self.errors.get(&section)
     }
+
+    /// Extracts combat power, boss multipliers, and spec breakdowns into a [`CharacterCombatAnalytics`].
+    pub fn combat_analytics(&self) -> CharacterCombatAnalytics {
+        CharacterCombatAnalytics {
+            character_name: self.character_name().to_string(),
+            world_name: self.basic.world_name.clone(),
+            character_class: self.basic.character_class.clone(),
+            character_level: self.character_level(),
+            combat_power: self.combat_power(),
+            boss_damage: self.stat.boss_damage().unwrap_or(0.0),
+            ignore_monster_armor: self.stat.ignore_monster_armor().unwrap_or(0.0),
+            damage: self.stat.damage().unwrap_or(0.0),
+            critical_rate: self.stat.critical_rate().unwrap_or(0.0),
+            critical_damage: self.stat.critical_damage().unwrap_or(0.0),
+            total_starforce: self.total_starforce(),
+            arcane_force: self.arcane_force(),
+            authentic_force: self.authentic_force(),
+            dojang_best_floor: self.dojang_best_floor(),
+        }
+    }
+}
+
+// ─── Character Combat Analytics (전투 스펙 및 보스 대미지 심화 분석) ──────────────
+
+/// Comprehensive combat power, boss armor penetration, and damage factor analytics.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CharacterCombatAnalytics {
+    /// Character name
+    pub character_name: String,
+    /// World name
+    pub world_name: Option<String>,
+    /// Character class
+    pub character_class: Option<String>,
+    /// Character level
+    pub character_level: i64,
+    /// In-game Combat Power (전투력)
+    pub combat_power: i64,
+    /// Boss monster damage percentage (보스 몬스터 데미지 %)
+    pub boss_damage: f64,
+    /// Ignore Monster Armor percentage (방어율 무시 %)
+    pub ignore_monster_armor: f64,
+    /// General damage percentage (데미지 %)
+    pub damage: f64,
+    /// Critical rate percentage (크리티컬 확률 %)
+    pub critical_rate: f64,
+    /// Critical damage percentage (크리티컬 데미지 %)
+    pub critical_damage: f64,
+    /// Total Starforce across equipped items (스타포스 총합)
+    pub total_starforce: i64,
+    /// Total Arcane Force from symbols (아케인포스 총합)
+    pub arcane_force: i64,
+    /// Total Authentic Force from symbols (어센틱포스 총합)
+    pub authentic_force: i64,
+    /// Highest floor reached in Mu Lung Dojo (무릉도장 최고 기록 층수)
+    pub dojang_best_floor: Option<i64>,
+}
+
+impl CharacterCombatAnalytics {
+    /// Calculate effective damage multiplier against a monster with the given armor/defense rate percentage.
+    ///
+    /// For example, against a 300% defense boss (`defense_rate_pct = 300.0`):
+    /// - If character IED is 95%: reduction = 3.0 * (1.0 - 0.95) = 0.15 (15% reduction) -> 85% damage multiplier (0.85).
+    /// - If character IED is 90%: reduction = 3.0 * (1.0 - 0.90) = 0.30 (30% reduction) -> 70% damage multiplier (0.70).
+    pub fn effective_damage_multiplier_against_defense(&self, defense_rate_pct: f64) -> f64 {
+        let monster_armor_ratio = defense_rate_pct / 100.0;
+        let ied_ratio = (self.ignore_monster_armor / 100.0).clamp(0.0, 1.0);
+        let damage_reduction = monster_armor_ratio * (1.0 - ied_ratio);
+        (1.0 - damage_reduction).max(0.0)
+    }
+
+    /// Effective damage multiplier against standard 300% defense bosses (루시드, 윌, 더스크, 듄케일, 진힐라, 검은마법사 등).
+    pub fn effective_damage_multiplier_300(&self) -> f64 {
+        self.effective_damage_multiplier_against_defense(300.0)
+    }
+
+    /// Effective damage multiplier against extreme 380% defense bosses (익스트림 세렌, 익스트림 칼로스, 카링 등).
+    pub fn effective_damage_multiplier_380(&self) -> f64 {
+        self.effective_damage_multiplier_against_defense(380.0)
+    }
+
+    /// Total boss damage multiplier factor `1.0 + (damage + boss_damage) / 100.0`.
+    pub fn total_damage_factor(&self) -> f64 {
+        1.0 + (self.damage + self.boss_damage) / 100.0
+    }
+
+    /// Critical damage multiplier factor assuming 100% critical rate:
+    /// In MapleStory, base critical damage is an average of 135% (1.35).
+    pub fn critical_damage_factor(&self) -> f64 {
+        1.35 + (self.critical_damage / 100.0)
+    }
+
+    /// Estimated Mu Lung Dojo floor based on combat power benchmarks.
+    pub fn estimated_dojang_floor(&self) -> i64 {
+        match self.combat_power {
+            cp if cp < 3_000_000 => 40,
+            cp if cp < 6_000_000 => 45,
+            cp if cp < 15_000_000 => 50,
+            cp if cp < 35_000_000 => 55,
+            cp if cp < 70_000_000 => 60,
+            cp if cp < 150_000_000 => 65,
+            cp if cp < 300_000_000 => 70,
+            cp if cp < 600_000_000 => 75,
+            cp if cp < 1_000_000_000 => 80,
+            _ => 85,
+        }
+    }
 }
 
 // ─── Character Progression Helpers (HEXA, V-Matrix, Ability, Hyper Stat) ─────

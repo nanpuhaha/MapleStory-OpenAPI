@@ -2085,3 +2085,162 @@ fn test_character_progression_domain_helpers() {
         Some(15)
     );
 }
+
+#[test]
+fn test_character_combat_analytics() {
+    use maplestory_openapi::models::character::{
+        CharacterBasic, CharacterCombatAnalytics, CharacterCoordination, CharacterDashboard,
+        CharacterDojang, CharacterItemEquipment, CharacterStat, FinalStatEntry,
+    };
+
+    let analytics = CharacterCombatAnalytics {
+        character_name: "테스터".to_string(),
+        world_name: Some("스카니아".to_string()),
+        character_class: Some("아델".to_string()),
+        character_level: 285,
+        combat_power: 450_000_000,
+        boss_damage: 380.0,
+        ignore_monster_armor: 95.0,
+        damage: 60.0,
+        critical_rate: 100.0,
+        critical_damage: 85.0,
+        total_starforce: 380,
+        arcane_force: 1320,
+        authentic_force: 660,
+        dojang_best_floor: Some(72),
+    };
+
+    // 1. Effective boss damage multiplier calculations
+    // 300% Boss: reduction = 3.0 * (1.0 - 0.95) = 0.15 -> 0.85 (85%)
+    let mult_300 = analytics.effective_damage_multiplier_300();
+    assert!((mult_300 - 0.85).abs() < 1e-6);
+
+    // 380% Extreme Boss: reduction = 3.8 * 0.05 = 0.19 -> 0.81 (81%)
+    let mult_380 = analytics.effective_damage_multiplier_380();
+    assert!((mult_380 - 0.81).abs() < 1e-6);
+
+    // Extreme case: 0% IED against 300% boss -> 0% damage
+    let zero_ied = CharacterCombatAnalytics {
+        ignore_monster_armor: 0.0,
+        ..analytics.clone()
+    };
+    assert_eq!(zero_ied.effective_damage_multiplier_300(), 0.0);
+
+    // 2. Damage factors
+    // Total damage factor: 1.0 + (60 + 380) / 100 = 5.40
+    assert!((analytics.total_damage_factor() - 5.40).abs() < 1e-6);
+
+    // Critical damage factor: 1.35 + 0.85 = 2.20
+    assert!((analytics.critical_damage_factor() - 2.20).abs() < 1e-6);
+
+    // 3. Estimated Dojo floor
+    // 450,000,000 CP -> Floor 75 tier
+    assert_eq!(analytics.estimated_dojang_floor(), 75);
+
+    // 4. Extraction from CharacterDashboard
+    let dashboard = CharacterDashboard {
+        basic: CharacterBasic {
+            date: None,
+            character_name: Some("대시보드캐릭".to_string()),
+            world_name: Some("루나".to_string()),
+            character_gender: None,
+            character_class: Some("히어로".to_string()),
+            character_class_level: None,
+            character_level: Some(275),
+            character_exp: None,
+            character_exp_rate: None,
+            character_guild_name: None,
+            character_image: None,
+            character_date_create: None,
+            access_flag: None,
+            liberation_quest_clear_flag: None,
+        },
+        stat: CharacterStat {
+            date: None,
+            character_class: None,
+            final_stat: Some(vec![
+                FinalStatEntry {
+                    stat_name: Some("전투력".to_string()),
+                    stat_value: Some("120000000".to_string()),
+                },
+                FinalStatEntry {
+                    stat_name: Some("보스 몬스터 데미지".to_string()),
+                    stat_value: Some("320.0".to_string()),
+                },
+                FinalStatEntry {
+                    stat_name: Some("방어율 무시".to_string()),
+                    stat_value: Some("96.0".to_string()),
+                },
+                FinalStatEntry {
+                    stat_name: Some("데미지".to_string()),
+                    stat_value: Some("45.0".to_string()),
+                },
+                FinalStatEntry {
+                    stat_name: Some("크리티컬 데미지".to_string()),
+                    stat_value: Some("72.0".to_string()),
+                },
+            ]),
+            remain_ap: None,
+        },
+        item_equipment: CharacterItemEquipment {
+            date: None,
+            character_gender: None,
+            character_class: None,
+            preset_no: None,
+            item_equipment: None,
+            item_equipment_preset_1: None,
+            item_equipment_preset_2: None,
+            item_equipment_preset_3: None,
+            title: None,
+            dragon_equipment: None,
+            mechanic_equipment: None,
+        },
+        cash_item_equipment: Default::default(),
+        beauty_equipment: Default::default(),
+        coordination: CharacterCoordination {
+            character_name: Some("대시보드캐릭".to_string()),
+            world_name: Some("루나".to_string()),
+            character_class: Some("히어로".to_string()),
+            character_level: Some(275),
+            character_image: None,
+            avatar_code: None,
+            hair: None,
+            face: None,
+            skin: None,
+            cash_preset_no: None,
+            visible_items: vec![],
+        },
+        symbols: None,
+        ability: None,
+        hyper_stat: None,
+        hexa_matrix: None,
+        hexa_matrix_stat: None,
+        v_matrix: None,
+        set_effect: None,
+        pet_equipment: None,
+        android_equipment: None,
+        link_skill: None,
+        propensity: None,
+        popularity: None,
+        dojang: Some(CharacterDojang {
+            date: None,
+            character_class: None,
+            world_name: None,
+            dojang_best_floor: Some(64),
+            date_dojang_record: None,
+            dojang_best_time: None,
+        }),
+        union: None,
+        union_artifact: None,
+        guild: None,
+        errors: std::collections::HashMap::new(),
+    };
+
+    let extracted = dashboard.combat_analytics();
+    assert_eq!(extracted.character_name, "대시보드캐릭");
+    assert_eq!(extracted.combat_power, 120_000_000);
+    assert_eq!(extracted.boss_damage, 320.0);
+    assert_eq!(extracted.ignore_monster_armor, 96.0);
+    assert_eq!(extracted.dojang_best_floor, Some(64));
+    assert_eq!(extracted.estimated_dojang_floor(), 65);
+}
