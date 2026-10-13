@@ -458,32 +458,44 @@ impl ParsedPotentialOption {
 impl ItemEquipmentDetail {
     /// Parsed main potential line 1.
     pub fn potential_option_1_parsed(&self) -> Option<ParsedPotentialOption> {
-        self.potential_option_1.as_deref().and_then(ParsedPotentialOption::parse)
+        self.potential_option_1
+            .as_deref()
+            .and_then(ParsedPotentialOption::parse)
     }
 
     /// Parsed main potential line 2.
     pub fn potential_option_2_parsed(&self) -> Option<ParsedPotentialOption> {
-        self.potential_option_2.as_deref().and_then(ParsedPotentialOption::parse)
+        self.potential_option_2
+            .as_deref()
+            .and_then(ParsedPotentialOption::parse)
     }
 
     /// Parsed main potential line 3.
     pub fn potential_option_3_parsed(&self) -> Option<ParsedPotentialOption> {
-        self.potential_option_3.as_deref().and_then(ParsedPotentialOption::parse)
+        self.potential_option_3
+            .as_deref()
+            .and_then(ParsedPotentialOption::parse)
     }
 
     /// Parsed additional potential line 1.
     pub fn additional_potential_option_1_parsed(&self) -> Option<ParsedPotentialOption> {
-        self.additional_potential_option_1.as_deref().and_then(ParsedPotentialOption::parse)
+        self.additional_potential_option_1
+            .as_deref()
+            .and_then(ParsedPotentialOption::parse)
     }
 
     /// Parsed additional potential line 2.
     pub fn additional_potential_option_2_parsed(&self) -> Option<ParsedPotentialOption> {
-        self.additional_potential_option_2.as_deref().and_then(ParsedPotentialOption::parse)
+        self.additional_potential_option_2
+            .as_deref()
+            .and_then(ParsedPotentialOption::parse)
     }
 
     /// Parsed additional potential line 3.
     pub fn additional_potential_option_3_parsed(&self) -> Option<ParsedPotentialOption> {
-        self.additional_potential_option_3.as_deref().and_then(ParsedPotentialOption::parse)
+        self.additional_potential_option_3
+            .as_deref()
+            .and_then(ParsedPotentialOption::parse)
     }
 
     /// All parsed main potential lines.
@@ -760,16 +772,12 @@ impl CharacterSetEffect {
 
     /// Find a set effect by name (substring match).
     pub fn find_set(&self, set_name: &str) -> Option<&SetEffectInfo> {
-        self.set_effect
-            .as_deref()
-            .unwrap_or(&[])
-            .iter()
-            .find(|s| {
-                s.set_name
-                    .as_deref()
-                    .map(|name| name.contains(set_name))
-                    .unwrap_or(false)
-            })
+        self.set_effect.as_deref().unwrap_or(&[]).iter().find(|s| {
+            s.set_name
+                .as_deref()
+                .map(|name| name.contains(set_name))
+                .unwrap_or(false)
+        })
     }
 
     /// Retrieve all active set effect options across all equipped sets.
@@ -2335,4 +2343,3 @@ impl CharacterHyperStat {
             .find(|entry| entry.stat_type.as_deref() == Some(stat_type))
     }
 }
-

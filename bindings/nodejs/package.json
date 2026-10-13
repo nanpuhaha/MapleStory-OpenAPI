@@ -17,6 +17,10 @@
   ],
   "author": "",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nanpuhaha/MapleStory-OpenAPI-Rust.git"
+  },
   "devDependencies": {
     "@napi-rs/cli": "^3.0.0"
   },

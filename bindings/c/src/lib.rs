@@ -160,7 +160,11 @@ pub unsafe extern "C" fn maplestory_client_with_base_url(
         Err(_) => return ptr::null_mut(),
     };
 
-    let client = match MapleStoryClient::builder().api_key(key).base_url(url).build() {
+    let client = match MapleStoryClient::builder()
+        .api_key(key)
+        .base_url(url)
+        .build()
+    {
         Ok(c) => c,
         Err(e) => {
             set_last_error(e.to_string());
@@ -748,7 +752,8 @@ mod tests {
             // 2. User union
             let char_name = CString::new("아크").unwrap();
             let mut out_union: *mut c_char = ptr::null_mut();
-            let rc = maplestory_get_user_union(handle, char_name.as_ptr(), ptr::null(), &mut out_union);
+            let rc =
+                maplestory_get_user_union(handle, char_name.as_ptr(), ptr::null(), &mut out_union);
             assert_eq!(rc, 0);
             let union_json = take_c_string(out_union);
             assert!(union_json.contains("9000"));
@@ -808,10 +813,12 @@ mod tests {
             );
             assert_eq!(rc, -3);
             let err_msg = take_c_string(maplestory_last_error_message());
-            assert!(err_msg.contains("2023-12-21"), "Expected date error: {err_msg}");
+            assert!(
+                err_msg.contains("2023-12-21"),
+                "Expected date error: {err_msg}"
+            );
 
             maplestory_client_free(handle);
         }
     }
 }
-

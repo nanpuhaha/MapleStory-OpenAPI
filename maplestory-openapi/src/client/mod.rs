@@ -2,9 +2,9 @@
 //! HTTP client implementation for MapleStory OpenAPI.
 
 pub mod cache;
-pub use cache::{BoxFuture, IdentityCache, NoopIdentityCache};
 #[cfg(feature = "cache")]
 pub use cache::MokaIdentityCache;
+pub use cache::{BoxFuture, IdentityCache, NoopIdentityCache};
 
 mod battle_practice;
 mod character;
@@ -234,31 +234,31 @@ impl MapleStoryClientBuilder {
         }
         let base_url = base_url.as_str().trim_end_matches('/').to_string();
 
-        let identity_cache: std::sync::Arc<dyn IdentityCache> = if let Some(custom) = self.custom_identity_cache {
-            custom
-        } else {
-            #[cfg(feature = "cache")]
-            {
-                if self.cache_enabled {
-                    let ttl = self
-                        .cache_ttl
-                        .unwrap_or_else(|| std::time::Duration::from_secs(24 * 3600));
-                    let capacity = self.cache_capacity.unwrap_or(10_000);
-                    std::sync::Arc::new(MokaIdentityCache::new(capacity, ttl))
-                } else {
+        let identity_cache: std::sync::Arc<dyn IdentityCache> =
+            if let Some(custom) = self.custom_identity_cache {
+                custom
+            } else {
+                #[cfg(feature = "cache")]
+                {
+                    if self.cache_enabled {
+                        let ttl = self
+                            .cache_ttl
+                            .unwrap_or_else(|| std::time::Duration::from_secs(24 * 3600));
+                        let capacity = self.cache_capacity.unwrap_or(10_000);
+                        std::sync::Arc::new(MokaIdentityCache::new(capacity, ttl))
+                    } else {
+                        std::sync::Arc::new(NoopIdentityCache)
+                    }
+                }
+                #[cfg(not(feature = "cache"))]
+                {
                     std::sync::Arc::new(NoopIdentityCache)
                 }
-            }
-            #[cfg(not(feature = "cache"))]
-            {
-                std::sync::Arc::new(NoopIdentityCache)
-            }
-        };
+            };
 
         let max_concurrency = self.max_concurrency.unwrap_or(10).max(1);
         let max_retries = self.max_retries.unwrap_or(3);
-        let concurrency_limiter =
-            std::sync::Arc::new(tokio::sync::Semaphore::new(max_concurrency));
+        let concurrency_limiter = std::sync::Arc::new(tokio::sync::Semaphore::new(max_concurrency));
 
         Ok(MapleStoryClient {
             http: http_client,
@@ -412,11 +412,10 @@ impl MapleStoryClient {
         loop {
             attempts += 1;
 
-            let _permit = self
-                .concurrency_limiter
-                .acquire()
-                .await
-                .map_err(|e| MapleStoryError::Other(format!("Concurrency limiter error: {}", e)))?;
+            let _permit =
+                self.concurrency_limiter.acquire().await.map_err(|e| {
+                    MapleStoryError::Other(format!("Concurrency limiter error: {}", e))
+                })?;
 
             tracing::debug!("GET {} {:?} (attempt {})", url, params, attempts);
 
@@ -433,7 +432,9 @@ impl MapleStoryClient {
 
             let response = match response_result {
                 Ok(resp) => resp,
-                Err(err) if attempts <= self.max_retries && (err.is_timeout() || err.is_connect()) => {
+                Err(err)
+                    if attempts <= self.max_retries && (err.is_timeout() || err.is_connect()) =>
+                {
                     let delay = calculate_backoff_delay(attempts, None);
                     tokio::time::sleep(delay).await;
                     continue;
@@ -503,7 +504,8 @@ impl MapleStoryClient {
         path: &str,
         params: &[(&str, String)],
     ) -> Result<T> {
-        self.get_with_header(path, params, API_KEY_HEADER, &self.api_key).await
+        self.get_with_header(path, params, API_KEY_HEADER, &self.api_key)
+            .await
     }
 
     /// Validate a calendar date and return it as `YYYY-MM-DD`.
@@ -531,15 +533,21 @@ impl MapleStoryClient {
             });
         }
 
-        let year = date[..4].parse::<i32>().map_err(|_| MapleStoryError::InvalidDate {
-            date: date.to_string(),
-        })?;
-        let month = date[5..7].parse::<u32>().map_err(|_| MapleStoryError::InvalidDate {
-            date: date.to_string(),
-        })?;
-        let day = date[8..10].parse::<u32>().map_err(|_| MapleStoryError::InvalidDate {
-            date: date.to_string(),
-        })?;
+        let year = date[..4]
+            .parse::<i32>()
+            .map_err(|_| MapleStoryError::InvalidDate {
+                date: date.to_string(),
+            })?;
+        let month = date[5..7]
+            .parse::<u32>()
+            .map_err(|_| MapleStoryError::InvalidDate {
+                date: date.to_string(),
+            })?;
+        let day = date[8..10]
+            .parse::<u32>()
+            .map_err(|_| MapleStoryError::InvalidDate {
+                date: date.to_string(),
+            })?;
 
         if year <= 0 {
             return Err(MapleStoryError::InvalidDate {

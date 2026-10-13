@@ -46,7 +46,9 @@ impl<'a> RankingClient<'a> {
         if let Some(page) = query.page {
             params.push(("page", page.to_string()));
         }
-        self.client.get("/maplestory/v1/ranking/overall", &params).await
+        self.client
+            .get("/maplestory/v1/ranking/overall", &params)
+            .await
     }
 
     /// Retrieve Union ranking.
@@ -64,12 +66,15 @@ impl<'a> RankingClient<'a> {
         if let Some(page) = query.page {
             params.push(("page", page.to_string()));
         }
-        self.client.get("/maplestory/v1/ranking/union", &params).await
+        self.client
+            .get("/maplestory/v1/ranking/union", &params)
+            .await
     }
 
     /// Retrieve guild ranking.
     pub async fn get_guild(&self, query: GuildRankingQuery<'_>) -> Result<GuildRanking> {
-        let mut params: Vec<(&str, String)> = vec![("ranking_type", query.ranking_type.to_string())];
+        let mut params: Vec<(&str, String)> =
+            vec![("ranking_type", query.ranking_type.to_string())];
         if let Some(date) = query.date {
             params.push(("date", MapleStoryClient::validate_date(date)?));
         }
@@ -82,7 +87,9 @@ impl<'a> RankingClient<'a> {
         if let Some(page) = query.page {
             params.push(("page", page.to_string()));
         }
-        self.client.get("/maplestory/v1/ranking/guild", &params).await
+        self.client
+            .get("/maplestory/v1/ranking/guild", &params)
+            .await
     }
 
     /// Retrieve Mu Lung Dojang ranking.
@@ -103,7 +110,9 @@ impl<'a> RankingClient<'a> {
         if let Some(page) = query.page {
             params.push(("page", page.to_string()));
         }
-        self.client.get("/maplestory/v1/ranking/dojang", &params).await
+        self.client
+            .get("/maplestory/v1/ranking/dojang", &params)
+            .await
     }
 
     /// Retrieve The Seed ranking.
@@ -121,7 +130,9 @@ impl<'a> RankingClient<'a> {
         if let Some(page) = query.page {
             params.push(("page", page.to_string()));
         }
-        self.client.get("/maplestory/v1/ranking/theseed", &params).await
+        self.client
+            .get("/maplestory/v1/ranking/theseed", &params)
+            .await
     }
 
     /// Retrieve achievement ranking.

@@ -69,10 +69,7 @@ impl<'a> NoticeClient<'a> {
     }
 
     /// Retrieve cashshop notice detail.
-    pub async fn get_cashshop_notice_detail(
-        &self,
-        notice_id: i64,
-    ) -> Result<CashshopNoticeDetail> {
+    pub async fn get_cashshop_notice_detail(&self, notice_id: i64) -> Result<CashshopNoticeDetail> {
         let params = vec![("notice_id", notice_id.to_string())];
         self.client
             .get("/maplestory/v1/notice-cashshop/detail", &params)

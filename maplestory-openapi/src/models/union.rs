@@ -301,7 +301,13 @@ impl UserUnionArtifact {
             .as_deref()
             .unwrap_or(&[])
             .iter()
-            .filter(move |e| active && e.name.as_ref().map(|s| !s.trim().is_empty()).unwrap_or(false))
+            .filter(move |e| {
+                active
+                    && e.name
+                        .as_ref()
+                        .map(|s| !s.trim().is_empty())
+                        .unwrap_or(false)
+            })
     }
 
     /// Returns all crystals whose validity flag is expired ("1") or expiration timestamp has passed.
@@ -361,7 +367,8 @@ impl UnionArtifactCrystal {
                 if expire_dt.to_utc() < chrono::Utc::now() {
                     return true;
                 }
-            } else if let Ok(expire_date) = chrono::NaiveDate::parse_from_str(date_str, "%Y-%m-%d") {
+            } else if let Ok(expire_date) = chrono::NaiveDate::parse_from_str(date_str, "%Y-%m-%d")
+            {
                 let kst_today = chrono::Utc::now()
                     .with_timezone(&chrono::FixedOffset::east_opt(9 * 3600).unwrap())
                     .date_naive();
@@ -413,7 +420,9 @@ pub struct UnionChampionBadgeInfo {
 impl UserUnionChampion {
     /// Returns the number of registered Union Champions.
     pub fn champion_count(&self) -> usize {
-        self.union_champion.as_deref().map_or(0, <[UnionChampionInfo]>::len)
+        self.union_champion
+            .as_deref()
+            .map_or(0, <[UnionChampionInfo]>::len)
     }
 
     /// Find a registered Union Champion by its slot number (`1..=6`).
@@ -455,4 +464,3 @@ impl UserUnionChampion {
         to_typed_stat_map(self.total_badge_stats())
     }
 }
-

@@ -233,7 +233,10 @@ fn test_potential_history_deserialization() {
         serde_json::from_str(json_data).expect("failed to deserialize potential history");
     assert_eq!(history.count, Some(1));
     let entries = history.potential_history.unwrap();
-    assert_eq!(entries[0].potential_option_grade.as_deref(), Some("레전드리"));
+    assert_eq!(
+        entries[0].potential_option_grade.as_deref(),
+        Some("레전드리")
+    );
 }
 
 #[test]
@@ -291,7 +294,10 @@ fn test_ranking_deserialization() {
 
     let guild_json = r#"{"ranking": [{"ranking": 1, "guild_name": "최강"}]}"#;
     let guild: GuildRanking = serde_json::from_str(guild_json).unwrap();
-    assert_eq!(guild.ranking.unwrap()[0].guild_name.as_deref(), Some("최강"));
+    assert_eq!(
+        guild.ranking.unwrap()[0].guild_name.as_deref(),
+        Some("최강")
+    );
 
     let dojang_json = r#"{"ranking": [{"ranking": 1, "dojang_floor": 100}]}"#;
     let dojang: DojangRanking = serde_json::from_str(dojang_json).unwrap();
@@ -340,7 +346,10 @@ fn test_notice_deserialization() {
         ]
     }"#;
     let event: EventNoticeList = serde_json::from_str(event_json).unwrap();
-    assert_eq!(event.event_notice.unwrap()[0].title.as_deref(), Some("겨울 이벤트"));
+    assert_eq!(
+        event.event_notice.unwrap()[0].title.as_deref(),
+        Some("겨울 이벤트")
+    );
 
     let cash_json = r#"{
         "cashshop_notice": [
@@ -351,7 +360,10 @@ fn test_notice_deserialization() {
         ]
     }"#;
     let cash: CashshopNoticeList = serde_json::from_str(cash_json).unwrap();
-    assert_eq!(cash.cashshop_notice.unwrap()[0].ongoing_flag.as_deref(), Some("false"));
+    assert_eq!(
+        cash.cashshop_notice.unwrap()[0].ongoing_flag.as_deref(),
+        Some("false")
+    );
 }
 
 #[test]
@@ -386,7 +398,10 @@ fn test_scheduler_deserialization() {
     let scheduler: CharacterStateResponse = serde_json::from_str(json_data).unwrap();
     assert_eq!(scheduler.character_name.as_deref(), Some("스케줄러캐릭터"));
     assert_eq!(scheduler.weekly_boss_clear_count, Some(12));
-    assert_eq!(scheduler.daily_contents.unwrap()[0].content_name.as_deref(), Some("소멸의 여로"));
+    assert_eq!(
+        scheduler.daily_contents.unwrap()[0].content_name.as_deref(),
+        Some("소멸의 여로")
+    );
 }
 
 #[test]
@@ -401,7 +416,10 @@ fn test_battle_practice_deserialization() {
         ]
     }"#;
     let replay: ReplayId = serde_json::from_str(replay_json).unwrap();
-    assert_eq!(replay.replay_list.unwrap()[0].replay_id.as_deref(), Some("rep-abc-123"));
+    assert_eq!(
+        replay.replay_list.unwrap()[0].replay_id.as_deref(),
+        Some("rep-abc-123")
+    );
 
     let result_json = r#"{
         "total_play_time": 180000,

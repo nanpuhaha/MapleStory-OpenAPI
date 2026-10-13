@@ -1325,7 +1325,11 @@ impl<'a> CharacterClient<'a> {
     }
 
     /// Retrieve basic information of a character.
-    pub async fn get_basic(&self, ocid: &str, date: impl Into<DateParam>) -> Result<CharacterBasic> {
+    pub async fn get_basic(
+        &self,
+        ocid: &str,
+        date: impl Into<DateParam>,
+    ) -> Result<CharacterBasic> {
         let params = build_params(ocid, date.into().as_deref())?;
         self.client
             .get("/maplestory/v1/character/basic", &params)
@@ -1668,4 +1672,3 @@ impl<'a> CharacterClient<'a> {
             .await
     }
 }
-

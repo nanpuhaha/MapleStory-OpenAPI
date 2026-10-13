@@ -16,6 +16,10 @@ classifiers = [
     "Topic :: Games/Entertainment",
 ]
 
+[project.urls]
+Homepage = "https://github.com/nanpuhaha/MapleStory-OpenAPI-Rust"
+Repository = "https://github.com/nanpuhaha/MapleStory-OpenAPI-Rust"
+
 [tool.maturin]
 features = ["pyo3/extension-module"]
 module-name = "maplestory_openapi"

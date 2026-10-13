@@ -36,7 +36,9 @@ impl<'a> UserClient<'a> {
         if let Some(d) = date_param.as_deref() {
             params.push(("date", MapleStoryClient::validate_date(d)?));
         }
-        self.client.get("/maplestory/v1/user/achievement", &params).await
+        self.client
+            .get("/maplestory/v1/user/achievement", &params)
+            .await
     }
 
     /// Retrieve the account identifier (ouid) for the authenticated account.
@@ -61,11 +63,8 @@ impl<'a> UserClient<'a> {
         &self,
         date: impl Into<crate::models::common::DateParam>,
     ) -> Result<crate::models::user::AccountSummary> {
-        let (character_list_res, achievement_res) = futures_util::future::join(
-            self.get_character_list(),
-            self.get_achievement(date),
-        )
-        .await;
+        let (character_list_res, achievement_res) =
+            futures_util::future::join(self.get_character_list(), self.get_achievement(date)).await;
 
         let character_list = character_list_res?;
         let achievement = achievement_res.ok();

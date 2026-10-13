@@ -10,10 +10,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::models::{
     character::{
-        AbilityInfo, CashItemEquipmentDetail, CharacterPropensity, CharacterSkill,
-        FinalStatEntry, HexaCoreEquipment, HexaStatCore, HyperStatEntry, ItemEquipmentDetail,
-        LinkSkillPresetItem, OtherStatEntry, PetiteLunaPetSkill, SetEffectInfo,
-        SymbolEquipmentDetail, VCoreEquipment,
+        AbilityInfo, CashItemEquipmentDetail, CharacterPropensity, CharacterSkill, FinalStatEntry,
+        HexaCoreEquipment, HexaStatCore, HyperStatEntry, ItemEquipmentDetail, LinkSkillPresetItem,
+        OtherStatEntry, PetiteLunaPetSkill, SetEffectInfo, SymbolEquipmentDetail, VCoreEquipment,
     },
     common::{PetAutoSkill, PetItemEquipment},
     guild::GuildSkill,

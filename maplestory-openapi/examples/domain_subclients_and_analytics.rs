@@ -64,13 +64,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         StatType::AllStat,
         StatType::CooldownReduction,
     ] {
-        let (flat_sum, pct_sum) = equip
-            .active_items()
-            .iter()
-            .fold((0.0, 0.0), |(f_acc, p_acc), item| {
-                let (f, p) = item.total_potential_stat(stat);
-                (f_acc + f, p_acc + p)
-            });
+        let (flat_sum, pct_sum) =
+            equip
+                .active_items()
+                .iter()
+                .fold((0.0, 0.0), |(f_acc, p_acc), item| {
+                    let (f, p) = item.total_potential_stat(stat);
+                    (f_acc + f, p_acc + p)
+                });
         if flat_sum > 0.0 || pct_sum > 0.0 {
             println!("  - {}: +{:.0}% (고정 +{:.0})", stat, pct_sum, flat_sum);
         }

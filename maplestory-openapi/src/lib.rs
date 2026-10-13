@@ -73,9 +73,7 @@ pub use models::character::{
 };
 pub use models::common::{DateParam, MapleDate, SkillGrade};
 pub use models::guild::{GuildBasic, GuildId, GuildProfile, GuildSkill};
-pub use models::history::{
-    CubeHistory, PotentialHistory, SoulPotentialHistory, StarforceHistory,
-};
+pub use models::history::{CubeHistory, PotentialHistory, SoulPotentialHistory, StarforceHistory};
 pub use models::notice::{
     CashshopNoticeDetail, CashshopNoticeList, EventNoticeDetail, EventNoticeList, NoticeDetail,
     NoticeList, UpdateNoticeDetail, UpdateNoticeList,
