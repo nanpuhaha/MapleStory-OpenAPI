@@ -792,10 +792,8 @@ fn test_dashboard_options_and_section_masking() {
     assert!(!custom_opts.is_enabled(DashboardSection::VMatrix));
     assert!(!custom_opts.is_enabled(DashboardSection::Guild));
 
-    let exclude_opts = DashboardOptions::all_except(&[
-        DashboardSection::Guild,
-        DashboardSection::PetEquipment,
-    ]);
+    let exclude_opts =
+        DashboardOptions::all_except(&[DashboardSection::Guild, DashboardSection::PetEquipment]);
     assert!(exclude_opts.is_enabled(DashboardSection::Stat));
     assert!(!exclude_opts.is_enabled(DashboardSection::Guild));
     assert!(!exclude_opts.is_enabled(DashboardSection::PetEquipment));
@@ -879,7 +877,9 @@ fn test_dashboard_partial_failure_diagnostics() {
     };
 
     assert!(!dashboard.has_errors());
-    assert!(dashboard.section_error(DashboardSection::HexaMatrix).is_none());
+    assert!(dashboard
+        .section_error(DashboardSection::HexaMatrix)
+        .is_none());
 
     // Record a 429 rate limit error for 6th job
     dashboard.errors.insert(
@@ -893,7 +893,9 @@ fn test_dashboard_partial_failure_diagnostics() {
     );
 
     assert!(dashboard.has_errors());
-    let err = dashboard.section_error(DashboardSection::HexaMatrix).unwrap();
+    let err = dashboard
+        .section_error(DashboardSection::HexaMatrix)
+        .unwrap();
     assert_eq!(err.status_code, Some(429));
     assert_eq!(err.api_code.as_deref(), Some("OPENAPI00004"));
 }
@@ -1192,11 +1194,32 @@ fn test_equipment_potential_parser_and_total_stat() {
         ..Default::default()
     };
 
-    assert_eq!(detail.potential_option_1_parsed().unwrap().stat_type, StatType::Str);
-    assert_eq!(detail.potential_option_2_parsed().unwrap().stat_type, StatType::Str);
-    assert_eq!(detail.potential_option_3_parsed().unwrap().stat_type, StatType::MaxHp);
-    assert_eq!(detail.additional_potential_option_1_parsed().unwrap().stat_type, StatType::Str);
-    assert_eq!(detail.additional_potential_option_2_parsed().unwrap().stat_type, StatType::AttackPower);
+    assert_eq!(
+        detail.potential_option_1_parsed().unwrap().stat_type,
+        StatType::Str
+    );
+    assert_eq!(
+        detail.potential_option_2_parsed().unwrap().stat_type,
+        StatType::Str
+    );
+    assert_eq!(
+        detail.potential_option_3_parsed().unwrap().stat_type,
+        StatType::MaxHp
+    );
+    assert_eq!(
+        detail
+            .additional_potential_option_1_parsed()
+            .unwrap()
+            .stat_type,
+        StatType::Str
+    );
+    assert_eq!(
+        detail
+            .additional_potential_option_2_parsed()
+            .unwrap()
+            .stat_type,
+        StatType::AttackPower
+    );
     assert!(detail.additional_potential_option_3_parsed().is_none());
 
     // Aggregation: (flat, percent)
@@ -1299,23 +1322,24 @@ fn test_union_artifact_helpers() {
     assert_eq!(typed_stats.get(&StatType::AttackPower).copied(), Some(30.0));
     assert_eq!(typed_stats.get(&StatType::MagicPower).copied(), Some(30.0));
     assert_eq!(typed_stats.get(&StatType::BossDamage).copied(), Some(15.0));
-    assert_eq!(typed_stats.get(&StatType::CriticalDamage).copied(), Some(2.4));
+    assert_eq!(
+        typed_stats.get(&StatType::CriticalDamage).copied(),
+        Some(2.4)
+    );
 
     // 4. When all crystals are expired, is_active is false and active_effects is empty
     let fully_expired_artifact = UserUnionArtifact {
         date: Some("2024-05-01".to_string()),
         union_artifact_effect: artifact.union_artifact_effect.clone(),
-        union_artifact_crystal: Some(vec![
-            UnionArtifactCrystal {
-                name: Some("크리스탈 : 파랑".to_string()),
-                validity_flag: Some("1".to_string()),
-                date_expire: Some("2023-01-01T00:00:00+09:00".to_string()),
-                level: Some(5),
-                crystal_option_name_1: None,
-                crystal_option_name_2: None,
-                crystal_option_name_3: None,
-            },
-        ]),
+        union_artifact_crystal: Some(vec![UnionArtifactCrystal {
+            name: Some("크리스탈 : 파랑".to_string()),
+            validity_flag: Some("1".to_string()),
+            date_expire: Some("2023-01-01T00:00:00+09:00".to_string()),
+            level: Some(5),
+            crystal_option_name_1: None,
+            crystal_option_name_2: None,
+            crystal_option_name_3: None,
+        }]),
         union_artifact_remain_ap: Some(0),
     };
     assert!(!fully_expired_artifact.is_active());
@@ -1385,7 +1409,11 @@ fn test_set_effect_helpers() {
     let active_options = set_effects.active_set_options();
     assert_eq!(active_options.len(), 4); // 3 active from Root Abyss (2,3,4) + 1 active from Ethernal (2)
     assert!(!active_options.iter().any(|opt| opt.set_count == Some(5)));
-    assert!(!active_options.iter().any(|opt| opt.set_option.as_deref().unwrap_or("").contains("크리티컬 데미지")));
+    assert!(!active_options.iter().any(|opt| opt
+        .set_option
+        .as_deref()
+        .unwrap_or("")
+        .contains("크리티컬 데미지")));
 
     // 3. find_set
     let ethernel = set_effects.find_set("에테르넬").unwrap();
@@ -1394,9 +1422,9 @@ fn test_set_effect_helpers() {
 
 #[tokio::test]
 async fn test_identity_cache_custom_and_guild_caching() {
+    use maplestory_openapi::client::{BoxFuture, IdentityCache};
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Arc;
-    use maplestory_openapi::client::{BoxFuture, IdentityCache};
 
     // Custom in-memory cache to verify pluggability
     struct MockCache {
@@ -1428,7 +1456,11 @@ async fn test_identity_cache_custom_and_guild_caching() {
             })
         }
 
-        fn get_oguild_id<'a>(&'a self, guild: &'a str, world: &'a str) -> BoxFuture<'a, Option<String>> {
+        fn get_oguild_id<'a>(
+            &'a self,
+            guild: &'a str,
+            world: &'a str,
+        ) -> BoxFuture<'a, Option<String>> {
             Box::pin(async move {
                 let map = self.oguild_map.read().await;
                 if let Some(val) = map.get(&(guild.to_string(), world.to_string())) {
@@ -1440,7 +1472,12 @@ async fn test_identity_cache_custom_and_guild_caching() {
             })
         }
 
-        fn set_oguild_id<'a>(&'a self, guild: &'a str, world: &'a str, oguild_id: &'a str) -> BoxFuture<'a, ()> {
+        fn set_oguild_id<'a>(
+            &'a self,
+            guild: &'a str,
+            world: &'a str,
+            oguild_id: &'a str,
+        ) -> BoxFuture<'a, ()> {
             let key = (guild.to_string(), world.to_string());
             let val = oguild_id.to_string();
             Box::pin(async move {
@@ -1553,7 +1590,10 @@ async fn test_hierarchical_domain_namespaces() {
     assert_eq!(basic_from_sub.character_level, Some(285));
 
     // 3. Query through root convenience facade
-    let basic_from_root = client.get_character_basic("mock-ocid", "2024-05-01").await.unwrap();
+    let basic_from_root = client
+        .get_character_basic("mock-ocid", "2024-05-01")
+        .await
+        .unwrap();
     assert_eq!(basic_from_root.character_name.as_deref(), Some("HeroMock"));
 
     // 4. Query guild through sub-client and root facade
@@ -1701,14 +1741,19 @@ async fn test_guild_profile_and_account_summary_aggregators() {
     assert_eq!(guild_profile.fetched_member_count(), 2);
     assert_eq!(guild_profile.average_member_level(), Some(275.0));
     assert_eq!(guild_profile.total_member_combat_power(), 300_000_000);
-    assert_eq!(guild_profile.average_member_combat_power(), Some(150_000_000.0));
+    assert_eq!(
+        guild_profile.average_member_combat_power(),
+        Some(150_000_000.0)
+    );
     assert_eq!(guild_profile.max_member_combat_power(), Some(200_000_000));
 
     // 2. AccountSummary testing
     let account_summary = client.user().get_account_summary(None).await.unwrap();
     assert_eq!(account_summary.total_character_count(), 2);
     assert_eq!(
-        account_summary.highest_level_character().and_then(|c| c.character_name.as_deref()),
+        account_summary
+            .highest_level_character()
+            .and_then(|c| c.character_name.as_deref()),
         Some("영웅1")
     );
     assert_eq!(account_summary.achievement_points(), Some(12500));
@@ -1798,7 +1843,9 @@ fn test_union_raider_and_champion_helpers() {
     assert_eq!(raider_stats.get("공격력"), Some(&20.0));
     assert_eq!(raider_stats.get("마력"), Some(&20.0));
 
-    let active_p = raider.active_preset(None).expect("preset 2 should be active");
+    let active_p = raider
+        .active_preset(None)
+        .expect("preset 2 should be active");
     assert_eq!(active_p.total_raider_stats().get("STR"), Some(&120.0));
     assert_eq!(
         active_p.total_occupied_stats().get("크리티컬 데미지"),
@@ -1971,7 +2018,9 @@ fn test_character_progression_domain_helpers() {
     };
     assert_eq!(vmatrix.total_slot_enhancement_level(), 10);
     assert_eq!(
-        vmatrix.core_by_name("유니온 오라").and_then(|c| c.v_core_level),
+        vmatrix
+            .core_by_name("유니온 오라")
+            .and_then(|c| c.v_core_level),
         Some(25)
     );
     assert_eq!(vmatrix.max_level_cores().len(), 1);
@@ -2036,6 +2085,3 @@ fn test_character_progression_domain_helpers() {
         Some(15)
     );
 }
-
-
-

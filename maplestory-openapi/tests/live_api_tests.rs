@@ -26,7 +26,10 @@ async fn spawn_offline_fixture_server() -> String {
                 let path = first_line.split_whitespace().nth(1).unwrap_or("");
 
                 let avatar_hex = "a1".repeat(512);
-                let look_url = format!("https://open.api.nexon.com/static/maplestory/character/look/{}", avatar_hex);
+                let look_url = format!(
+                    "https://open.api.nexon.com/static/maplestory/character/look/{}",
+                    avatar_hex
+                );
 
                 let body = if path.starts_with("/maplestory/v1/id") {
                     if path.contains("%EB%8B%88%EB%8B%88%EB%A5%98") || path.contains("니니류") {
@@ -264,10 +267,7 @@ async fn test_live_equipment_and_set_effects() {
     }
     assert!(parsed_potential_count > 0);
 
-    let ocid = client
-        .get_ocid("온앤온")
-        .await
-        .expect("failed to get ocid");
+    let ocid = client.get_ocid("온앤온").await.expect("failed to get ocid");
     let set_effects = client
         .get_character_set_effect(&ocid, None)
         .await
@@ -283,9 +283,10 @@ async fn test_live_rankings_and_notices() {
 
     println!("\n=== Live/Replay Test: Overall Ranking & Notices ===");
     use maplestory_openapi::models::ranking::OverallRankingQuery;
-    let ranking_date = (chrono::Utc::now() + chrono::Duration::hours(9) - chrono::Duration::days(2))
-        .format("%Y-%m-%d")
-        .to_string();
+    let ranking_date = (chrono::Utc::now() + chrono::Duration::hours(9)
+        - chrono::Duration::days(2))
+    .format("%Y-%m-%d")
+    .to_string();
     let ranking = client
         .ranking()
         .get_overall(OverallRankingQuery {

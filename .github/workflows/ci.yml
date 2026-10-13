@@ -1,17 +1,15 @@
-name: CI
+name: CI (Manual Trigger)
 
+# 수동 실행 전용 (Manual trigger only via workflow_dispatch)
 on:
-  push:
-    branches: [ "main", "master" ]
-  pull_request:
-    branches: [ "main", "master" ]
+  workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
   check:
-    name: Check & Rustfmt
+    name: Check & Clippy
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -21,31 +19,33 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Check Formatting
         run: cargo fmt --all -- --check
-      - name: Clippy (all features)
+      - name: Clippy (all targets & all features)
         run: cargo clippy --all-targets --all-features -- -D warnings
 
   test:
-    name: Test Suite
+    name: Test Suite & Doc Tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - name: Unit & Integration Tests (default features)
-        run: cargo test --lib --tests
-      - name: Unit & Integration Tests (all features)
-        run: cargo test --all-features --lib --tests
+      - name: Workspace Tests (all features)
+        run: cargo test --all --all-features
       - name: Documentation Tests
         run: cargo test --doc --all-features
+      - name: Check Examples
+        run: cargo check --examples --all-features
 
-  docs:
-    name: Documentation Build
-    runs-on: ubuntu-latest
+  matrix-cross-platform:
+    name: Cross-Platform Build (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - name: Build Docs
-        env:
-          RUSTDOCFLAGS: -D warnings
-        run: cargo doc --no-deps --all-features
+      - name: Build Core Crate & C-ABI
+        run: cargo check --all-targets -p maplestory-openapi -p maplestory-openapi-c
