@@ -96,3 +96,24 @@ println!("노블레스 스킬 총합: {} 포인트", dash.noblesse_skill_points(
 println!("어빌리티: {:?}", dash.ability_grade());
 println!("무릉도장 최고 층수: {}층", dash.dojang_best_floor());
 ```
+
+---
+
+## 4. 확장 도메인 종합 애그리게이터 (`GuildProfile` & `AccountSummary`)
+
+`CharacterDashboard` 외에도 길드 전체와 계정 전체를 단 한 번의 호출로 분석할 수 있는 애그리게이터를 제공합니다:
+
+- **`GuildProfile` (`client.guild().get_profile(name, world, date)` / `get_profile_with_members(...)`)**:
+  길드 기본 정보(`GuildBasic`)를 조회하며, 옵션 활성화 시 소속 길드원 각각의 캐릭터 기본 정보(`CharacterBasic`)와 전투력을 내부 동시성 세마포어 제어 하에 병렬로 수집합니다.
+  - `average_member_level()`: 조회된 길드원 평균 레벨
+  - `total_member_combat_power()` / `average_member_combat_power()` / `max_member_combat_power()`: 길드원 전투력 통계
+  - `total_noblesse_points`: 노블레스 길드 스킬 포인트 총합
+
+- **`AccountSummary` (`client.user().get_account_summary(date)`)**:
+  API 키 소유 계정의 전체 캐릭터 목록(`CharacterList`), 업적 정보(`Achievement`), 본캐 유니온 정보(`UserUnion`)를 병렬로 결합합니다.
+  - `total_character_count()`: 계정 내 전체 캐릭터 수
+  - `highest_level_character()`: 계정 내 본캐(최고 레벨 캐릭터) 탐색
+  - `achievement_points()`: 업적 총점
+  - `main_character_union_level()` / `main_character_union_grade()`: 본캐 기준 유니온 레벨 및 등급
+
+

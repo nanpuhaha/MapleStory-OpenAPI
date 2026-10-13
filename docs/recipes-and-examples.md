@@ -155,3 +155,43 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 ```
+
+---
+
+## 📊 레시피 4: 장비 잠재능력·6차 코어·유니온 심층 스펙 분석기
+
+장착 장비의 잠재능력/에디셔널 합산, 6차 HEXA 코어/스탯, V매트릭스, 유니온 공격대 점령 효과를 구조화된 타입(`StatType`)으로 즉시 집계합니다.
+
+```rust
+use maplestory_openapi::{MapleStoryClient, StatType};
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let client = MapleStoryClient::from_env()?;
+    let char_api = client.character();
+    let ocid = char_api.get_ocid("온앤온").await?;
+
+    // 1. 장착 장비 잠재능력 + 에디셔널 스탯 합산
+    let equip = char_api.get_item_equipment(&ocid, None).await?;
+    if let Some(weapon) = equip.weapon() {
+        let (_, boss_pct) = weapon.total_potential_stat(StatType::BossDamage);
+        let (_, att_pct) = weapon.total_potential_stat(StatType::AttackPower);
+        println!("무기 보공 잠재: +{:.0}%, 공% 잠재: +{:.0}%", boss_pct, att_pct);
+    }
+
+    // 2. 6차 HEXA 코어 & V매트릭스 코어 분석
+    let hexa = char_api.get_hexamatrix(&ocid, None).await?;
+    println!("활성 6차 코어 수: {}개", hexa.active_cores().len());
+
+    // 3. 유니온 공격대 점령 효과 및 챔피언 휘장 효과 (StatType 키 기반)
+    let raider = client.union().get_raider(&ocid, None).await?;
+    let occupied = raider.total_occupied_stats_typed();
+    println!(
+        "유니온 점령 크리티컬 데미지: {:?}%",
+        occupied.get(&StatType::CriticalDamage)
+    );
+
+    Ok(())
+}
+```
+

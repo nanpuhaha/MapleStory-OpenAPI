@@ -42,7 +42,7 @@ flowchart TD
 
 ### 🐍 1. Python (`bindings/python`)
 - **기술 스택**: `PyO3 0.22`, `maturin`, `pyo3-async-runtimes`, `pythonize`
-- **특징**: Rust 모델을 파이썬 네이티브 `dict`로 제로-카피 직렬화하여 반환. 비동기 `async/await` 완벽 지원.
+- **특징**: Rust 모델을 파이썬 네이티브 `dict`로 직렬화하여 반환. 캐릭터 대시보드/프로필/코디, 길드(`get_guild_basic`, `get_guild_profile`), 유니온(`get_user_union`, `get_user_union_artifact`, `get_user_union_raider`), 랭킹(`get_overall_ranking`, `get_union_ranking`, `get_guild_ranking`, `get_dojang_ranking`), 확률/강화 이력(`get_starforce_history`, `get_potential_history`, `get_cube_history`, `get_soul_potential_history`), 공지/이벤트(`get_notice_list`, `get_event_notice_list` 등), 계정 요약(`get_account_summary`), 스케줄러(`get_scheduler_character_state`) 완벽 지원.
 - **빌드 및 로컬 설치**:
   ```bash
   cd bindings/python
@@ -55,9 +55,13 @@ flowchart TD
 
   async def main():
       client = MapleStoryClient.from_env()
-      dash = await client.get_character_dashboard_by_name("온앤온")
-      print(f"{dash['name']} 전투력: {dash['combat_power']:,}")
-      
+      dash = await client.get_character_dashboard("온앤온")
+      print(f"{dash['basic']['character_name']} 레벨: Lv.{dash['basic']['character_level']}")
+
+      # 길드 종합 프로필 및 유니온 조회
+      guild = await client.get_guild_profile("리더", "스카니아")
+      union_info = await client.get_user_union("온앤온")
+
       # 걷기 애니메이션 GIF 바이트 생성
       gif_bytes = await client.render_character_gif("온앤온", "walk", 128, 128)
       with open("walk.gif", "wb") as f:
@@ -70,13 +74,13 @@ flowchart TD
 
 ### 🟩 2. Node.js / TypeScript (`bindings/nodejs`)
 - **기술 스택**: `napi-rs 2.16`
-- **특징**: Node.js C++ 애드온 대비 가볍고 안전함. 컴파일 시 `index.d.ts` 타입 정의 자동 생성. Node `Buffer`로 GIF 반환.
+- **특징**: 컴파일 시 `index.d.ts` 타입 정의 자동 생성. 캐릭터/길드/유니온/랭킹/확률 이력/공지/계정 요약/스케줄러 전체 엔드포인트 및 Node `Buffer` 기반 GIF 렌더링 지원.
 - **빌드 및 로컬 테스트**:
   ```bash
   cd bindings/nodejs
   npm install
   npm run build
-  node test_live.js
+  node --test test_smoke.mjs
   ```
 - **사용 예시**:
   ```typescript
@@ -84,8 +88,11 @@ flowchart TD
   import * as fs from 'fs';
 
   const client = MapleStoryClient.fromEnv();
-  const dash = await client.getCharacterDashboardByName("온앤온");
-  console.log(`${dash.name} 전투력: ${dash.combat_power.toLocaleString()}`);
+  const dash = await client.getCharacterDashboard("온앤온");
+  console.log(`${dash.basic.character_name} Lv.${dash.basic.character_level}`);
+
+  const guild = await client.getGuildProfile("리더", "스카니아");
+  const notices = await client.getNoticeList();
 
   const gifBuffer = await client.renderCharacterGif("온앤온", "walk", 128, 128);
   fs.writeFileSync("walk.gif", gifBuffer);
@@ -113,22 +120,21 @@ flowchart TD
 
 ---
 
-### 🔷 4. C# / .NET (`bindings/dotnet`)
-- **기술 스택**: C# P/Invoke (.NET 8.0, .NET 9.0, .NET Standard 2.0 멀티 타겟)
-- **특징**: `IDisposable` 및 비동기 `Task<string>`, `Task<byte[]>` 지원. Unity 게임 클라이언트 및 ASP.NET Core 백엔드에 즉시 적용 가능.
-- **실행 및 테스트**:
-  ```bash
-  dotnet run --project bindings/dotnet/MapleStory.OpenApi.csproj --framework net8.0
-  ```
-- **사용 예시**:
+### 🔷 4. C / C++ & C# / .NET (`bindings/c`, `bindings/dotnet`)
+- **기술 스택**: C-ABI (`maplestory_openapi.h`) + C# P/Invoke (.NET 8.0, .NET 9.0, .NET Standard 2.0 멀티 타겟)
+- **특징**:
+  - 스레드 로컬 에러 진단 메시지(`maplestory_last_error_message()`)를 통해 FFI 경계 너머로 상세한 Rust 에러 원인을 전달합니다.
+  - `GetCharacterDashboardAsync`, `GetGuildProfileAsync`, `GetUserUnionAsync`, `GetOverallRankingAsync`, `GetNoticeListAsync`, `GetAccountSummaryAsync`, `RenderCharacterGifAsync` 지원.
+- **사용 예시 (C#)**:
   ```csharp
   using MapleStory.OpenApi;
 
   using var client = MapleStoryClient.FromEnv();
-  var dash = client.GetCharacterDashboardByName("온앤온");
-  Console.WriteLine($"닉네임: {dash.Name}, 전투력: {dash.CombatPower:N0}");
+  string dashJson = await client.GetCharacterDashboardAsync("온앤온");
+  string guildJson = await client.GetGuildProfileAsync("리더", "스카니아");
+  string noticeJson = await client.GetNoticeListAsync();
 
-  byte[] gif = client.RenderCharacterGif("온앤온", "walk", 128, 128);
+  byte[] gif = await client.RenderCharacterGifAsync("온앤온", "walk", 128, 128);
   File.WriteAllBytes("walk.gif", gif);
   ```
 
@@ -136,7 +142,7 @@ flowchart TD
 
 ### 🐹 5. Go (`bindings/go`)
 - **기술 스택**: `cgo` 기반 패키지 (`go 1.20+`)
-- **특징**: Gin, Fiber 등 Go 기반 고성능 마이크로서비스 백엔드에 적합.
+- **특징**: `GetCharacterDashboard`, `GetGuildProfile`, `GetUserUnion`, `GetOverallRanking`, `GetNoticeList`, `GetAccountSummary`, `RenderCharacterGif` 지원 및 `maplestory_last_error_message` 기반 상세 에러 반환.
 - **사용 예시**:
   ```go
   package main
@@ -151,8 +157,9 @@ flowchart TD
       client, _ := maplestory.FromEnv()
       defer client.Close()
 
-      dash, _ := client.GetCharacterDashboardByName("온앤온")
-      fmt.Printf("닉네임: %s, 전투력: %d\n", dash.Name, dash.CombatPower)
+      dashJson, _ := client.GetCharacterDashboard("온앤온")
+      guildJson, _ := client.GetGuildProfile("리더", "스카니아", "")
+      fmt.Println(dashJson, guildJson)
 
       gif, _ := client.RenderCharacterGif("온앤온", "walk", 128, 128)
       os.WriteFile("walk.gif", gif, 0644)
@@ -162,16 +169,17 @@ flowchart TD
 ---
 
 ### 📱 6. 모바일 (iOS Swift & Android Kotlin) (`bindings/mobile`)
-- **iOS Swift**: C-ABI Native FFI를 활용한 Swift 클라이언트 (`bindings/mobile/ios/MapleStoryClient.swift`). `async/await` 및 `Foundation.Data`를 지원하여 SwiftUI에서 바로 사용 가능.
-- **Android Kotlin**: JNI 네이티브 브릿지 클라이언트 (`bindings/mobile/android/MapleStoryClient.kt`). Kotlin Coroutines `suspend fun` 및 `ByteArray`를 지원하여 Jetpack Compose에서 즉시 사용 가능.
+- **iOS Swift**: C-ABI Native FFI를 활용한 Swift 클라이언트 (`bindings/mobile/swift/MapleStoryClient.swift`). `async/await`, `Foundation.Data`, `MapleStoryError.apiError(code, message)`를 지원하여 SwiftUI에서 바로 사용 가능.
+- **Android Kotlin**: JNI/C-FFI 네이티브 브릿지 클라이언트 (`bindings/mobile/kotlin/MapleStoryClient.kt`). Kotlin Coroutines `suspend fun` 및 `ByteArray`를 지원하여 Jetpack Compose에서 즉시 사용 가능.
 
 ---
 
 ## 3. 워크스페이스 통합 빌드 및 검증
 
-모든 네이티브 FFI 크레이트는 루트 `Cargo.toml` 워크스페이스에 통합 관리되므로, 다음 단 1줄의 커맨드로 전체 언어 바인딩을 일괄 컴파일 및 검증할 수 있습니다:
+모든 네이티브 FFI 크레이트는 루트 `Cargo.toml` 워크스페이스에 통합 관리되므로, 다음 커맨드로 전체 크레이트와 바인딩을 검증할 수 있습니다:
 
 ```bash
-cargo check --workspace
-cargo test --workspace
+cargo check --all
+cargo test --all
 ```
+

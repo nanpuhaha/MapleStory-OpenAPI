@@ -3,10 +3,10 @@
 [![Crates.io](https://img.shields.io/crates/v/maplestory-openapi.svg)](https://crates.io/crates/maplestory-openapi)
 [![Docs.rs](https://docs.rs/maplestory-openapi/badge.svg)](https://docs.rs/maplestory-openapi)
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE-MIT)
-[![CI](https://github.com/yourusername/maplestory-openapi-rust/actions/workflows/ci.yml/badge.svg)](https://github.com/yourusername/maplestory-openapi-rust/actions)
+[![CI](https://github.com/nanpuhaha/MapleStory-OpenAPI-Rust/actions/workflows/ci.yml/badge.svg)](https://github.com/nanpuhaha/MapleStory-OpenAPI-Rust/actions)
 
 [NEXON MapleStory OpenAPI](https://openapi.nexon.com/ko/game/maplestory/)의 고성능·인체공학적(Ergonomic) Rust 클라이언트 라이브러리이자 **다국어 네이티브 SDK 코어(Python, Node.js, C#, Go, WASM, 모바일)**입니다.  
-공식 OpenAPI 스펙을 100% 준수하면서도, 실제 메이플스토리 캐릭터 정보/스펙 분석 사이트·디스코드 봇·데이터 분석 도구를 개발할 때 필요한 **실무 편의 기능(코디/외형 자동 합성, 전투력 도메인 헬퍼, 인메모리 캐시, 올인원 종합 대시보드, 아바타 모션 GIF 생성)**을 강력하게 지원합니다.
+공식 OpenAPI 스펙을 100% 준수하면서도, 실제 메이플스토리 캐릭터 정보/스펙 분석 사이트·디스코드 봇·데이터 분석 도구를 개발할 때 필요한 **실무 편의 기능(계층형 도메인 서브클라이언트, 코디/외형 자동 합성, 잠재능력/성장 도메인 헬퍼, 길드/계정 종합 애그리게이터, 자동 페이지네이션 히스토리 스트림, 아바타 모션 GIF 생성)**을 강력하게 지원합니다.
 
 > 🔑 **API Key 발급**: [NEXON Developers](https://openapi.nexon.com/)에서 손쉽게 발급받을 수 있습니다.  
 > 📖 **빠른 링크**: [📚 공식 기술 문서 전체 보기](docs/README.md) | [🤖 디스코드 봇 레시피](docs/recipes-and-examples.md) | [❓ FAQ & 트러블슈팅](docs/error-handling-and-faq.md) | [🤝 기여 가이드](CONTRIBUTING.md)
@@ -21,9 +21,11 @@
 |---|---|---|
 | **캐릭터 조회** | 닉네임 -> `GET /id` -> `ocid` 추출 -> 본 API 호출 (최소 2-Step) | `get_character_by_name("온앤온")` **단 1줄 호출** |
 | **종합 대시보드** | 스펙, 장비, 유니온, 길드 등 20개 엔드포인트 수동 병합 (수백 줄 코드) | `get_character_dashboard_by_name()` **단 1줄 병렬 자동 취합** |
+| **길드 / 계정 집계** | 길드원 수십 명 스펙 개별 조회 / 본캐·업적·유니온 수동 결합 | `GuildProfile` · `AccountSummary` **자동 병렬 집계 및 전투력 통계** |
 | **코디 / 외형** | 뷰티, 캐시장비, 일반장비 파편화 / 모루, 프리즘, 한벌옷 계산 불가 | `CharacterCoordination` **인게임 렌더링 규칙 100% 자동 합성** |
+| **잠재 / 성장 분석** | 문자열 옵션 직접 정규식 파싱 필요 (`"보스 몬스터 공격 시 데미지 : +40%"`) | `StatType` 기반 **잠재·아티팩트·유니온·헥사/V매트릭스 자동 집계** |
 | **아바타 렌더러** | 정적 PNG 이미지 URL만 제공 | 걷기/윙크/점프 **무손실 투명 배경 애니메이션 GIF 자동 인코딩** |
-| **API 호출 한도** | 동일 캐릭터 반복 조회 시 초당 한도(Rate Limit 429) 초과 빈번 | `moka` 기반 **인메모리 OCID 캐시로 트래픽 50% 절감 (0ms)** |
+| **호출 한도 & 안정성** | 병렬 호출 시 429 에러 빈번, `next_cursor` 페이지네이션 수동 루프 | **Semaphore 동시성 제어 + 지수 백오프 재시도 + `IdentityCache` + Stream** |
 | **언어 지원** | 언어마다 직접 모델링 및 HTTP 클라이언트 구현 필요 | **Python, Node.js, C#, Go, WASM, iOS, Android 공식 SDK 제공** |
 
 ---
@@ -38,6 +40,7 @@
   - [3. 전투력 및 주요 스탯 헬퍼 활용](#3-전투력-및-주요-스탯-헬퍼-활용)
   - [4. 원스톱 종합 프로필 조회](#4-원스톱-종합-프로필-get_character_profile_by_name)
   - [5. 🏆 상용 정보 사이트 올인원 대시보드](#5--상용-정보-사이트-수준의-올인원-대시보드-get_character_dashboard_by_name)
+  - [6. 🧭 계층형 도메인 서브클라이언트 & 심화 분석](#6--계층형-도메인-서브클라이언트--심화-분석-sub-clients--analytics)
 - [🛠 에러 처리 및 트러블슈팅](#-정밀한-에러-처리-error-handling)
 - [💡 넥슨 OpenAPI 실무 팁 & FAQ](#-넥슨-openapi-실무-주의사항-및-팁-gotchas)
 - [📋 지원 API 전체 목록](#-지원-api-전체-목록)
@@ -50,34 +53,22 @@
 
 ## 🌟 핵심 특징 (Key Highlights)
 
+- 🧭 **계층형 도메인 서브클라이언트**: `client.character()`, `client.guild()`, `client.union()`, `client.ranking()`, `client.history()`, `client.notice()`, `client.user()`, `client.battle_practice()`, `client.scheduler()`로 깔끔하게 구조화된 도메인 API 제공 (기존 루트 편의 메서드도 100% 호환).
 - ⚡ **닉네임 원스톱 조회**: OCID를 먼저 수동으로 조회할 필요 없이, 인게임 닉네임으로 기본 정보·스탯·장비·코디 등을 단 1줄로 조회 (`get_character_by_name`, `get_character_stat_by_name` 등).
-- 🏆 **올인원 종합 대시보드 (`get_character_dashboard_by_name`)**:
-  - 메이플스카우터·츄츄지지·메애기·메짱 등 상용 캐릭터 정보 사이트에서 제공하는 **모든 정보(기본 스펙, 전투력, 스타포스 합, 심볼 포스, 유니온/아티팩트, 소속 길드/노블레스 스킬 자동 연계, 6차 헥사 코어/스탯, 5차 V매트릭스, 장비 세트효과, 펫, 안드로이드, 성향, 코디/아바타 렌더러)**를 단 1번의 닉네임 호출로 병렬 취합.
+- 🏆 **올인원 종합 대시보드 (`get_character_dashboard_by_name`) & 애그리게이터 (`GuildProfile`, `AccountSummary`)**:
+  - 캐릭터 스펙·장비·유니온·길드·6차 헥사·코디를 단 1번의 호출로 병렬 취합하는 `CharacterDashboard` (섹션 마스킹 `DashboardOptions` 및 부분 실패 진단 `DashboardSectionError` 지원).
+  - 길드 기본 정보와 전체 길드원 프로필/전투력 통계를 병렬 집계하는 `GuildProfile`, 계정 내 전체 캐릭터·업적·본캐 유니온을 결합하는 `AccountSummary`.
 - 👗 **최종 코디/외형 합성 (Coordination Look)**:
-  - 인게임 노출 규칙 완벽 지원: **캐시 장비가 있으면 캐시 아이템 우선 노출, 없는 부위는 일반 장비 노출**.
-  - **신비의 모루** 외형 변경 자동 반영 (`is_anvil: true`, 모루 외형명 및 아이콘 자동 우선 노출).
-  - **한벌옷** 착용 시 하의가 가려지는 인게임 레이어 규칙 반영.
-  - **투명 장비/비노출 보조무기 감지** (`is_transparent`, `is_visually_rendered()`).
-  - 컬러링 프리즘 염색 정보 및 마스터라벨/스페셜라벨 정보 제공.
+  - 인게임 노출 규칙 완벽 지원: **캐시 장비 우선 노출, 신비의 모루 외형 자동 반영, 한벌옷 착용 시 하의 가림, 투명 장비/비노출 보조무기 감지, 컬러링 프리즘 염색 정보**.
 - 🎨 **아바타 Look URL 파서 & 동적 렌더러 빌더 (`AvatarCode`)**:
-  - `open.api.nexon.com` 및 `avatar.maplestory.nexon.com`의 1024자리 Base16 아바타 코드 상호 변환.
-  - 표정(`emotion`), 포즈(`action`), 무기 모션(`wmotion`), 크기 커스텀 쿼리 빌더 (`AvatarLookQuery`).
-  - 512바이트 원본 바이너리 블록 언패킹 지원 (`AvatarCode::to_bytes()`).
-- ⚔️ **풍부한 도메인 헬퍼**:
-  - `dash.combat_power()` / `stat.combat_power()` (전투력 정밀 파싱)
-  - `dash.total_starforce()` (전체 장착 장비 스타포스 합계)
-  - `dash.arcane_force()`, `dash.authentic_force()` (아케인/어센틱 심볼 포스 합계)
-  - `dash.noblesse_skill_points()` (소속 길드 노블레스 스킬 포인트 총합)
-  - `stat.stat_attack()` (최소/최대 스탯공격력 튜플)
-  - `stat.boss_damage()`, `stat.ignore_monster_armor()` (보스 데미지, 방무 등)
-  - `equip.weapon()`, `equip.hat()`, `equip.find_slot("무기")` (부위별 장비 즉시 검색)
-- 🏰 **길드 & 유니온 모듈 완비**:
-  - 길드 ID 및 기본 정보, 노블레스 스킬 포인트 계산 (`get_guild_by_name`, `get_guild_basic`).
-  - 유니온 등급/레벨, 공격대 배치, 아티팩트 크리스탈/효과 (`get_user_union`, `get_user_union_raider`, `get_user_union_artifact`).
-- 🪶 **가벼운 의존성 발자국**: 라이브러리 레벨의 불필요한 `tokio` 런타임 강제를 제거하여, 초경량 컴파일 및 런타임-애그노스틱 비동기 환경 지원.
-- 💾 **인메모리 OCID 캐싱 (`cache` feature)**: `moka` 기반의 고성능 LRU+TTL 캐시 탑재. 거의 불변인 `닉네임 -> OCID` 매핑을 캐싱하여 API 호출 횟수를 절반으로 절약하고 레이트 리밋을 방어.
-- 🔒 **타입 안전성**: 넥슨 공식 엔드포인트 전체에 대한 엄격한 모델링 및 상세한 에러 핸들링.
-- 🌐 **다국어 네이티브 바인딩 완비**: Rust 코어 엔진을 기반으로 Python, Node.js/TypeScript, C# .NET, Go, WebAssembly, 모바일(iOS/Android)까지 100% 동일한 기능 지원.
+  - 1024자리 Base16 아바타 코드 디코딩, 표정/포즈/무기 모션 쿼리 빌더(`AvatarLookQuery`), 무손실 투명 배경 애니메이션 GIF 인코딩.
+- ⚔️ **깊은 도메인 헬퍼 (Deep Domain Helpers)**:
+  - **장비 잠재능력 & 세트효과**: `equip.total_potential_stats(StatType::BossDamage)`, `set_effect.active_set_effects()`, `set_effect.total_set_stats()`.
+  - **유니온 & 아티팩트 & 챔피언**: `artifact.total_artifact_stats_typed()`, `raider.total_occupied_stats_typed()`, `raider.active_preset(None)`, `champion.total_badge_stats_typed()`.
+  - **캐릭터 성장 (HEXA / V매트릭스 / 어빌리티 / 하이퍼스탯)**: `hexa.core_level(...)`, `hexa_stat.main_stat_level(1)`, `vmatrix.total_slot_enhancement_level()`, `ability.active_preset_abilities(None)`, `hyper_stat.find_hyper_stat(...)`.
+- 🔄 **자동 페이지네이션 히스토리 스트림**: `client.history().get_starforce_stream(...)`, `get_potential_stream(...)`, `get_cube_stream(...)`, `get_soul_potential_stream(...)`으로 커서 기반 이력을 `Stream`으로 손쉽게 순회.
+- 🛡️ **내장 동시성 제한기 & 지수 백오프 재시도 & `MapleDate` 검증 & 플러그형 `IdentityCache`**:
+  - `Semaphore` 기반 동시 요청 제한(`max_concurrent_requests`), HTTP 429/503 자동 지수 백오프 재시도(`max_retries`), KST 오전 01:00 갱신 기준 날짜 검증(`MapleDate`), OCID/OGuildID 커스텀 캐시(`IdentityCache`).
 
 ---
 
@@ -93,8 +84,8 @@ Rust의 압도적인 성능과 메모리 안전성을 모든 언어 환경에서
 | **WebAssembly** | wasm-bindgen | [`bindings/wasm`](./bindings/wasm) | 웹 브라우저 클라이언트, Cloudflare Workers |
 | **C# / .NET** | P/Invoke (.NET 8+) | [`bindings/dotnet`](./bindings/dotnet) | Unity 게임 클라이언트, ASP.NET Core 백엔드 |
 | **Go** | cgo | [`bindings/go`](./bindings/go) | 대규모 트래픽 마이크로서비스, Gin/Fiber API 서버 |
-| **iOS (Swift)** | C-ABI Native FFI | [`bindings/mobile/ios`](./bindings/mobile) | Swift Package Manager / iOS 네이티브 앱 |
-| **Android (Kotlin)** | JNI Native FFI | [`bindings/mobile/android`](./bindings/mobile) | Android NDK / Kotlin 네이티브 앱 |
+| **iOS (Swift)** | C-ABI Native FFI | [`bindings/mobile/swift`](./bindings/mobile/swift) | Swift Package Manager / iOS 네이티브 앱 |
+| **Android (Kotlin)** | JNI Native FFI | [`bindings/mobile/kotlin`](./bindings/mobile/kotlin) | Android NDK / Kotlin 네이티브 앱 |
 | **C / C++** | C-ABI Dynamic Lib | [`bindings/c`](./bindings/c) | C 헤더(`maplestory_openapi.h`) 및 `.dll`/`.so` |
 
 ---
@@ -307,6 +298,50 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
+### 6. 🧭 계층형 도메인 서브클라이언트 & 심화 분석 (Sub-Clients & Analytics)
+9개의 직관적인 도메인 서브클라이언트(`character()`, `guild()`, `union()`, `ranking()`, `history()`, `notice()`, `user()`, `battle_practice()`, `scheduler()`)와 심화 도메인 분석 헬퍼를 제공합니다:
+
+```rust
+use futures_util::TryStreamExt;
+use maplestory_openapi::{MapleStoryClient, StatType};
+use std::pin::pin;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let client = MapleStoryClient::from_env()?;
+    let ocid = client.character().get_ocid("온앤온").await?;
+
+    // 1. 장착 장비 잠재능력/에디셔널 스탯 파싱
+    let equip = client.character().get_item_equipment(&ocid, None).await?;
+    if let Some(weapon) = equip.weapon() {
+        let (_, boss_pct) = weapon.total_potential_stat(StatType::BossDamage);
+        println!("무기 보스 몬스터 데미지 잠재 합계: +{:.0}%", boss_pct);
+    }
+
+    // 2. 6차 HEXA 매트릭스 & V매트릭스 & 어빌리티/하이퍼스탯 분석
+    let hexa = client.character().get_hexamatrix(&ocid, None).await?;
+    println!("활성 6차 코어 수: {}개", hexa.active_cores().len());
+
+    // 3. 유니온 공격대 점령/공격대원 효과 & 아티팩트 효과 합산 (StatType 키 기반)
+    let raider = client.union().get_raider(&ocid, None).await?;
+    let occupied = raider.total_occupied_stats_typed();
+    println!("유니온 점령 크리티컬 데미지: {:?}%", occupied.get(&StatType::CriticalDamage));
+
+    // 4. 길드 종합 프로필 조회
+    let guild_profile = client.guild().get_profile("리부트", "스카니아", None).await?;
+    println!("노블레스 포인트: {}p", guild_profile.total_noblesse_points);
+
+    // 5. 확률/강화 이력 자동 페이지네이션 스트림 (Cursor 자동 추적)
+    let stream = client.history().stream_cube(100, "2025-01-01");
+    let mut stream = pin!(stream);
+    if let Some(item) = stream.try_next().await? {
+        println!("큐브 사용 이력: {:?} ({:?})", item.target_item, item.cube_type);
+    }
+
+    Ok(())
+}
+```
+
 ---
 
 ## 🛠 정밀한 에러 처리 (Error Handling)
@@ -365,11 +400,14 @@ async fn main() {
 | **편의 기능** | `get_character_item_equipment_by_name(name)` | — | 닉네임 한방 장착 장비 조회 |
 | **편의 기능** | `get_character_coordination_by_name(name)` | — | **닉네임 한방 최종 코디/외형 합성 조회** |
 | **편의 기능** | `get_character_profile_by_name(name)` | — | **닉네임 한방 전체 종합 프로필 병렬 조회** |
+| **편의 기능** | `get_guild_profile(name, world, date)` | — | **길드 기본 정보 + 길드원 스펙 병렬 종합 조회 (`GuildProfile`)** |
+| **편의 기능** | `get_account_summary(date)` | — | **계정 내 전체 캐릭터 목록 + 업적 종합 요약 (`AccountSummary`)** |
 | **User** | `get_character_list()` | `GET /maplestory/v1/character/list` | 계정 캐릭터 목록 |
 | **User** | `get_achievement(date)` | `GET /maplestory/v1/user/achievement` | 업적 정보 |
 | **Union** | `get_user_union(ocid, date)` | `GET /maplestory/v1/user/union` | 유니온 레벨 및 등급, 아티팩트 레벨 |
 | **Union** | `get_user_union_raider(ocid, date)` | `GET /maplestory/v1/user/union-raider` | 유니온 공격대원 배치 및 점령 스탯 |
 | **Union** | `get_user_union_artifact(ocid, date)` | `GET /maplestory/v1/user/union-artifact` | 유니온 아티팩트 효과 및 크리스탈 |
+| **Union** | `get_user_union_champion(ocid, date)` | `GET /maplestory/v1/user/union-champion` | 유니온 챔피언 슬롯 및 휘장 스탯 |
 | **Guild** | `get_guild_id(name, world)` | `GET /maplestory/v1/guild/id` | 길드 식별자(oguild_id) 조회 |
 | **Guild** | `get_guild_basic(oguild_id, date)` | `GET /maplestory/v1/guild/basic` | 길드 기본 정보 및 노블레스 스킬 |
 | **Guild** | `get_guild_by_name(name, world, date)`| — | 길드명+월드로 기본 정보 즉시 조회 |
@@ -407,22 +445,25 @@ async fn main() {
 # 1. 🏆 올인원 종합 대시보드 (전투력, 스타포스, 심볼, 유니온, 길드, 노블스킬, 코디)
 cargo run --example character_dashboard
 
-# 2. 닉네임 한방 조회 (전투력, 스공, 대표 코디 포함)
+# 2. 🧭 도메인 서브클라이언트 & 심화 스펙 분석 (잠재능력, HEXA/V매트릭스, 유니온 공격대/챔피언, 길드 프로필)
+cargo run --example domain_subclients_and_analytics -- 온앤온
+
+# 3. 닉네임 한방 조회 (전투력, 스공, 대표 코디 포함)
 cargo run --example quick_lookup -- 온앤온
 
-# 3. 최종 코디/외형 정보 상세 조회 (캐시 우선 + 모루 외형 + 프리즘)
+# 4. 최종 코디/외형 정보 상세 조회 (캐시 우선 + 모루 외형 + 프리즘)
 cargo run --example coordination_lookup -- 온앤온
 
-# 4. 아바타 1024자리 Base16 디코딩 및 동적 렌더러
+# 5. 아바타 1024자리 Base16 디코딩 및 동적 렌더러
 cargo run --example avatar_decoding_and_look -- 온앤온
 
-# 5. 🎬 아바타 애니메이션 GIF 생성 (걷기, 윙크, 숨쉬기, 점프 등)
+# 6. 🎬 아바타 애니메이션 GIF 생성 (걷기, 윙크, 숨쉬기, 점프 등)
 cargo run --example avatar_animation_gif --features animation -- 온앤온
 
-# 6. 기본 사용법
+# 7. 기본 사용법
 cargo run --example basic_usage
 
-# 7. 전체 정보 병렬 조회
+# 8. 전체 정보 병렬 조회
 cargo run --example character_full_info -- 온앤온
 ```
 
@@ -556,8 +597,8 @@ const walkingUrl = buildAvatarUrl(parsed.code, "walk", 1, "smile", 1, "default")
 <details>
 <summary><b>📱 Mobile (iOS Swift / Android Kotlin)</b> (자세히 보기)</summary>
 
-- **iOS Swift**: C-ABI Native FFI를 활용한 고성능 클라이언트 [`bindings/mobile/ios/MapleStoryClient.swift`](./bindings/mobile/ios)
-- **Android Kotlin**: JNI 네이티브 브릿지 클라이언트 [`bindings/mobile/android/MapleStoryClient.kt`](./bindings/mobile/android)
+- **iOS Swift**: C-ABI Native FFI를 활용한 고성능 클라이언트 [`bindings/mobile/swift/MapleStoryClient.swift`](./bindings/mobile/swift)
+- **Android Kotlin**: JNI/C-ABI 네이티브 브릿지 클라이언트 [`bindings/mobile/kotlin/MapleStoryClient.kt`](./bindings/mobile/kotlin)
 </details>
 
 ---
