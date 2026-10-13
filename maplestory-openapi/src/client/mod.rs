@@ -203,6 +203,7 @@ impl MapleStoryClientBuilder {
         let http_client = if let Some(client) = self.custom_client {
             client
         } else {
+            #[cfg(not(target_arch = "wasm32"))]
             let timeout = std::time::Duration::from_secs(self.timeout_secs.unwrap_or(30));
             let mut default_headers = HeaderMap::new();
             default_headers.insert(
@@ -212,11 +213,15 @@ impl MapleStoryClientBuilder {
                 })?,
             );
 
-            Client::builder()
-                .default_headers(default_headers)
-                .timeout(timeout)
-                .build()
-                .map_err(MapleStoryError::Request)?
+            #[allow(unused_mut)]
+            let mut builder = Client::builder().default_headers(default_headers);
+
+            #[cfg(not(target_arch = "wasm32"))]
+            {
+                builder = builder.timeout(timeout);
+            }
+
+            builder.build().map_err(MapleStoryError::Request)?
         };
 
         let base_url = self
@@ -433,7 +438,17 @@ impl MapleStoryClient {
             let response = match response_result {
                 Ok(resp) => resp,
                 Err(err)
-                    if attempts <= self.max_retries && (err.is_timeout() || err.is_connect()) =>
+                    if attempts <= self.max_retries
+                        && (err.is_timeout() || {
+                            #[cfg(not(target_arch = "wasm32"))]
+                            {
+                                err.is_connect()
+                            }
+                            #[cfg(target_arch = "wasm32")]
+                            {
+                                false
+                            }
+                        }) =>
                 {
                     let delay = calculate_backoff_delay(attempts, None);
                     tokio::time::sleep(delay).await;

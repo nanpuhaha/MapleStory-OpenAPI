@@ -13,7 +13,10 @@ use crate::{
         },
     },
 };
+#[cfg(not(target_arch = "wasm32"))]
 use futures_util::stream::{self, BoxStream, StreamExt};
+#[cfg(target_arch = "wasm32")]
+use futures_util::stream::{self, LocalBoxStream as BoxStream, StreamExt};
 
 fn build_history_params(
     count: u32,
@@ -30,6 +33,7 @@ fn build_history_params(
     Ok(params)
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn paginate_history_stream<'a, T, F, Fut>(
     date: impl Into<DateParam>,
     fetch_page: F,
@@ -84,6 +88,63 @@ where
         }
     })
     .boxed()
+}
+
+#[cfg(target_arch = "wasm32")]
+fn paginate_history_stream<'a, T, F, Fut>(
+    date: impl Into<DateParam>,
+    fetch_page: F,
+) -> BoxStream<'a, Result<T>>
+where
+    T: 'a,
+    F: Fn(Option<String>, Option<String>) -> Fut + 'a,
+    Fut: std::future::Future<Output = Result<(Option<String>, Vec<T>)>> + 'a,
+{
+    let date_str = date.into().as_deref().map(|s| s.to_string());
+
+    struct State<T, F> {
+        cursor: Option<String>,
+        buffer: std::vec::IntoIter<T>,
+        finished: bool,
+        fetch_page: F,
+        date_str: Option<String>,
+    }
+
+    let initial_state = State {
+        cursor: None,
+        buffer: Vec::new().into_iter(),
+        finished: false,
+        fetch_page,
+        date_str,
+    };
+
+    stream::unfold(initial_state, move |mut state| async move {
+        loop {
+            if let Some(item) = state.buffer.next() {
+                return Some((Ok(item), state));
+            }
+            if state.finished {
+                return None;
+            }
+
+            let res = (state.fetch_page)(state.date_str.clone(), state.cursor.clone()).await;
+            match res {
+                Ok((next_cursor, entries)) => {
+                    let next_cursor = next_cursor.filter(|c| !c.is_empty());
+                    if entries.is_empty() || next_cursor.is_none() {
+                        state.finished = true;
+                    }
+                    state.cursor = next_cursor;
+                    state.buffer = entries.into_iter();
+                }
+                Err(e) => {
+                    state.finished = true;
+                    return Some((Err(e), state));
+                }
+            }
+        }
+    })
+    .boxed_local()
 }
 
 // ─── HistoryClient ───────────────────────────────────────────────────────────
