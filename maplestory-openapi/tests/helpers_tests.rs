@@ -1721,3 +1721,321 @@ async fn test_guild_profile_and_account_summary_aggregators() {
     server_task.abort();
 }
 
+#[test]
+fn test_union_raider_and_champion_helpers() {
+    use maplestory_openapi::models::union::{
+        UnionBlock, UnionChampionBadgeInfo, UnionChampionInfo, UnionRaiderPreset,
+        UserUnionChampion, UserUnionRaider,
+    };
+    use maplestory_openapi::StatType;
+
+    let preset_2 = UnionRaiderPreset {
+        union_raider_stat: Some(vec![
+            "STR 80 증가".to_string(),
+            "STR 40 증가".to_string(),
+            "크리티컬 확률 5% 증가".to_string(),
+        ]),
+        union_occupied_stat: Some(vec![
+            "보스 몬스터 공격 시 데미지 40% 증가".to_string(),
+            "크리티컬 데미지 20.00% 증가".to_string(),
+        ]),
+        union_inner_stat: None,
+        union_block: None,
+    };
+
+    let raider = UserUnionRaider {
+        date: None,
+        union_raider_stat: Some(vec![
+            "INT 100 증가".to_string(),
+            "INT 80 증가".to_string(),
+            "공격력/마력 20 증가".to_string(),
+        ]),
+        union_occupied_stat: Some(vec![
+            "보스 몬스터 공격 시 데미지 35% 증가".to_string(),
+            "방어율 무시 40% 증가".to_string(),
+        ]),
+        union_block: Some(vec![
+            UnionBlock {
+                block_type: Some("마법사".to_string()),
+                block_class: Some("배틀메이지".to_string()),
+                block_level: Some("295".to_string()),
+                block_control_point: None,
+                block_position: None,
+            },
+            UnionBlock {
+                block_type: Some("해적".to_string()),
+                block_class: Some("메카닉".to_string()),
+                block_level: Some("260".to_string()),
+                block_control_point: None,
+                block_position: None,
+            },
+        ]),
+        union_inner_stat: None,
+        use_preset_no: Some(2),
+        union_raider_preset_1: None,
+        union_raider_preset_2: Some(preset_2),
+        union_raider_preset_3: None,
+        union_raider_preset_4: None,
+        union_raider_preset_5: None,
+        union_state_stat: None,
+        union_state_stat_preset: None,
+        union_max_point: Some(100),
+    };
+
+    let occupied = raider.total_occupied_stats();
+    assert_eq!(occupied.get("보스 몬스터 공격 시 데미지"), Some(&35.0));
+    assert_eq!(occupied.get("방어율 무시"), Some(&40.0));
+
+    let occupied_typed = raider.total_occupied_stats_typed();
+    assert_eq!(occupied_typed.get(&StatType::BossDamage), Some(&35.0));
+    assert_eq!(
+        occupied_typed.get(&StatType::IgnoreMonsterArmor),
+        Some(&40.0)
+    );
+
+    let raider_stats = raider.total_raider_stats();
+    assert_eq!(raider_stats.get("INT"), Some(&180.0));
+    assert_eq!(raider_stats.get("공격력"), Some(&20.0));
+    assert_eq!(raider_stats.get("마력"), Some(&20.0));
+
+    let active_p = raider.active_preset(None).expect("preset 2 should be active");
+    assert_eq!(active_p.total_raider_stats().get("STR"), Some(&120.0));
+    assert_eq!(
+        active_p.total_occupied_stats().get("크리티컬 데미지"),
+        Some(&20.0)
+    );
+    assert_eq!(raider.blocks_by_class("배틀메이지").len(), 1);
+
+    let champion = UserUnionChampion {
+        date: None,
+        union_champion: Some(vec![
+            UnionChampionInfo {
+                champion_name: Some("메인챔피언".to_string()),
+                champion_slot: Some(1),
+                champion_grade: Some("SSS".to_string()),
+                champion_class: Some("배틀메이지".to_string()),
+                champion_badge_info: Some(vec![UnionChampionBadgeInfo {
+                    stat: Some("올스탯 100 증가".to_string()),
+                }]),
+            },
+            UnionChampionInfo {
+                champion_name: Some("서브챔피언".to_string()),
+                champion_slot: Some(2),
+                champion_grade: Some("SS".to_string()),
+                champion_class: Some("비숍".to_string()),
+                champion_badge_info: Some(vec![UnionChampionBadgeInfo {
+                    stat: Some("공격력/마력 50 증가".to_string()),
+                }]),
+            },
+        ]),
+        champion_badge_total_info: Some(vec![
+            UnionChampionBadgeInfo {
+                stat: Some("올스탯 100 증가".to_string()),
+            },
+            UnionChampionBadgeInfo {
+                stat: Some("공격력/마력 50 증가".to_string()),
+            },
+            UnionChampionBadgeInfo {
+                stat: Some("보스 몬스터 공격 시 데미지 10% 증가".to_string()),
+            },
+        ]),
+    };
+
+    assert_eq!(champion.champion_count(), 2);
+    assert_eq!(
+        champion
+            .find_champion_by_slot(1)
+            .and_then(|c| c.champion_name.as_deref()),
+        Some("메인챔피언")
+    );
+    assert!(champion.find_champion_by_slot(3).is_none());
+
+    let badge_stats = champion.total_badge_stats();
+    assert_eq!(badge_stats.get("올스탯"), Some(&100.0));
+    assert_eq!(badge_stats.get("공격력"), Some(&50.0));
+    assert_eq!(badge_stats.get("마력"), Some(&50.0));
+    assert_eq!(badge_stats.get("보스 몬스터 공격 시 데미지"), Some(&10.0));
+
+    let badge_typed = champion.total_badge_stats_typed();
+    assert_eq!(badge_typed.get(&StatType::AllStat), Some(&100.0));
+    assert_eq!(badge_typed.get(&StatType::BossDamage), Some(&10.0));
+}
+
+#[test]
+#[allow(deprecated)]
+fn test_character_progression_domain_helpers() {
+    use maplestory_openapi::models::character::{
+        AbilityInfo, AbilityPreset, CharacterAbility, CharacterHexaMatrix, CharacterHexaMatrixStat,
+        CharacterHyperStat, CharacterVMatrix, HexaCoreEquipment, HexaStatCore, HyperStatEntry,
+        VCoreEquipment,
+    };
+
+    // 1. HEXA Matrix
+    let hexa = CharacterHexaMatrix {
+        date: None,
+        character_hexa_core_equipment: Some(vec![
+            HexaCoreEquipment {
+                hexa_core_name: Some("마스터리 코어 I".to_string()),
+                hexa_core_level: Some(30),
+                hexa_core_event_level: None,
+                hexa_core_type: Some("마스터리 코어".to_string()),
+                linked_skill: None,
+            },
+            HexaCoreEquipment {
+                hexa_core_name: Some("오리진 스킬".to_string()),
+                hexa_core_level: Some(20),
+                hexa_core_event_level: None,
+                hexa_core_type: Some("스킬 코어".to_string()),
+                linked_skill: None,
+            },
+            HexaCoreEquipment {
+                hexa_core_name: Some("미개방 코어".to_string()),
+                hexa_core_level: Some(0),
+                hexa_core_event_level: None,
+                hexa_core_type: Some("강화 코어".to_string()),
+                linked_skill: None,
+            },
+        ]),
+    };
+    assert_eq!(hexa.active_cores().len(), 2);
+    assert_eq!(hexa.core_level("마스터리 코어 I"), Some(30));
+    assert_eq!(hexa.cores_by_type("스킬 코어").len(), 1);
+
+    // 2. HEXA Matrix Stat
+    let hexa_stat = CharacterHexaMatrixStat {
+        date: None,
+        character_class: Some("배틀메이지".to_string()),
+        character_hexa_stat_core: Some(vec![HexaStatCore {
+            slot_id: Some("0".to_string()),
+            main_stat_name: Some("크리티컬 데미지 증가".to_string()),
+            sub_stat_name_1: Some("마력 증가".to_string()),
+            sub_stat_name_2: Some("보스 데미지 증가".to_string()),
+            main_stat_level: Some(8),
+            sub_stat_level_1: Some(7),
+            sub_stat_level_2: Some(5),
+            stat_grade: Some(20),
+        }]),
+        character_hexa_stat_core_2: Some(vec![HexaStatCore {
+            slot_id: Some("1".to_string()),
+            main_stat_name: Some("보스 데미지 증가".to_string()),
+            sub_stat_name_1: Some("크리티컬 데미지 증가".to_string()),
+            sub_stat_name_2: Some("마력 증가".to_string()),
+            main_stat_level: Some(9),
+            sub_stat_level_1: Some(6),
+            sub_stat_level_2: Some(5),
+            stat_grade: Some(20),
+        }]),
+        character_hexa_stat_core_3: None,
+        preset_hexa_stat_core: None,
+        preset_hexa_stat_core_2: None,
+        preset_hexa_stat_core_3: None,
+    };
+    assert_eq!(hexa_stat.active_stat_cores().len(), 2);
+    assert_eq!(hexa_stat.main_stat_level(1), Some(8));
+    assert_eq!(hexa_stat.additional_stat_levels(1), Some((7, 5)));
+    assert_eq!(hexa_stat.main_stat_level(2), Some(9));
+    assert_eq!(hexa_stat.main_stat_level(3), None);
+
+    // 3. V-Matrix
+    let vmatrix = CharacterVMatrix {
+        date: None,
+        character_class: Some("배틀메이지".to_string()),
+        character_v_core_equipment: Some(vec![
+            VCoreEquipment {
+                slot_id: Some("0".to_string()),
+                slot_level: Some(5),
+                v_core_name: Some("유니온 오라".to_string()),
+                v_core_type: Some("스킬코어".to_string()),
+                v_core_level: Some(25),
+                v_core_skill_1: None,
+                v_core_skill_2: None,
+                v_core_skill_3: None,
+            },
+            VCoreEquipment {
+                slot_id: Some("1".to_string()),
+                slot_level: Some(5),
+                v_core_name: Some("블랙 매직 알터".to_string()),
+                v_core_type: Some("스킬코어".to_string()),
+                v_core_level: Some(20),
+                v_core_skill_1: None,
+                v_core_skill_2: None,
+                v_core_skill_3: None,
+            },
+        ]),
+        character_v_matrix_remain_slot_upgrade_point: Some(0),
+        character_v_core_equipment_preset_1: None,
+        character_v_core_equipment_preset_2: None,
+        character_v_core_equipment_preset_3: None,
+        character_v_core_equipment_preset_4: None,
+        character_v_core_equipment_preset_5: None,
+    };
+    assert_eq!(vmatrix.total_slot_enhancement_level(), 10);
+    assert_eq!(
+        vmatrix.core_by_name("유니온 오라").and_then(|c| c.v_core_level),
+        Some(25)
+    );
+    assert_eq!(vmatrix.max_level_cores().len(), 1);
+
+    // 4. Ability
+    let ability = CharacterAbility {
+        date: None,
+        ability_grade: Some("레전드리".to_string()),
+        ability_info: Some(vec![AbilityInfo {
+            ability_no: Some("1".to_string()),
+            ability_grade: Some("레전드리".to_string()),
+            ability_value: Some("보스 몬스터 공격 시 데미지 20% 증가".to_string()),
+        }]),
+        remain_fame: Some(100_000),
+        ability_preset_1: None,
+        ability_preset_2: Some(AbilityPreset {
+            ability_preset_grade: Some("레전드리".to_string()),
+            ability_info: Some(vec![AbilityInfo {
+                ability_no: Some("1".to_string()),
+                ability_grade: Some("레전드리".to_string()),
+                ability_value: Some("아이템 드롭률 20% 증가".to_string()),
+            }]),
+        }),
+        ability_preset_3: None,
+    };
+    assert_eq!(
+        ability.active_preset_abilities(None)[0]
+            .ability_value
+            .as_deref(),
+        Some("보스 몬스터 공격 시 데미지 20% 증가")
+    );
+    assert_eq!(
+        ability.active_preset_abilities(Some(2))[0]
+            .ability_value
+            .as_deref(),
+        Some("아이템 드롭률 20% 증가")
+    );
+
+    // 5. Hyper Stat
+    let hyper_stat = CharacterHyperStat {
+        date: None,
+        character_class: Some("배틀메이지".to_string()),
+        use_preset_no: Some("2".to_string()),
+        use_available_hyper_stat: Some(0),
+        hyper_stat_preset_1: Some(vec![]),
+        hyper_stat_preset_1_remain_point: Some(0),
+        hyper_stat_preset_2: Some(vec![HyperStatEntry {
+            stat_type: Some("보스 몬스터 공격 시 데미지 증가".to_string()),
+            stat_point: Some(250),
+            stat_level: Some(15),
+            stat_increase: Some("보스 몬스터 공격 시 데미지 51% 증가".to_string()),
+        }]),
+        hyper_stat_preset_2_remain_point: Some(0),
+        hyper_stat_preset_3: None,
+        hyper_stat_preset_3_remain_point: None,
+    };
+    assert_eq!(hyper_stat.active_preset_hyper_stats(None).len(), 1);
+    assert_eq!(
+        hyper_stat
+            .find_hyper_stat("보스 몬스터 공격 시 데미지 증가")
+            .and_then(|e| e.stat_level),
+        Some(15)
+    );
+}
+
+
+

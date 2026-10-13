@@ -144,6 +144,141 @@ pub struct UnionArtifactCrystal {
     pub crystal_option_name_3: Option<String>,
 }
 
+fn accumulate_stat_descriptions<'a>(
+    descriptions: impl IntoIterator<Item = &'a str>,
+) -> std::collections::HashMap<String, f64> {
+    let mut totals = std::collections::HashMap::new();
+
+    for desc in descriptions {
+        for part in desc.split(',') {
+            let clause = part.trim();
+            if clause.is_empty() {
+                continue;
+            }
+            let cleaned = clause
+                .trim_end_matches("증가")
+                .trim_end_matches("감소")
+                .trim();
+            if let Some(last_space) = cleaned.rfind(' ') {
+                let stat_name = cleaned[..last_space].trim();
+                let num_part = cleaned[last_space + 1..].trim();
+                let num_str = num_part
+                    .trim_start_matches('+')
+                    .trim_end_matches('%')
+                    .trim_end_matches('초');
+                if let Ok(val) = num_str.parse::<f64>() {
+                    if stat_name == "공격력/마력" || stat_name == "공격력 / 마력" {
+                        *totals.entry("공격력".to_string()).or_insert(0.0) += val;
+                        *totals.entry("마력".to_string()).or_insert(0.0) += val;
+                    } else if !stat_name.is_empty() {
+                        *totals.entry(stat_name.to_string()).or_insert(0.0) += val;
+                    }
+                }
+            }
+        }
+    }
+
+    totals
+}
+
+fn to_typed_stat_map(
+    raw_totals: std::collections::HashMap<String, f64>,
+) -> std::collections::HashMap<crate::models::character::StatType, f64> {
+    use crate::models::character::StatType;
+    let mut typed_totals = std::collections::HashMap::new();
+    for (stat_name, val) in raw_totals {
+        let st = StatType::from_stat_name(&stat_name).unwrap_or(StatType::Other);
+        *typed_totals.entry(st).or_insert(0.0) += val;
+    }
+    typed_totals
+}
+
+impl UserUnionRaider {
+    /// Retrieve a Raider preset by preset number (`1..=5`), or the currently active preset
+    /// (`use_preset_no`) when `preset_no` is `None`.
+    pub fn active_preset(&self, preset_no: Option<u8>) -> Option<&UnionRaiderPreset> {
+        let target = preset_no.or_else(|| self.use_preset_no.and_then(|n| u8::try_from(n).ok()))?;
+        match target {
+            1 => self.union_raider_preset_1.as_ref(),
+            2 => self.union_raider_preset_2.as_ref(),
+            3 => self.union_raider_preset_3.as_ref(),
+            4 => self.union_raider_preset_4.as_ref(),
+            5 => self.union_raider_preset_5.as_ref(),
+            _ => None,
+        }
+    }
+
+    /// Parse and aggregate all occupied board stats (`union_occupied_stat`) by stat name.
+    pub fn total_occupied_stats(&self) -> std::collections::HashMap<String, f64> {
+        accumulate_stat_descriptions(
+            self.union_occupied_stat
+                .as_deref()
+                .unwrap_or(&[])
+                .iter()
+                .map(String::as_str),
+        )
+    }
+
+    /// Parse and aggregate all occupied board stats keyed by [`StatType`](crate::models::character::StatType).
+    pub fn total_occupied_stats_typed(
+        &self,
+    ) -> std::collections::HashMap<crate::models::character::StatType, f64> {
+        to_typed_stat_map(self.total_occupied_stats())
+    }
+
+    /// Parse and aggregate all raider member effect stats (`union_raider_stat`) by stat name.
+    pub fn total_raider_stats(&self) -> std::collections::HashMap<String, f64> {
+        accumulate_stat_descriptions(
+            self.union_raider_stat
+                .as_deref()
+                .unwrap_or(&[])
+                .iter()
+                .map(String::as_str),
+        )
+    }
+
+    /// Parse and aggregate all raider member effect stats keyed by [`StatType`](crate::models::character::StatType).
+    pub fn total_raider_stats_typed(
+        &self,
+    ) -> std::collections::HashMap<crate::models::character::StatType, f64> {
+        to_typed_stat_map(self.total_raider_stats())
+    }
+
+    /// Find all placed blocks matching the given character class name.
+    pub fn blocks_by_class(&self, class_name: &str) -> Vec<&UnionBlock> {
+        self.union_block
+            .as_deref()
+            .unwrap_or(&[])
+            .iter()
+            .filter(|b| b.block_class.as_deref() == Some(class_name))
+            .collect()
+    }
+}
+
+impl UnionRaiderPreset {
+    /// Parse and aggregate all occupied board stats in this preset.
+    pub fn total_occupied_stats(&self) -> std::collections::HashMap<String, f64> {
+        accumulate_stat_descriptions(
+            self.union_occupied_stat
+                .as_deref()
+                .unwrap_or(&[])
+                .iter()
+                .map(String::as_str),
+        )
+    }
+
+    /// Parse and aggregate all raider member stats in this preset.
+    pub fn total_raider_stats(&self) -> std::collections::HashMap<String, f64> {
+        accumulate_stat_descriptions(
+            self.union_raider_stat
+                .as_deref()
+                .unwrap_or(&[])
+                .iter()
+                .map(String::as_str),
+        )
+    }
+}
+
 impl UserUnionArtifact {
     /// Returns true if the artifact currently has active effects.
     ///
@@ -198,35 +333,10 @@ impl UserUnionArtifact {
     /// - `"공격력/마력 30 증가"` -> `{"공격력": 30.0, "마력": 30.0}`
     /// - `"보스 몬스터 공격 시 데미지 15.00% 증가"` -> `{"보스 몬스터 공격 시 데미지": 15.0}`
     pub fn total_artifact_stats(&self) -> std::collections::HashMap<String, f64> {
-        let mut totals = std::collections::HashMap::new();
-
-        for effect in self.active_effects() {
-            if let Some(desc) = effect.name.as_deref() {
-                // Split multiple clauses by comma: e.g. "올스탯 150 증가, 공격력/마력 30 증가"
-                for part in desc.split(',') {
-                    let clause = part.trim();
-                    if clause.is_empty() {
-                        continue;
-                    }
-                    let cleaned = clause.trim_end_matches("증가").trim_end_matches("감소").trim();
-                    if let Some(last_space) = cleaned.rfind(' ') {
-                        let stat_name = cleaned[..last_space].trim();
-                        let num_part = cleaned[last_space + 1..].trim();
-                        let num_str = num_part.trim_end_matches('%').trim_end_matches('초');
-                        if let Ok(val) = num_str.parse::<f64>() {
-                            if stat_name == "공격력/마력" {
-                                *totals.entry("공격력".to_string()).or_insert(0.0) += val;
-                                *totals.entry("마력".to_string()).or_insert(0.0) += val;
-                            } else if !stat_name.is_empty() {
-                                *totals.entry(stat_name.to_string()).or_insert(0.0) += val;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        totals
+        accumulate_stat_descriptions(
+            self.active_effects()
+                .filter_map(|effect| effect.name.as_deref()),
+        )
     }
 
     /// Parse and summarize active bonus numbers across all active artifact effects,
@@ -234,13 +344,7 @@ impl UserUnionArtifact {
     pub fn total_artifact_stats_typed(
         &self,
     ) -> std::collections::HashMap<crate::models::character::StatType, f64> {
-        use crate::models::character::StatType;
-        let mut typed_totals = std::collections::HashMap::new();
-        for (stat_name, val) in self.total_artifact_stats() {
-            let st = StatType::from_stat_name(&stat_name).unwrap_or(StatType::Other);
-            *typed_totals.entry(st).or_insert(0.0) += val;
-        }
-        typed_totals
+        to_typed_stat_map(self.total_artifact_stats())
     }
 }
 
@@ -305,3 +409,50 @@ pub struct UnionChampionBadgeInfo {
     /// Badge stat / effect description
     pub stat: Option<String>,
 }
+
+impl UserUnionChampion {
+    /// Returns the number of registered Union Champions.
+    pub fn champion_count(&self) -> usize {
+        self.union_champion.as_deref().map_or(0, <[UnionChampionInfo]>::len)
+    }
+
+    /// Find a registered Union Champion by its slot number (`1..=6`).
+    pub fn find_champion_by_slot(&self, slot: i64) -> Option<&UnionChampionInfo> {
+        self.union_champion
+            .as_deref()
+            .unwrap_or(&[])
+            .iter()
+            .find(|c| c.champion_slot == Some(slot))
+    }
+
+    /// Parse and aggregate total Union Champion badge stats by stat name.
+    ///
+    /// Uses `champion_badge_total_info` if present and non-empty, or falls back to summing
+    /// individual `champion_badge_info` across all registered champions.
+    pub fn total_badge_stats(&self) -> std::collections::HashMap<String, f64> {
+        let total_badges = self.champion_badge_total_info.as_deref().unwrap_or(&[]);
+        if !total_badges.is_empty() {
+            return accumulate_stat_descriptions(
+                total_badges.iter().filter_map(|b| b.stat.as_deref()),
+            );
+        }
+
+        accumulate_stat_descriptions(
+            self.union_champion
+                .as_deref()
+                .unwrap_or(&[])
+                .iter()
+                .filter_map(|c| c.champion_badge_info.as_deref())
+                .flatten()
+                .filter_map(|b| b.stat.as_deref()),
+        )
+    }
+
+    /// Parse and aggregate total Union Champion badge stats keyed by [`StatType`](crate::models::character::StatType).
+    pub fn total_badge_stats_typed(
+        &self,
+    ) -> std::collections::HashMap<crate::models::character::StatType, f64> {
+        to_typed_stat_map(self.total_badge_stats())
+    }
+}
+

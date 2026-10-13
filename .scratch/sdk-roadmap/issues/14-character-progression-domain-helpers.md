@@ -4,9 +4,9 @@
 
 **Blocked by:** 04: Equipment Potential Option Parser & Stat Aggregator
 
-**Status:** todo
+**Status:** done
 
-- [ ] Add `CharacterHexaMatrix` helpers: `core_level(name)`, `cores_by_type(core_type)`, `active_cores()`, and `CharacterHexaMatrixStat` main/additional stat level accessors.
-- [ ] Add `CharacterVMatrix` helpers: `total_slot_enhancement_level()`, `core_by_name(name)`, `max_level_cores()`.
-- [ ] Add `CharacterAbility` and `CharacterHyperStat` preset-aware helpers (`active_preset_abilities()`, `active_preset_hyper_stats()`, `find_hyper_stat(stat_type)`).
-- [ ] Expose progression models in `src/lib.rs` root re-exports and add unit tests in `tests/helpers_tests.rs`.
+- [x] Add `CharacterHexaMatrix` helpers: `core_level(name)`, `cores_by_type(core_type)`, `active_cores()`, and `CharacterHexaMatrixStat` main/additional stat level accessors.
+- [x] Add `CharacterVMatrix` helpers: `total_slot_enhancement_level()`, `core_by_name(name)`, `max_level_cores()`.
+- [x] Add `CharacterAbility` and `CharacterHyperStat` preset-aware helpers (`active_preset_abilities()`, `active_preset_hyper_stats()`, `find_hyper_stat(stat_type)`).
+- [x] Expose progression models in `src/lib.rs` root re-exports and add unit tests in `tests/helpers_tests.rs`.

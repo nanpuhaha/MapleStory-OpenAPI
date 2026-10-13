@@ -63,10 +63,12 @@ pub use models::battle_practice::{
     BattlePracticeCharacterInfo, BattlePracticeResult, ReplayId, SkillTimeline,
 };
 pub use models::character::{
-    CharacterAppearance, CharacterBasic, CharacterBeautyEquipment, CharacterCashItemEquipment,
-    CharacterCoordination, CharacterDashboard, CharacterDojang, CharacterItemEquipment,
-    CharacterOcid, CharacterPopularity, CharacterProfile, CharacterStat, DashboardOptions,
-    DashboardSection, DashboardSectionError, ItemEquipmentDetail, ParsedPotentialOption, StatType,
+    AbilityInfo, CharacterAbility, CharacterAppearance, CharacterBasic, CharacterBeautyEquipment,
+    CharacterCashItemEquipment, CharacterCoordination, CharacterDashboard, CharacterDojang,
+    CharacterHexaMatrix, CharacterHexaMatrixStat, CharacterHyperStat, CharacterItemEquipment,
+    CharacterOcid, CharacterPopularity, CharacterProfile, CharacterStat, CharacterVMatrix,
+    DashboardOptions, DashboardSection, DashboardSectionError, HexaCoreEquipment, HexaStatCore,
+    HyperStatEntry, ItemEquipmentDetail, ParsedPotentialOption, StatType, VCoreEquipment,
     VisibleEquipItem,
 };
 pub use models::common::{DateParam, MapleDate, SkillGrade};
@@ -84,5 +86,8 @@ pub use models::ranking::{
     UnionRanking, UnionRankingQuery,
 };
 pub use models::scheduler::CharacterStateResponse;
-pub use models::union::{UserUnion, UserUnionArtifact, UserUnionChampion, UserUnionRaider};
+pub use models::union::{
+    UnionBlock, UnionChampionBadgeInfo, UnionChampionInfo, UnionRaiderPreset, UserUnion,
+    UserUnionArtifact, UserUnionChampion, UserUnionRaider,
+};
 pub use models::user::{AccountSummary, User};

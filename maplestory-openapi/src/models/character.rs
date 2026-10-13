@@ -2189,3 +2189,150 @@ impl CharacterDashboard {
         self.errors.get(&section)
     }
 }
+
+// ─── Character Progression Helpers (HEXA, V-Matrix, Ability, Hyper Stat) ─────
+
+impl CharacterHexaMatrix {
+    /// Returns all HEXA cores whose level is greater than 0.
+    pub fn active_cores(&self) -> Vec<&HexaCoreEquipment> {
+        self.character_hexa_core_equipment
+            .as_deref()
+            .unwrap_or(&[])
+            .iter()
+            .filter(|c| c.hexa_core_level.unwrap_or(0) > 0)
+            .collect()
+    }
+
+    /// Look up the level of a specific HEXA core by name (e.g. `"마스터리 코어"`, `"오리진 스킬"`).
+    pub fn core_level(&self, name: &str) -> Option<i64> {
+        self.character_hexa_core_equipment
+            .as_deref()?
+            .iter()
+            .find(|c| c.hexa_core_name.as_deref() == Some(name))
+            .and_then(|c| c.hexa_core_level)
+    }
+
+    /// Filter HEXA cores by their core type (e.g. `"스킬 코어"`, `"마스터리 코어"`, `"강화 코어"`, `"공용 코어"`).
+    pub fn cores_by_type(&self, core_type: &str) -> Vec<&HexaCoreEquipment> {
+        self.character_hexa_core_equipment
+            .as_deref()
+            .unwrap_or(&[])
+            .iter()
+            .filter(|c| c.hexa_core_type.as_deref() == Some(core_type))
+            .collect()
+    }
+}
+
+impl CharacterHexaMatrixStat {
+    fn slot_core(&self, slot_index: usize) -> Option<&HexaStatCore> {
+        let list = match slot_index {
+            1 => self.character_hexa_stat_core.as_deref(),
+            2 => self.character_hexa_stat_core_2.as_deref(),
+            3 => self.character_hexa_stat_core_3.as_deref(),
+            _ => None,
+        };
+        list?.first()
+    }
+
+    /// Collects all active HEXA Stat cores across slots I, II, and III.
+    pub fn active_stat_cores(&self) -> Vec<&HexaStatCore> {
+        [
+            self.character_hexa_stat_core.as_deref(),
+            self.character_hexa_stat_core_2.as_deref(),
+            self.character_hexa_stat_core_3.as_deref(),
+        ]
+        .into_iter()
+        .flatten()
+        .flatten()
+        .collect()
+    }
+
+    /// Returns the main stat level for the given 1-based HEXA Stat core slot (`1..=3`).
+    pub fn main_stat_level(&self, slot_index: usize) -> Option<i64> {
+        self.slot_core(slot_index)?.main_stat_name.as_ref()?;
+        self.slot_core(slot_index)?.main_stat_level
+    }
+
+    /// Returns the two additional/sub stat levels `(sub_stat_level_1, sub_stat_level_2)` for the given 1-based slot (`1..=3`).
+    pub fn additional_stat_levels(&self, slot_index: usize) -> Option<(i64, i64)> {
+        let core = self.slot_core(slot_index)?;
+        Some((core.sub_stat_level_1?, core.sub_stat_level_2?))
+    }
+}
+
+impl CharacterVMatrix {
+    /// Calculates the total V-Matrix slot enhancement level across all equipped V-Cores.
+    #[allow(deprecated)]
+    pub fn total_slot_enhancement_level(&self) -> i64 {
+        self.character_v_core_equipment
+            .as_deref()
+            .unwrap_or(&[])
+            .iter()
+            .filter_map(|c| c.slot_level)
+            .sum()
+    }
+
+    /// Finds an equipped V-Core by its exact name.
+    pub fn core_by_name(&self, name: &str) -> Option<&VCoreEquipment> {
+        self.character_v_core_equipment
+            .as_deref()?
+            .iter()
+            .find(|c| c.v_core_name.as_deref() == Some(name))
+    }
+
+    /// Returns all equipped V-Cores that have reached maximum base level (`>= 25`).
+    pub fn max_level_cores(&self) -> Vec<&VCoreEquipment> {
+        self.character_v_core_equipment
+            .as_deref()
+            .unwrap_or(&[])
+            .iter()
+            .filter(|c| c.v_core_level.unwrap_or(0) >= 25)
+            .collect()
+    }
+}
+
+impl CharacterAbility {
+    /// Returns the ability lines for the specified preset (`1..=3`), or the currently active
+    /// `ability_info` when `preset_no` is `None`.
+    pub fn active_preset_abilities(&self, preset_no: Option<u8>) -> &[AbilityInfo] {
+        let preset = match preset_no {
+            Some(1) => self.ability_preset_1.as_ref(),
+            Some(2) => self.ability_preset_2.as_ref(),
+            Some(3) => self.ability_preset_3.as_ref(),
+            _ => None,
+        };
+        if let Some(p) = preset {
+            if let Some(lines) = p.ability_info.as_deref() {
+                return lines;
+            }
+        }
+        self.ability_info.as_deref().unwrap_or(&[])
+    }
+}
+
+impl CharacterHyperStat {
+    /// Returns the Hyper Stat entries for the specified preset (`1..=3`), or the currently active
+    /// preset (`use_preset_no`) when `preset_no` is `None`.
+    pub fn active_preset_hyper_stats(&self, preset_no: Option<u8>) -> &[HyperStatEntry] {
+        let target = preset_no.or_else(|| {
+            self.use_preset_no
+                .as_deref()
+                .and_then(|s| s.parse::<u8>().ok())
+        });
+        match target {
+            Some(1) => self.hyper_stat_preset_1.as_deref().unwrap_or(&[]),
+            Some(2) => self.hyper_stat_preset_2.as_deref().unwrap_or(&[]),
+            Some(3) => self.hyper_stat_preset_3.as_deref().unwrap_or(&[]),
+            _ => self.hyper_stat_preset_1.as_deref().unwrap_or(&[]),
+        }
+    }
+
+    /// Finds a specific Hyper Stat entry by its `stat_type` (e.g. `"보스 몬스터 공격 시 데미지 증가"`, `"크리티컬 데미지"`)
+    /// in the currently active preset.
+    pub fn find_hyper_stat(&self, stat_type: &str) -> Option<&HyperStatEntry> {
+        self.active_preset_hyper_stats(None)
+            .iter()
+            .find(|entry| entry.stat_type.as_deref() == Some(stat_type))
+    }
+}
+
