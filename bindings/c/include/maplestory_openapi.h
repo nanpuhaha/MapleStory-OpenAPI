@@ -11,10 +11,23 @@ extern "C" {
 typedef struct ClientHandle ClientHandle;
 
 /**
+ * Retrieve the last error message recorded on the current thread.
+ * Returns a newly allocated UTF-8 C string (free with maplestory_free_string),
+ * or NULL if no error has occurred.
+ */
+char* maplestory_last_error_message(void);
+
+/**
  * Create a new MapleStory client handle with an API key.
  * Returns NULL on failure.
  */
 ClientHandle* maplestory_client_new(const char* api_key);
+
+/**
+ * Create a new MapleStory client handle with an API key and a custom base URL.
+ * Returns NULL on failure.
+ */
+ClientHandle* maplestory_client_with_base_url(const char* api_key, const char* base_url);
 
 /**
  * Create a new MapleStory client handle from NEXON_API_KEY environment variable.
@@ -33,6 +46,69 @@ void maplestory_client_free(ClientHandle* handle);
 int32_t maplestory_get_character_dashboard(
     ClientHandle* handle,
     const char* character_name,
+    char** out_json
+);
+
+/**
+ * Fetch guild profile (guild basic + member profiles) JSON string.
+ * `date` may be NULL or empty for the latest available data.
+ * Returns 0 on success. The caller must free *out_json using maplestory_free_string.
+ */
+int32_t maplestory_get_guild_profile(
+    ClientHandle* handle,
+    const char* guild_name,
+    const char* world_name,
+    const char* date,
+    char** out_json
+);
+
+/**
+ * Fetch user union level/grade information by character name as a JSON string.
+ * `date` may be NULL or empty for the latest available data.
+ * Returns 0 on success. The caller must free *out_json using maplestory_free_string.
+ */
+int32_t maplestory_get_user_union(
+    ClientHandle* handle,
+    const char* character_name,
+    const char* date,
+    char** out_json
+);
+
+/**
+ * Fetch overall ranking information as a JSON string.
+ * Optional string parameters (`world_name`, `character_class`, `ocid`) may be NULL or empty.
+ * Pass `world_type < 0` to omit world_type filter, and `page <= 0` to omit page filter.
+ * Returns 0 on success. The caller must free *out_json using maplestory_free_string.
+ */
+int32_t maplestory_get_overall_ranking(
+    ClientHandle* handle,
+    const char* date,
+    const char* world_name,
+    int32_t world_type,
+    const char* character_class,
+    const char* ocid,
+    int32_t page,
+    char** out_json
+);
+
+/**
+ * Fetch the latest official in-game notices list as a JSON string.
+ * Returns 0 on success. The caller must free *out_json using maplestory_free_string.
+ */
+int32_t maplestory_get_notice_list(
+    ClientHandle* handle,
+    char** out_json
+);
+
+/**
+ * Fetch a complete account summary (union + artifact + champion + achievements) as a JSON string.
+ * `date` may be NULL or empty for the latest available data.
+ * Returns 0 on success. The caller must free *out_json using maplestory_free_string.
+ */
+int32_t maplestory_get_account_summary(
+    ClientHandle* handle,
+    const char* character_name,
+    const char* date,
     char** out_json
 );
 
@@ -79,3 +155,4 @@ void maplestory_free_bytes(uint8_t* ptr, size_t len);
 #endif
 
 #endif /* MAPLESTORY_OPENAPI_H */
+
