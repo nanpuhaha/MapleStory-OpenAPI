@@ -1769,7 +1769,7 @@ async fn test_guild_profile_and_account_summary_aggregators() {
 #[test]
 fn test_union_raider_and_champion_helpers() {
     use maplestory_openapi::models::union::{
-        UnionBlock, UnionChampionBadgeInfo, UnionChampionInfo, UnionRaiderPreset,
+        UnionBlock, UnionChampionBadgeInfo, UnionChampionInfo, UnionInnerStat, UnionRaiderPreset,
         UserUnionChampion, UserUnionRaider,
     };
     use maplestory_openapi::StatType;
@@ -1784,7 +1784,10 @@ fn test_union_raider_and_champion_helpers() {
             "보스 몬스터 공격 시 데미지 40% 증가".to_string(),
             "크리티컬 데미지 20.00% 증가".to_string(),
         ]),
-        union_inner_stat: None,
+        union_inner_stat: Some(vec![UnionInnerStat {
+            stat_field_id: Some("0".to_string()),
+            stat_field_effect: Some("공격력 15 증가".to_string()),
+        }]),
         union_block: None,
     };
 
@@ -1815,7 +1818,16 @@ fn test_union_raider_and_champion_helpers() {
                 block_position: None,
             },
         ]),
-        union_inner_stat: None,
+        union_inner_stat: Some(vec![
+            UnionInnerStat {
+                stat_field_id: Some("0".to_string()),
+                stat_field_effect: Some("보스 몬스터 공격 시 데미지 5% 증가".to_string()),
+            },
+            UnionInnerStat {
+                stat_field_id: Some("1".to_string()),
+                stat_field_effect: Some("마력 10 증가".to_string()),
+            },
+        ]),
         use_preset_no: Some(2),
         union_raider_preset_1: None,
         union_raider_preset_2: Some(preset_2),
@@ -1843,6 +1855,14 @@ fn test_union_raider_and_champion_helpers() {
     assert_eq!(raider_stats.get("공격력"), Some(&20.0));
     assert_eq!(raider_stats.get("마력"), Some(&20.0));
 
+    let inner_stats = raider.total_inner_stats();
+    assert_eq!(inner_stats.get("보스 몬스터 공격 시 데미지"), Some(&5.0));
+    assert_eq!(inner_stats.get("마력"), Some(&10.0));
+
+    let inner_typed = raider.total_inner_stats_typed();
+    assert_eq!(inner_typed.get(&StatType::BossDamage), Some(&5.0));
+    assert_eq!(inner_typed.get(&StatType::MagicPower), Some(&10.0));
+
     let active_p = raider
         .active_preset(None)
         .expect("preset 2 should be active");
@@ -1851,7 +1871,17 @@ fn test_union_raider_and_champion_helpers() {
         active_p.total_occupied_stats().get("크리티컬 데미지"),
         Some(&20.0)
     );
+    assert_eq!(active_p.total_inner_stats().get("공격력"), Some(&15.0));
+    assert_eq!(
+        active_p
+            .total_inner_stats_typed()
+            .get(&StatType::AttackPower),
+        Some(&15.0)
+    );
     assert_eq!(raider.blocks_by_class("배틀메이지").len(), 1);
+    assert_eq!(raider.blocks_by_min_level(290).len(), 1);
+    assert_eq!(raider.blocks_by_min_level(250).len(), 2);
+    assert_eq!(raider.blocks_by_min_level(300).len(), 0);
 
     let champion = UserUnionChampion {
         date: None,
@@ -1896,6 +1926,12 @@ fn test_union_raider_and_champion_helpers() {
         Some("메인챔피언")
     );
     assert!(champion.find_champion_by_slot(3).is_none());
+
+    let grade_summary = champion.champion_grade_summary();
+    assert_eq!(grade_summary.get("SSS"), Some(&1));
+    assert_eq!(grade_summary.get("SS"), Some(&1));
+    assert_eq!(champion.champions_by_grade("SSS").len(), 1);
+    assert_eq!(champion.champions_by_grade("C").len(), 0);
 
     let badge_stats = champion.total_badge_stats();
     assert_eq!(badge_stats.get("올스탯"), Some(&100.0));
@@ -2078,6 +2114,9 @@ fn test_character_progression_domain_helpers() {
         hyper_stat_preset_3_remain_point: None,
     };
     assert_eq!(hyper_stat.active_preset_hyper_stats(None).len(), 1);
+    assert_eq!(hyper_stat.active_preset_hyper_stats(Some(2)).len(), 1);
+    assert_eq!(hyper_stat.active_preset_hyper_stats(Some(1)).len(), 0);
+    assert_eq!(hyper_stat.active_preset_hyper_stats(Some(99)).len(), 0);
     assert_eq!(
         hyper_stat
             .find_hyper_stat("보스 몬스터 공격 시 데미지 증가")
@@ -2133,7 +2172,13 @@ fn test_character_combat_analytics() {
     // Critical damage factor: 1.35 + 0.85 = 2.20
     assert!((analytics.critical_damage_factor() - 2.20).abs() < 1e-6);
 
-    // 3. Estimated Dojo floor
+    // 3. Force stat bonus calculations
+    // 1320 AF -> (1320 / 10) * 100 = 13,200 main stat
+    assert_eq!(analytics.arcane_force_stat_bonus(), 13_200);
+    // 660 Authentic Force -> (660 / 10) * 200 = 13,200 main stat
+    assert_eq!(analytics.authentic_force_stat_bonus(), 13_200);
+
+    // 4. Estimated Dojo floor
     // 450,000,000 CP -> Floor 75 tier
     assert_eq!(analytics.estimated_dojang_floor(), 75);
 

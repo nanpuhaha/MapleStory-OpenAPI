@@ -2287,20 +2287,38 @@ impl CharacterCombatAnalytics {
         1.35 + (self.critical_damage / 100.0)
     }
 
+    /// Additional main stat bonus contributed by Arcane Force (`(arcane_force / 10) * 100`).
+    /// (For Demon Avenger: HP +2,100 per 10 AF; Xenon: +48 per 10 AF; standard jobs: +100 main stat per 10 AF).
+    pub fn arcane_force_stat_bonus(&self) -> i64 {
+        (self.arcane_force / 10) * 100
+    }
+
+    /// Additional main stat bonus contributed by Authentic Force (`(authentic_force / 10) * 200`).
+    /// (Standard jobs: +200 main stat per 10 AutF).
+    pub fn authentic_force_stat_bonus(&self) -> i64 {
+        (self.authentic_force / 10) * 200
+    }
+
     /// Estimated Mu Lung Dojo floor based on combat power benchmarks.
     pub fn estimated_dojang_floor(&self) -> i64 {
-        match self.combat_power {
-            cp if cp < 3_000_000 => 40,
-            cp if cp < 6_000_000 => 45,
-            cp if cp < 15_000_000 => 50,
-            cp if cp < 35_000_000 => 55,
-            cp if cp < 70_000_000 => 60,
-            cp if cp < 150_000_000 => 65,
-            cp if cp < 300_000_000 => 70,
-            cp if cp < 600_000_000 => 75,
-            cp if cp < 1_000_000_000 => 80,
-            _ => 85,
+        const DOJANG_BENCHMARKS: &[(i64, i64)] = &[
+            (3_000_000, 40),
+            (6_000_000, 45),
+            (15_000_000, 50),
+            (35_000_000, 55),
+            (70_000_000, 60),
+            (150_000_000, 65),
+            (300_000_000, 70),
+            (600_000_000, 75),
+            (1_000_000_000, 80),
+        ];
+
+        for &(threshold, floor) in DOJANG_BENCHMARKS {
+            if self.combat_power < threshold {
+                return floor;
+            }
         }
+        85
     }
 }
 
@@ -2427,16 +2445,27 @@ impl CharacterAbility {
 impl CharacterHyperStat {
     /// Returns the Hyper Stat entries for the specified preset (`1..=3`), or the currently active
     /// preset (`use_preset_no`) when `preset_no` is `None`.
+    ///
+    /// If an explicit `preset_no` is provided that is not `1..=3`, an empty slice is returned.
     pub fn active_preset_hyper_stats(&self, preset_no: Option<u8>) -> &[HyperStatEntry] {
-        let target = preset_no.or_else(|| {
-            self.use_preset_no
-                .as_deref()
-                .and_then(|s| s.parse::<u8>().ok())
-        });
+        if let Some(n) = preset_no {
+            return match n {
+                1 => self.hyper_stat_preset_1.as_deref().unwrap_or(&[]),
+                2 => self.hyper_stat_preset_2.as_deref().unwrap_or(&[]),
+                3 => self.hyper_stat_preset_3.as_deref().unwrap_or(&[]),
+                _ => &[],
+            };
+        }
+
+        let target = self
+            .use_preset_no
+            .as_deref()
+            .and_then(|s| s.parse::<u8>().ok())
+            .unwrap_or(1);
         match target {
-            Some(1) => self.hyper_stat_preset_1.as_deref().unwrap_or(&[]),
-            Some(2) => self.hyper_stat_preset_2.as_deref().unwrap_or(&[]),
-            Some(3) => self.hyper_stat_preset_3.as_deref().unwrap_or(&[]),
+            1 => self.hyper_stat_preset_1.as_deref().unwrap_or(&[]),
+            2 => self.hyper_stat_preset_2.as_deref().unwrap_or(&[]),
+            3 => self.hyper_stat_preset_3.as_deref().unwrap_or(&[]),
             _ => self.hyper_stat_preset_1.as_deref().unwrap_or(&[]),
         }
     }

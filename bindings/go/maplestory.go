@@ -77,6 +77,22 @@ func FromEnv() (*Client, error) {
 }
 
 // Close frees the underlying native Rust client handle.
+func (c *Client) callStringApi(fallback string, cCall func(out **C.char) C.int32_t) (string, error) {
+	if c.handle == nil {
+		return "", errors.New("client is closed")
+	}
+
+	var cJson *C.char
+	res := cCall(&cJson)
+	if res != 0 || cJson == nil {
+		return "", lastError(fallback, res)
+	}
+	defer C.maplestory_free_string(cJson)
+
+	return C.GoString(cJson), nil
+}
+
+// Close frees the underlying native Rust client handle.
 func (c *Client) Close() {
 	if c.handle != nil {
 		C.maplestory_client_free(c.handle)
@@ -86,30 +102,17 @@ func (c *Client) Close() {
 
 // GetCharacterDashboard retrieves the comprehensive all-in-one character dashboard JSON string.
 func (c *Client) GetCharacterDashboard(characterName string) (string, error) {
-	if c.handle == nil {
-		return "", errors.New("client is closed")
-	}
-
 	cName := C.CString(characterName)
 	defer C.free(unsafe.Pointer(cName))
 
-	var cJson *C.char
-	res := C.maplestory_get_character_dashboard(c.handle, cName, &cJson)
-	if res != 0 || cJson == nil {
-		return "", lastError("failed to get character dashboard", res)
-	}
-	defer C.maplestory_free_string(cJson)
-
-	return C.GoString(cJson), nil
+	return c.callStringApi("failed to get character dashboard", func(out **C.char) C.int32_t {
+		return C.maplestory_get_character_dashboard(c.handle, cName, out)
+	})
 }
 
 // GetGuildProfile retrieves the guild profile (guild basic + member profiles) JSON string.
 // Pass an empty string for date to query the latest available data.
 func (c *Client) GetGuildProfile(guildName, worldName, date string) (string, error) {
-	if c.handle == nil {
-		return "", errors.New("client is closed")
-	}
-
 	cGuild := C.CString(guildName)
 	defer C.free(unsafe.Pointer(cGuild))
 	cWorld := C.CString(worldName)
@@ -117,44 +120,26 @@ func (c *Client) GetGuildProfile(guildName, worldName, date string) (string, err
 	cDate, freeDate := optionalCString(date)
 	defer freeDate()
 
-	var cJson *C.char
-	res := C.maplestory_get_guild_profile(c.handle, cGuild, cWorld, cDate, &cJson)
-	if res != 0 || cJson == nil {
-		return "", lastError("failed to get guild profile", res)
-	}
-	defer C.maplestory_free_string(cJson)
-
-	return C.GoString(cJson), nil
+	return c.callStringApi("failed to get guild profile", func(out **C.char) C.int32_t {
+		return C.maplestory_get_guild_profile(c.handle, cGuild, cWorld, cDate, out)
+	})
 }
 
 // GetUserUnion retrieves user union level/grade information by character name as a JSON string.
 func (c *Client) GetUserUnion(characterName, date string) (string, error) {
-	if c.handle == nil {
-		return "", errors.New("client is closed")
-	}
-
 	cName := C.CString(characterName)
 	defer C.free(unsafe.Pointer(cName))
 	cDate, freeDate := optionalCString(date)
 	defer freeDate()
 
-	var cJson *C.char
-	res := C.maplestory_get_user_union(c.handle, cName, cDate, &cJson)
-	if res != 0 || cJson == nil {
-		return "", lastError("failed to get user union", res)
-	}
-	defer C.maplestory_free_string(cJson)
-
-	return C.GoString(cJson), nil
+	return c.callStringApi("failed to get user union", func(out **C.char) C.int32_t {
+		return C.maplestory_get_user_union(c.handle, cName, cDate, out)
+	})
 }
 
 // GetOverallRanking retrieves overall ranking information as a JSON string.
 // Pass worldType < 0 to omit worldType filter, and page <= 0 to omit page filter.
 func (c *Client) GetOverallRanking(date, worldName string, worldType int32, characterClass, ocid string, page int32) (string, error) {
-	if c.handle == nil {
-		return "", errors.New("client is closed")
-	}
-
 	cDate := C.CString(date)
 	defer C.free(unsafe.Pointer(cDate))
 	cWorld, freeWorld := optionalCString(worldName)
@@ -164,60 +149,37 @@ func (c *Client) GetOverallRanking(date, worldName string, worldType int32, char
 	cOcid, freeOcid := optionalCString(ocid)
 	defer freeOcid()
 
-	var cJson *C.char
-	res := C.maplestory_get_overall_ranking(
-		c.handle,
-		cDate,
-		cWorld,
-		C.int32_t(worldType),
-		cClass,
-		cOcid,
-		C.int32_t(page),
-		&cJson,
-	)
-	if res != 0 || cJson == nil {
-		return "", lastError("failed to get overall ranking", res)
-	}
-	defer C.maplestory_free_string(cJson)
-
-	return C.GoString(cJson), nil
+	return c.callStringApi("failed to get overall ranking", func(out **C.char) C.int32_t {
+		return C.maplestory_get_overall_ranking(
+			c.handle,
+			cDate,
+			cWorld,
+			C.int32_t(worldType),
+			cClass,
+			cOcid,
+			C.int32_t(page),
+			out,
+		)
+	})
 }
 
 // GetNoticeList retrieves the latest official notices list as a JSON string.
 func (c *Client) GetNoticeList() (string, error) {
-	if c.handle == nil {
-		return "", errors.New("client is closed")
-	}
-
-	var cJson *C.char
-	res := C.maplestory_get_notice_list(c.handle, &cJson)
-	if res != 0 || cJson == nil {
-		return "", lastError("failed to get notice list", res)
-	}
-	defer C.maplestory_free_string(cJson)
-
-	return C.GoString(cJson), nil
+	return c.callStringApi("failed to get notice list", func(out **C.char) C.int32_t {
+		return C.maplestory_get_notice_list(c.handle, out)
+	})
 }
 
 // GetAccountSummary retrieves the account summary (union + artifact + champion + achievements) as a JSON string.
 func (c *Client) GetAccountSummary(characterName, date string) (string, error) {
-	if c.handle == nil {
-		return "", errors.New("client is closed")
-	}
-
 	cName := C.CString(characterName)
 	defer C.free(unsafe.Pointer(cName))
 	cDate, freeDate := optionalCString(date)
 	defer freeDate()
 
-	var cJson *C.char
-	res := C.maplestory_get_account_summary(c.handle, cName, cDate, &cJson)
-	if res != 0 || cJson == nil {
-		return "", lastError("failed to get account summary", res)
-	}
-	defer C.maplestory_free_string(cJson)
-
-	return C.GoString(cJson), nil
+	return c.callStringApi("failed to get account summary", func(out **C.char) C.int32_t {
+		return C.maplestory_get_account_summary(c.handle, cName, cDate, out)
+	})
 }
 
 // RenderCharacterGif renders an animated GIF for the character look.

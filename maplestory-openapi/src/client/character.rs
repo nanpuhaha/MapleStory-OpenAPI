@@ -303,8 +303,9 @@ impl MapleStoryClient {
         &self,
         character_name: &str,
     ) -> Result<CharacterCombatAnalytics> {
-        let dash = self.get_character_dashboard_by_name(character_name).await?;
-        Ok(dash.combat_analytics())
+        self.character()
+            .get_combat_analytics_by_name(character_name)
+            .await
     }
 
     /// Retrieve a comprehensive all-in-one character dashboard using custom [`DashboardOptions`].
@@ -1682,12 +1683,24 @@ impl<'a> CharacterClient<'a> {
     }
 
     /// Retrieve combat analytics of a character by OCID.
+    ///
+    /// Selectively fetches only the required dashboard sections (`Basic`, `Stat`, `ItemEquipment`,
+    /// `Symbols`, and `Dojang`) instead of the entire 20+ endpoint set.
     pub async fn get_combat_analytics(
         &self,
         ocid: &str,
         date: impl Into<DateParam>,
     ) -> Result<CharacterCombatAnalytics> {
-        let dash = self.get_dashboard(ocid, date).await?;
+        let options = DashboardOptions::builder()
+            .include(DashboardSection::Basic)
+            .include(DashboardSection::Stat)
+            .include(DashboardSection::ItemEquipment)
+            .include(DashboardSection::Symbols)
+            .include(DashboardSection::Dojang)
+            .build();
+        let dash = self
+            .get_dashboard_with_options(ocid, date, &options)
+            .await?;
         Ok(dash.combat_analytics())
     }
 
@@ -1696,8 +1709,7 @@ impl<'a> CharacterClient<'a> {
         &self,
         character_name: &str,
     ) -> Result<CharacterCombatAnalytics> {
-        self.client
-            .get_character_combat_analytics_by_name(character_name)
-            .await
+        let ocid = self.get_ocid(character_name).await?;
+        self.get_combat_analytics(&ocid, None).await
     }
 }

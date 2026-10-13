@@ -1,0 +1,37 @@
+name: Release (Manual Trigger)
+
+# 수동 실행 전용 (Manual trigger only via workflow_dispatch)
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run verification (skip actual publishing)'
+        required: true
+        type: boolean
+        default: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  verify-and-package:
+    name: Verify & Package Verification
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Verify workspace tests
+        run: cargo test --all --all-features
+      - name: Verify doc tests
+        run: cargo test --doc --all-features
+      - name: Verify clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
+      - name: Verify examples
+        run: cargo check --examples --all-features
+      - name: Package Core Crate (dry-run)
+        run: cargo package -p maplestory-openapi
+      - name: Package C-ABI Crate (dry-run)
+        run: cargo package -p maplestory-openapi-c

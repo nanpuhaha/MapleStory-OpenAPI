@@ -62,55 +62,49 @@ public final class MapleStoryClient {
         return value.withCString { body($0) }
     }
 
-    /// Asynchronously retrieves character dashboard JSON string.
-    public func getCharacterDashboard(characterName: String) async throws -> String {
+    private func executeJsonApi(_ call: @escaping (OpaquePointer, inout UnsafeMutablePointer<CChar>?) -> Int32) async throws -> String {
         guard let h = handle else {
             throw MapleStoryError.clientClosed
         }
 
         return try await Task.detached {
             var outJson: UnsafeMutablePointer<CChar>?
-            let code = characterName.withCString { cName in
-                maplestory_get_character_dashboard(h, cName, &outJson)
-            }
+            let code = call(h, &outJson)
             return try Self.unwrapJsonResult(code: code, outJson: outJson)
         }.value
     }
 
+    /// Asynchronously retrieves character dashboard JSON string.
+    public func getCharacterDashboard(characterName: String) async throws -> String {
+        try await executeJsonApi { h, outJson in
+            characterName.withCString { cName in
+                maplestory_get_character_dashboard(h, cName, &outJson)
+            }
+        }
+    }
+
     /// Asynchronously retrieves guild profile (guild basic + member profiles) JSON string.
     public func getGuildProfile(guildName: String, worldName: String, date: String? = nil) async throws -> String {
-        guard let h = handle else {
-            throw MapleStoryError.clientClosed
-        }
-
-        return try await Task.detached {
-            var outJson: UnsafeMutablePointer<CChar>?
-            let code = guildName.withCString { cGuild in
+        try await executeJsonApi { h, outJson in
+            guildName.withCString { cGuild in
                 worldName.withCString { cWorld in
                     Self.withOptionalCString(date) { cDate in
                         maplestory_get_guild_profile(h, cGuild, cWorld, cDate, &outJson)
                     }
                 }
             }
-            return try Self.unwrapJsonResult(code: code, outJson: outJson)
-        }.value
+        }
     }
 
     /// Asynchronously retrieves user union level/grade information by character name as a JSON string.
     public func getUserUnion(characterName: String, date: String? = nil) async throws -> String {
-        guard let h = handle else {
-            throw MapleStoryError.clientClosed
-        }
-
-        return try await Task.detached {
-            var outJson: UnsafeMutablePointer<CChar>?
-            let code = characterName.withCString { cName in
+        try await executeJsonApi { h, outJson in
+            characterName.withCString { cName in
                 Self.withOptionalCString(date) { cDate in
                     maplestory_get_user_union(h, cName, cDate, &outJson)
                 }
             }
-            return try Self.unwrapJsonResult(code: code, outJson: outJson)
-        }.value
+        }
     }
 
     /// Asynchronously retrieves overall ranking information as a JSON string.
@@ -122,13 +116,8 @@ public final class MapleStoryClient {
         ocid: String? = nil,
         page: Int32 = 0
     ) async throws -> String {
-        guard let h = handle else {
-            throw MapleStoryError.clientClosed
-        }
-
-        return try await Task.detached {
-            var outJson: UnsafeMutablePointer<CChar>?
-            let code = date.withCString { cDate in
+        try await executeJsonApi { h, outJson in
+            date.withCString { cDate in
                 Self.withOptionalCString(worldName) { cWorld in
                     Self.withOptionalCString(characterClass) { cClass in
                         Self.withOptionalCString(ocid) { cOcid in
@@ -137,38 +126,25 @@ public final class MapleStoryClient {
                     }
                 }
             }
-            return try Self.unwrapJsonResult(code: code, outJson: outJson)
-        }.value
+        }
     }
 
     /// Asynchronously retrieves the latest official notices list as a JSON string.
     public func getNoticeList() async throws -> String {
-        guard let h = handle else {
-            throw MapleStoryError.clientClosed
+        try await executeJsonApi { h, outJson in
+            maplestory_get_notice_list(h, &outJson)
         }
-
-        return try await Task.detached {
-            var outJson: UnsafeMutablePointer<CChar>?
-            let code = maplestory_get_notice_list(h, &outJson)
-            return try Self.unwrapJsonResult(code: code, outJson: outJson)
-        }.value
     }
 
     /// Asynchronously retrieves the account summary (union + artifact + champion + achievements) as a JSON string.
     public func getAccountSummary(characterName: String, date: String? = nil) async throws -> String {
-        guard let h = handle else {
-            throw MapleStoryError.clientClosed
-        }
-
-        return try await Task.detached {
-            var outJson: UnsafeMutablePointer<CChar>?
-            let code = characterName.withCString { cName in
+        try await executeJsonApi { h, outJson in
+            characterName.withCString { cName in
                 Self.withOptionalCString(date) { cDate in
                     maplestory_get_account_summary(h, cName, cDate, &outJson)
                 }
             }
-            return try Self.unwrapJsonResult(code: code, outJson: outJson)
-        }.value
+        }
     }
 
     /// Asynchronously renders animated GIF for character motion.

@@ -244,6 +244,19 @@ impl UserUnionRaider {
         to_typed_stat_map(self.total_raider_stats())
     }
 
+    /// Parse and aggregate all inner board stats (`union_inner_stat`) by stat name.
+    pub fn total_inner_stats(&self) -> std::collections::HashMap<String, f64> {
+        let stats = self.union_inner_stat.as_deref().unwrap_or(&[]);
+        accumulate_stat_descriptions(stats.iter().filter_map(|s| s.stat_field_effect.as_deref()))
+    }
+
+    /// Parse and aggregate all inner board stats keyed by [`StatType`](crate::models::character::StatType).
+    pub fn total_inner_stats_typed(
+        &self,
+    ) -> std::collections::HashMap<crate::models::character::StatType, f64> {
+        to_typed_stat_map(self.total_inner_stats())
+    }
+
     /// Find all placed blocks matching the given character class name.
     pub fn blocks_by_class(&self, class_name: &str) -> Vec<&UnionBlock> {
         self.union_block
@@ -251,6 +264,22 @@ impl UserUnionRaider {
             .unwrap_or(&[])
             .iter()
             .filter(|b| b.block_class.as_deref() == Some(class_name))
+            .collect()
+    }
+
+    /// Find all placed blocks whose character level is greater than or equal to `min_level`.
+    pub fn blocks_by_min_level(&self, min_level: i64) -> Vec<&UnionBlock> {
+        self.union_block
+            .as_deref()
+            .unwrap_or(&[])
+            .iter()
+            .filter(|b| {
+                b.block_level
+                    .as_deref()
+                    .and_then(|l| l.parse::<i64>().ok())
+                    .unwrap_or(0)
+                    >= min_level
+            })
             .collect()
     }
 }
@@ -276,6 +305,19 @@ impl UnionRaiderPreset {
                 .iter()
                 .map(String::as_str),
         )
+    }
+
+    /// Parse and aggregate all inner board stats in this preset.
+    pub fn total_inner_stats(&self) -> std::collections::HashMap<String, f64> {
+        let stats = self.union_inner_stat.as_deref().unwrap_or(&[]);
+        accumulate_stat_descriptions(stats.iter().filter_map(|s| s.stat_field_effect.as_deref()))
+    }
+
+    /// Parse and aggregate all inner board stats in this preset keyed by [`StatType`](crate::models::character::StatType).
+    pub fn total_inner_stats_typed(
+        &self,
+    ) -> std::collections::HashMap<crate::models::character::StatType, f64> {
+        to_typed_stat_map(self.total_inner_stats())
     }
 }
 
@@ -462,5 +504,26 @@ impl UserUnionChampion {
         &self,
     ) -> std::collections::HashMap<crate::models::character::StatType, f64> {
         to_typed_stat_map(self.total_badge_stats())
+    }
+
+    /// Count champions by their grade string (e.g. "SSS", "SS", "S", "A").
+    pub fn champion_grade_summary(&self) -> std::collections::HashMap<String, usize> {
+        let mut summary = std::collections::HashMap::new();
+        for champ in self.union_champion.as_deref().unwrap_or(&[]) {
+            if let Some(grade) = champ.champion_grade.as_deref() {
+                *summary.entry(grade.to_string()).or_insert(0) += 1;
+            }
+        }
+        summary
+    }
+
+    /// Retrieve all champions matching the given grade string (e.g. "SSS").
+    pub fn champions_by_grade(&self, grade: &str) -> Vec<&UnionChampionInfo> {
+        self.union_champion
+            .as_deref()
+            .unwrap_or(&[])
+            .iter()
+            .filter(|c| c.champion_grade.as_deref() == Some(grade))
+            .collect()
     }
 }
