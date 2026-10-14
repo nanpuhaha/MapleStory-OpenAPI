@@ -2130,6 +2130,7 @@ fn test_character_combat_analytics() {
     use maplestory_openapi::models::character::{
         CharacterBasic, CharacterCombatAnalytics, CharacterCoordination, CharacterDashboard,
         CharacterDojang, CharacterItemEquipment, CharacterStat, FinalStatEntry,
+        StarforceStatBreakdown,
     };
 
     let analytics = CharacterCombatAnalytics {
@@ -2147,6 +2148,7 @@ fn test_character_combat_analytics() {
         arcane_force: 1320,
         authentic_force: 660,
         dojang_best_floor: Some(72),
+        starforce_stat_breakdown: None,
     };
 
     // 1. Effective boss damage multiplier calculations
@@ -2179,8 +2181,36 @@ fn test_character_combat_analytics() {
     assert_eq!(analytics.authentic_force_stat_bonus(), 13_200);
 
     // 4. Estimated Dojo floor
-    // 450,000,000 CP -> Floor 75 tier
-    assert_eq!(analytics.estimated_dojang_floor(), 75);
+    // 450,000,000 CP -> Floor 70 tier (>= 300M benchmark)
+    assert_eq!(analytics.estimated_dojang_floor(), 70);
+
+    // Verify sub-benchmark and zero combat power edge cases
+    let mut zero_analytics = analytics.clone();
+    zero_analytics.combat_power = 0;
+    assert_eq!(zero_analytics.estimated_dojang_floor(), 0);
+
+    let mut low_analytics = analytics.clone();
+    low_analytics.combat_power = 100_000;
+    assert_eq!(low_analytics.estimated_dojang_floor(), 4);
+
+    let mut endgame_analytics = analytics.clone();
+    endgame_analytics.combat_power = 1_200_000_000;
+    assert_eq!(endgame_analytics.estimated_dojang_floor(), 80);
+
+    // 5. Starforce breakdown tests
+    let mut sf_analytics = analytics.clone();
+    sf_analytics.starforce_stat_breakdown = Some(StarforceStatBreakdown {
+        total_starforce: 180,
+        str: 350,
+        dex: 280,
+        int: 120,
+        luk: 120,
+        attack_power: 145,
+        magic_power: 0,
+        ..Default::default()
+    });
+    assert_eq!(sf_analytics.starforce_main_stat_bonus(), 350);
+    assert_eq!(sf_analytics.starforce_attack_bonus(), 145);
 
     // 4. Extraction from CharacterDashboard
     let dashboard = CharacterDashboard {
@@ -2287,5 +2317,7 @@ fn test_character_combat_analytics() {
     assert_eq!(extracted.boss_damage, 320.0);
     assert_eq!(extracted.ignore_monster_armor, 96.0);
     assert_eq!(extracted.dojang_best_floor, Some(64));
-    assert_eq!(extracted.estimated_dojang_floor(), 65);
+    // 120,000,000 CP -> Floor 60 tier (>= 70M benchmark)
+    assert_eq!(extracted.estimated_dojang_floor(), 60);
+    assert!(extracted.starforce_stat_breakdown.is_some());
 }

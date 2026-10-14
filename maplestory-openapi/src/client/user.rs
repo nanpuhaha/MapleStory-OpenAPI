@@ -58,9 +58,11 @@ impl<'a> UserClient<'a> {
             .await
     }
 
-    /// Retrieve an aggregated summary of the account (roster, achievements, and main character Union).
-    pub async fn get_account_summary(
+    /// Retrieve an aggregated summary of the account (roster, achievements, and main character Union),
+    /// optionally specifying an explicit character name fallback for Union lookup.
+    pub async fn get_account_summary_with_character(
         &self,
+        character_name: Option<&str>,
         date: impl Into<crate::models::common::DateParam>,
     ) -> Result<crate::models::user::AccountSummary> {
         let (character_list_res, achievement_res) =
@@ -69,18 +71,20 @@ impl<'a> UserClient<'a> {
         let character_list = character_list_res?;
         let achievement = achievement_res.ok();
 
-        let highest_char_name = character_list
-            .account_list
-            .as_deref()
-            .unwrap_or(&[])
-            .iter()
-            .filter_map(|acc| acc.character_list.as_deref())
-            .flatten()
-            .max_by_key(|c| c.character_level.unwrap_or(0))
-            .and_then(|c| c.character_name.clone());
+        let target_name = character_name.map(|s| s.to_string()).or_else(|| {
+            character_list
+                .account_list
+                .as_deref()
+                .unwrap_or(&[])
+                .iter()
+                .filter_map(|acc| acc.character_list.as_deref())
+                .flatten()
+                .max_by_key(|c| c.character_level.unwrap_or(0))
+                .and_then(|c| c.character_name.clone())
+        });
 
-        let union = if let Some(main_name) = highest_char_name.as_deref() {
-            self.client.union().get_by_name(main_name).await.ok()
+        let union = if let Some(name) = target_name.as_deref() {
+            self.client.union().get_by_name(name).await.ok()
         } else {
             None
         };
@@ -90,6 +94,14 @@ impl<'a> UserClient<'a> {
             achievement,
             union,
         ))
+    }
+
+    /// Retrieve an aggregated summary of the account (roster, achievements, and main character Union).
+    pub async fn get_account_summary(
+        &self,
+        date: impl Into<crate::models::common::DateParam>,
+    ) -> Result<crate::models::user::AccountSummary> {
+        self.get_account_summary_with_character(None, date).await
     }
 }
 
@@ -170,10 +182,23 @@ impl MapleStoryClient {
     }
 
     /// Retrieve an aggregated summary of the account (roster, achievements, and main character Union).
+    #[inline]
     pub async fn get_account_summary(
         &self,
         date: impl Into<crate::models::common::DateParam>,
     ) -> Result<crate::models::user::AccountSummary> {
         self.user().get_account_summary(date).await
+    }
+
+    /// Retrieve an aggregated summary of the account, optionally specifying an explicit character name fallback.
+    #[inline]
+    pub async fn get_account_summary_with_character(
+        &self,
+        character_name: Option<&str>,
+        date: impl Into<crate::models::common::DateParam>,
+    ) -> Result<crate::models::user::AccountSummary> {
+        self.user()
+            .get_account_summary_with_character(character_name, date)
+            .await
     }
 }

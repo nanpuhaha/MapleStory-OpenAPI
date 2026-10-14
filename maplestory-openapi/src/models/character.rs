@@ -1364,6 +1364,89 @@ impl CharacterItemEquipment {
             .filter_map(|s| s.parse::<i64>().ok())
             .sum()
     }
+
+    /// Calculate total Starforce stat contribution breakdown across all currently active equipped items.
+    pub fn starforce_stat_breakdown(&self) -> StarforceStatBreakdown {
+        let mut breakdown = StarforceStatBreakdown {
+            total_starforce: self.total_starforce(),
+            ..Default::default()
+        };
+        for item in self.active_items() {
+            if let Some(opt) = &item.item_starforce_option {
+                if let Some(v) = opt.str.as_deref().and_then(|s| s.parse::<i64>().ok()) {
+                    breakdown.str += v;
+                }
+                if let Some(v) = opt.dex.as_deref().and_then(|s| s.parse::<i64>().ok()) {
+                    breakdown.dex += v;
+                }
+                if let Some(v) = opt.int.as_deref().and_then(|s| s.parse::<i64>().ok()) {
+                    breakdown.int += v;
+                }
+                if let Some(v) = opt.luk.as_deref().and_then(|s| s.parse::<i64>().ok()) {
+                    breakdown.luk += v;
+                }
+                if let Some(v) = opt.max_hp.as_deref().and_then(|s| s.parse::<i64>().ok()) {
+                    breakdown.max_hp += v;
+                }
+                if let Some(v) = opt.max_mp.as_deref().and_then(|s| s.parse::<i64>().ok()) {
+                    breakdown.max_mp += v;
+                }
+                if let Some(v) = opt
+                    .attack_power
+                    .as_deref()
+                    .and_then(|s| s.parse::<i64>().ok())
+                {
+                    breakdown.attack_power += v;
+                }
+                if let Some(v) = opt
+                    .magic_power
+                    .as_deref()
+                    .and_then(|s| s.parse::<i64>().ok())
+                {
+                    breakdown.magic_power += v;
+                }
+                if let Some(v) = opt.armor.as_deref().and_then(|s| s.parse::<i64>().ok()) {
+                    breakdown.armor += v;
+                }
+                if let Some(v) = opt.speed.as_deref().and_then(|s| s.parse::<i64>().ok()) {
+                    breakdown.speed += v;
+                }
+                if let Some(v) = opt.jump.as_deref().and_then(|s| s.parse::<i64>().ok()) {
+                    breakdown.jump += v;
+                }
+            }
+        }
+        breakdown
+    }
+}
+
+/// Aggregated Starforce statistics across all equipped items.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct StarforceStatBreakdown {
+    /// Total stars across equipped items
+    pub total_starforce: i64,
+    /// Total STR gained from Starforce
+    pub str: i64,
+    /// Total DEX gained from Starforce
+    pub dex: i64,
+    /// Total INT gained from Starforce
+    pub int: i64,
+    /// Total LUK gained from Starforce
+    pub luk: i64,
+    /// Total MaxHP gained from Starforce
+    pub max_hp: i64,
+    /// Total MaxMP gained from Starforce
+    pub max_mp: i64,
+    /// Total Attack Power gained from Starforce
+    pub attack_power: i64,
+    /// Total Magic Power gained from Starforce
+    pub magic_power: i64,
+    /// Total Armor gained from Starforce
+    pub armor: i64,
+    /// Total Speed gained from Starforce
+    pub speed: i64,
+    /// Total Jump gained from Starforce
+    pub jump: i64,
 }
 
 // ─── CharacterCashItemEquipment Helpers ───────────────────────────────────────
@@ -2187,6 +2270,11 @@ impl CharacterDashboard {
         self.coordination.avatar_code.as_ref()
     }
 
+    /// Total Starforce stat contribution breakdown across equipped items.
+    pub fn starforce_stat_breakdown(&self) -> StarforceStatBreakdown {
+        self.item_equipment.starforce_stat_breakdown()
+    }
+
     /// Returns `true` if any non-critical sections experienced errors during aggregation.
     pub fn has_errors(&self) -> bool {
         !self.errors.is_empty()
@@ -2214,6 +2302,7 @@ impl CharacterDashboard {
             arcane_force: self.arcane_force(),
             authentic_force: self.authentic_force(),
             dojang_best_floor: self.dojang_best_floor(),
+            starforce_stat_breakdown: Some(self.starforce_stat_breakdown()),
         }
     }
 }
@@ -2251,6 +2340,8 @@ pub struct CharacterCombatAnalytics {
     pub authentic_force: i64,
     /// Highest floor reached in Mu Lung Dojo (무릉도장 최고 기록 층수)
     pub dojang_best_floor: Option<i64>,
+    /// Starforce stat contribution breakdown (if item equipment is available)
+    pub starforce_stat_breakdown: Option<StarforceStatBreakdown>,
 }
 
 impl CharacterCombatAnalytics {
@@ -2299,26 +2390,47 @@ impl CharacterCombatAnalytics {
         (self.authentic_force / 10) * 200
     }
 
+    /// Estimated main stat gain from Starforce enhancements.
+    pub fn starforce_main_stat_bonus(&self) -> i64 {
+        self.starforce_stat_breakdown
+            .as_ref()
+            .map(|b| b.str.max(b.dex).max(b.int).max(b.luk))
+            .unwrap_or(0)
+    }
+
+    /// Estimated attack power gain from Starforce enhancements.
+    pub fn starforce_attack_bonus(&self) -> i64 {
+        self.starforce_stat_breakdown
+            .as_ref()
+            .map(|b| b.attack_power.max(b.magic_power))
+            .unwrap_or(0)
+    }
+
     /// Estimated Mu Lung Dojo floor based on combat power benchmarks.
     pub fn estimated_dojang_floor(&self) -> i64 {
+        if self.combat_power <= 0 {
+            return 0;
+        }
         const DOJANG_BENCHMARKS: &[(i64, i64)] = &[
-            (3_000_000, 40),
-            (6_000_000, 45),
-            (15_000_000, 50),
-            (35_000_000, 55),
-            (70_000_000, 60),
-            (150_000_000, 65),
-            (300_000_000, 70),
-            (600_000_000, 75),
             (1_000_000_000, 80),
+            (600_000_000, 75),
+            (300_000_000, 70),
+            (150_000_000, 65),
+            (70_000_000, 60),
+            (35_000_000, 55),
+            (15_000_000, 50),
+            (6_000_000, 45),
+            (3_000_000, 40),
+            (1_500_000, 35),
+            (500_000, 30),
         ];
 
         for &(threshold, floor) in DOJANG_BENCHMARKS {
-            if self.combat_power < threshold {
+            if self.combat_power >= threshold {
                 return floor;
             }
         }
-        85
+        (self.combat_power / 25_000).clamp(1, 29)
     }
 }
 
@@ -2443,31 +2555,28 @@ impl CharacterAbility {
 }
 
 impl CharacterHyperStat {
+    /// Returns the Hyper Stat entries for the specified preset (`1..=3`).
+    pub fn preset_hyper_stats(&self, preset_no: u8) -> &[HyperStatEntry] {
+        match preset_no {
+            1 => self.hyper_stat_preset_1.as_deref().unwrap_or(&[]),
+            2 => self.hyper_stat_preset_2.as_deref().unwrap_or(&[]),
+            3 => self.hyper_stat_preset_3.as_deref().unwrap_or(&[]),
+            _ => &[],
+        }
+    }
+
     /// Returns the Hyper Stat entries for the specified preset (`1..=3`), or the currently active
     /// preset (`use_preset_no`) when `preset_no` is `None`.
     ///
     /// If an explicit `preset_no` is provided that is not `1..=3`, an empty slice is returned.
     pub fn active_preset_hyper_stats(&self, preset_no: Option<u8>) -> &[HyperStatEntry] {
-        if let Some(n) = preset_no {
-            return match n {
-                1 => self.hyper_stat_preset_1.as_deref().unwrap_or(&[]),
-                2 => self.hyper_stat_preset_2.as_deref().unwrap_or(&[]),
-                3 => self.hyper_stat_preset_3.as_deref().unwrap_or(&[]),
-                _ => &[],
-            };
-        }
-
-        let target = self
-            .use_preset_no
-            .as_deref()
-            .and_then(|s| s.parse::<u8>().ok())
-            .unwrap_or(1);
-        match target {
-            1 => self.hyper_stat_preset_1.as_deref().unwrap_or(&[]),
-            2 => self.hyper_stat_preset_2.as_deref().unwrap_or(&[]),
-            3 => self.hyper_stat_preset_3.as_deref().unwrap_or(&[]),
-            _ => self.hyper_stat_preset_1.as_deref().unwrap_or(&[]),
-        }
+        let n = preset_no.unwrap_or_else(|| {
+            self.use_preset_no
+                .as_deref()
+                .and_then(|s| s.parse::<u8>().ok())
+                .unwrap_or(1)
+        });
+        self.preset_hyper_stats(n)
     }
 
     /// Finds a specific Hyper Stat entry by its `stat_type` (e.g. `"보스 몬스터 공격 시 데미지 증가"`, `"크리티컬 데미지"`)

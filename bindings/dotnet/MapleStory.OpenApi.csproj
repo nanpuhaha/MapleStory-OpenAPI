@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
+    <!-- netstandard2.0 does not support native LPUTF8Str unmanaged marshalling or direct Exe output; modern .NET 8 LTS and .NET 9 STS are targeted -->
     <TargetFrameworks>net8.0;net9.0</TargetFrameworks>
     <OutputType>Exe</OutputType>
     <RootNamespace>MapleStory.OpenApi</RootNamespace>

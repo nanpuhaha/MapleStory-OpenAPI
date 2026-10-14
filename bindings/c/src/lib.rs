@@ -115,6 +115,34 @@ unsafe fn serialize_json_result<T: Serialize>(
     }
 }
 
+fn create_runtime() -> Option<Runtime> {
+    match Runtime::new() {
+        Ok(rt) => Some(rt),
+        Err(e) => {
+            set_last_error(format!("Failed to initialize Tokio runtime: {e}"));
+            None
+        }
+    }
+}
+
+fn build_client_handle(
+    client_res: maplestory_openapi::Result<MapleStoryClient>,
+) -> *mut ClientHandle {
+    let client = match client_res {
+        Ok(c) => c,
+        Err(e) => {
+            set_last_error(e.to_string());
+            return ptr::null_mut();
+        }
+    };
+    let runtime = match create_runtime() {
+        Some(rt) => rt,
+        None => return ptr::null_mut(),
+    };
+    clear_last_error();
+    Box::into_raw(Box::new(ClientHandle { client, runtime }))
+}
+
 /// Create a new MapleStory client handle with an API key.
 /// Returns NULL on failure (inspect `maplestory_last_error_message()`).
 #[no_mangle]
@@ -123,25 +151,7 @@ pub unsafe extern "C" fn maplestory_client_new(api_key: *const c_char) -> *mut C
         Ok(s) => s,
         Err(_) => return ptr::null_mut(),
     };
-
-    let client = match MapleStoryClient::new(key) {
-        Ok(c) => c,
-        Err(e) => {
-            set_last_error(e.to_string());
-            return ptr::null_mut();
-        }
-    };
-
-    let runtime = match Runtime::new() {
-        Ok(rt) => rt,
-        Err(e) => {
-            set_last_error(format!("Failed to initialize Tokio runtime: {e}"));
-            return ptr::null_mut();
-        }
-    };
-
-    clear_last_error();
-    Box::into_raw(Box::new(ClientHandle { client, runtime }))
+    build_client_handle(MapleStoryClient::new(key))
 }
 
 /// Create a new MapleStory client handle with an API key and a custom base URL.
@@ -159,52 +169,18 @@ pub unsafe extern "C" fn maplestory_client_with_base_url(
         Ok(s) => s,
         Err(_) => return ptr::null_mut(),
     };
-
-    let client = match MapleStoryClient::builder()
-        .api_key(key)
-        .base_url(url)
-        .build()
-    {
-        Ok(c) => c,
-        Err(e) => {
-            set_last_error(e.to_string());
-            return ptr::null_mut();
-        }
-    };
-
-    let runtime = match Runtime::new() {
-        Ok(rt) => rt,
-        Err(e) => {
-            set_last_error(format!("Failed to initialize Tokio runtime: {e}"));
-            return ptr::null_mut();
-        }
-    };
-
-    clear_last_error();
-    Box::into_raw(Box::new(ClientHandle { client, runtime }))
+    build_client_handle(
+        MapleStoryClient::builder()
+            .api_key(key)
+            .base_url(url)
+            .build(),
+    )
 }
 
 /// Create a new MapleStory client handle from NEXON_API_KEY environment variable.
 #[no_mangle]
 pub unsafe extern "C" fn maplestory_client_from_env() -> *mut ClientHandle {
-    let client = match MapleStoryClient::from_env() {
-        Ok(c) => c,
-        Err(e) => {
-            set_last_error(e.to_string());
-            return ptr::null_mut();
-        }
-    };
-
-    let runtime = match Runtime::new() {
-        Ok(rt) => rt,
-        Err(e) => {
-            set_last_error(format!("Failed to initialize Tokio runtime: {e}"));
-            return ptr::null_mut();
-        }
-    };
-
-    clear_last_error();
-    Box::into_raw(Box::new(ClientHandle { client, runtime }))
+    build_client_handle(MapleStoryClient::from_env())
 }
 
 /// Free a MapleStory client handle.
@@ -392,17 +368,11 @@ pub unsafe extern "C" fn maplestory_get_account_summary(
         Err(code) => return code,
     };
 
-    let res = h.runtime.block_on(async {
-        let mut summary = h.client.user().get_account_summary(date_opt).await?;
-        if summary.union.is_none() {
-            if let Some(name) = name_opt {
-                if let Ok(ocid) = h.client.get_ocid(name).await {
-                    summary.union = h.client.union().get_union(&ocid, date_opt).await.ok();
-                }
-            }
-        }
-        Ok(summary)
-    });
+    let res = h.runtime.block_on(
+        h.client
+            .user()
+            .get_account_summary_with_character(name_opt, date_opt),
+    );
     serialize_json_result(res, out_json)
 }
 

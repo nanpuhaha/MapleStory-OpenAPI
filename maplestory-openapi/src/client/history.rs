@@ -33,68 +33,10 @@ fn build_history_params(
     Ok(params)
 }
 
-#[cfg(not(target_arch = "wasm32"))]
-fn paginate_history_stream<'a, T, F, Fut>(
+fn history_unfold_stream<'a, T, F, Fut>(
     date: impl Into<DateParam>,
     fetch_page: F,
-) -> BoxStream<'a, Result<T>>
-where
-    T: Send + 'a,
-    F: Fn(Option<String>, Option<String>) -> Fut + Send + Sync + 'a,
-    Fut: std::future::Future<Output = Result<(Option<String>, Vec<T>)>> + Send + 'a,
-{
-    let date_str = date.into().as_deref().map(|s| s.to_string());
-
-    struct State<T, F> {
-        cursor: Option<String>,
-        buffer: std::vec::IntoIter<T>,
-        finished: bool,
-        fetch_page: F,
-        date_str: Option<String>,
-    }
-
-    let initial_state = State {
-        cursor: None,
-        buffer: Vec::new().into_iter(),
-        finished: false,
-        fetch_page,
-        date_str,
-    };
-
-    stream::unfold(initial_state, move |mut state| async move {
-        loop {
-            if let Some(item) = state.buffer.next() {
-                return Some((Ok(item), state));
-            }
-            if state.finished {
-                return None;
-            }
-
-            let res = (state.fetch_page)(state.date_str.clone(), state.cursor.clone()).await;
-            match res {
-                Ok((next_cursor, entries)) => {
-                    let next_cursor = next_cursor.filter(|c| !c.is_empty());
-                    if entries.is_empty() || next_cursor.is_none() {
-                        state.finished = true;
-                    }
-                    state.cursor = next_cursor;
-                    state.buffer = entries.into_iter();
-                }
-                Err(e) => {
-                    state.finished = true;
-                    return Some((Err(e), state));
-                }
-            }
-        }
-    })
-    .boxed()
-}
-
-#[cfg(target_arch = "wasm32")]
-fn paginate_history_stream<'a, T, F, Fut>(
-    date: impl Into<DateParam>,
-    fetch_page: F,
-) -> BoxStream<'a, Result<T>>
+) -> impl futures_util::Stream<Item = Result<T>> + 'a
 where
     T: 'a,
     F: Fn(Option<String>, Option<String>) -> Fut + 'a,
@@ -144,7 +86,32 @@ where
             }
         }
     })
-    .boxed_local()
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn paginate_history_stream<'a, T, F, Fut>(
+    date: impl Into<DateParam>,
+    fetch_page: F,
+) -> BoxStream<'a, Result<T>>
+where
+    T: Send + 'a,
+    F: Fn(Option<String>, Option<String>) -> Fut + Send + Sync + 'a,
+    Fut: std::future::Future<Output = Result<(Option<String>, Vec<T>)>> + Send + 'a,
+{
+    history_unfold_stream(date, fetch_page).boxed()
+}
+
+#[cfg(target_arch = "wasm32")]
+fn paginate_history_stream<'a, T, F, Fut>(
+    date: impl Into<DateParam>,
+    fetch_page: F,
+) -> BoxStream<'a, Result<T>>
+where
+    T: 'a,
+    F: Fn(Option<String>, Option<String>) -> Fut + 'a,
+    Fut: std::future::Future<Output = Result<(Option<String>, Vec<T>)>> + 'a,
+{
+    history_unfold_stream(date, fetch_page).boxed_local()
 }
 
 // ─── HistoryClient ───────────────────────────────────────────────────────────
@@ -180,16 +147,17 @@ impl<'a> HistoryClient<'a> {
         count: u32,
         date: impl Into<DateParam>,
     ) -> BoxStream<'a, Result<StarforceHistoryEntry>> {
-        let client = self.client;
+        let history = *self;
         paginate_history_stream(date, move |d, c| async move {
-            let page = client
-                .get_starforce_history(count, d.as_deref(), c.as_deref())
+            let page = history
+                .get_starforce(count, d.as_deref(), c.as_deref())
                 .await?;
             Ok((page.next_cursor, page.starforce_history.unwrap_or_default()))
         })
     }
 
     /// Alias for [`get_starforce_history_stream`](Self::get_starforce_history_stream).
+    #[inline]
     pub fn get_starforce_stream(
         &self,
         count: u32,
@@ -217,16 +185,17 @@ impl<'a> HistoryClient<'a> {
         count: u32,
         date: impl Into<DateParam>,
     ) -> BoxStream<'a, Result<PotentialHistoryEntry>> {
-        let client = self.client;
+        let history = *self;
         paginate_history_stream(date, move |d, c| async move {
-            let page = client
-                .get_potential_history(count, d.as_deref(), c.as_deref())
+            let page = history
+                .get_potential(count, d.as_deref(), c.as_deref())
                 .await?;
             Ok((page.next_cursor, page.potential_history.unwrap_or_default()))
         })
     }
 
     /// Alias for [`get_potential_history_stream`](Self::get_potential_history_stream).
+    #[inline]
     pub fn get_potential_stream(
         &self,
         count: u32,
@@ -254,16 +223,15 @@ impl<'a> HistoryClient<'a> {
         count: u32,
         date: impl Into<DateParam>,
     ) -> BoxStream<'a, Result<CubeHistoryEntry>> {
-        let client = self.client;
+        let history = *self;
         paginate_history_stream(date, move |d, c| async move {
-            let page = client
-                .get_cube_history(count, d.as_deref(), c.as_deref())
-                .await?;
+            let page = history.get_cube(count, d.as_deref(), c.as_deref()).await?;
             Ok((page.next_cursor, page.cube_history.unwrap_or_default()))
         })
     }
 
     /// Alias for [`get_cube_history_stream`](Self::get_cube_history_stream).
+    #[inline]
     pub fn get_cube_stream(
         &self,
         count: u32,
@@ -291,10 +259,10 @@ impl<'a> HistoryClient<'a> {
         count: u32,
         date: impl Into<DateParam>,
     ) -> BoxStream<'a, Result<SoulPotentialHistoryEntry>> {
-        let client = self.client;
+        let history = *self;
         paginate_history_stream(date, move |d, c| async move {
-            let page = client
-                .get_soul_potential_history(count, d.as_deref(), c.as_deref())
+            let page = history
+                .get_soul_potential(count, d.as_deref(), c.as_deref())
                 .await?;
             Ok((
                 page.next_cursor,
@@ -304,6 +272,7 @@ impl<'a> HistoryClient<'a> {
     }
 
     /// Alias for [`get_soul_potential_history_stream`](Self::get_soul_potential_history_stream).
+    #[inline]
     pub fn get_soul_potential_stream(
         &self,
         count: u32,
@@ -317,6 +286,7 @@ impl MapleStoryClient {
     /// Retrieve starforce enhancement history.
     ///
     /// Corresponds to `GET /maplestory/v1/history/starforce`.
+    #[inline]
     pub async fn get_starforce_history(
         &self,
         count: u32,
@@ -327,6 +297,7 @@ impl MapleStoryClient {
     }
 
     /// Stream starforce enhancement history entries with automatic cursor pagination.
+    #[inline]
     pub fn get_starforce_history_stream(
         &self,
         count: u32,
@@ -338,6 +309,7 @@ impl MapleStoryClient {
     /// Retrieve potential reset history.
     ///
     /// Corresponds to `GET /maplestory/v1/history/potential`.
+    #[inline]
     pub async fn get_potential_history(
         &self,
         count: u32,
@@ -348,6 +320,7 @@ impl MapleStoryClient {
     }
 
     /// Stream potential reset history entries with automatic cursor pagination.
+    #[inline]
     pub fn get_potential_history_stream(
         &self,
         count: u32,
@@ -359,6 +332,7 @@ impl MapleStoryClient {
     /// Retrieve cube and special item usage history.
     ///
     /// Corresponds to `GET /maplestory/v1/history/cube`.
+    #[inline]
     pub async fn get_cube_history(
         &self,
         count: u32,
@@ -369,6 +343,7 @@ impl MapleStoryClient {
     }
 
     /// Stream cube usage history entries with automatic cursor pagination.
+    #[inline]
     pub fn get_cube_history_stream(
         &self,
         count: u32,
@@ -380,6 +355,7 @@ impl MapleStoryClient {
     /// Retrieve soul potential reset history.
     ///
     /// Corresponds to `GET /maplestory/v1/history/soul-potential`.
+    #[inline]
     pub async fn get_soul_potential_history(
         &self,
         count: u32,
@@ -390,6 +366,7 @@ impl MapleStoryClient {
     }
 
     /// Stream soul potential reset history entries with automatic cursor pagination.
+    #[inline]
     pub fn get_soul_potential_history_stream(
         &self,
         count: u32,
