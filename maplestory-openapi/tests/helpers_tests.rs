@@ -698,6 +698,53 @@ fn test_transparent_equipment_and_invisible_sub_weapon() {
     );
 }
 
+#[test]
+fn test_equip_layer_resolver_direct_and_custom_rules() {
+    use maplestory_openapi::models::character::{
+        CashItemEquipmentDetail, CharacterBeautyEquipment, CharacterCashItemEquipment,
+        CharacterItemEquipment, EquipLayerResolver, ItemEquipmentDetail,
+    };
+
+    let beauty = CharacterBeautyEquipment::default();
+    let cash_equip = CharacterCashItemEquipment {
+        preset_no: Some(1),
+        cash_item_equipment_preset_1: Some(vec![CashItemEquipmentDetail {
+            cash_item_equipment_part: Some("한벌옷".to_string()),
+            cash_item_equipment_slot: Some("한벌옷".to_string()),
+            cash_item_name: Some("인형의 꿈".to_string()),
+            cash_item_icon: Some("https://example.com/dream.png".to_string()),
+            cash_item_label: Some("마스터라벨".to_string()),
+            ..Default::default()
+        }]),
+        ..Default::default()
+    };
+    let normal_equip = CharacterItemEquipment {
+        item_equipment: Some(vec![
+            ItemEquipmentDetail {
+                item_equipment_part: Some("상의".to_string()),
+                item_equipment_slot: Some("상의".to_string()),
+                item_name: Some("이글아이 던위치로브".to_string()),
+                ..Default::default()
+            },
+            ItemEquipmentDetail {
+                item_equipment_part: Some("하의".to_string()),
+                item_equipment_slot: Some("하의".to_string()),
+                item_name: Some("트릭스터 던위치팬츠".to_string()),
+                ..Default::default()
+            },
+        ]),
+        ..Default::default()
+    };
+
+    let resolved = EquipLayerResolver::resolve(&beauty, &cash_equip, &normal_equip);
+    assert_eq!(resolved.visible_items.len(), 1);
+    let overall = &resolved.visible_items[0];
+    assert_eq!(overall.slot, "한벌옷");
+    assert_eq!(overall.name, "인형의 꿈");
+    assert!(overall.is_cash);
+    assert_eq!(overall.cash_label.as_deref(), Some("마스터라벨"));
+}
+
 #[tokio::test]
 async fn test_client_concurrency_limiter_builder_and_default() {
     use maplestory_openapi::MapleStoryClient;

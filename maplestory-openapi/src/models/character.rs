@@ -175,7 +175,7 @@ pub struct AbilityPreset {
 // ─── Item Equipment ───────────────────────────────────────────────────────────
 
 /// Response from `GET /maplestory/v1/character/item-equipment`.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct CharacterItemEquipment {
     /// Query reference date (KST)
     pub date: Option<String>,
@@ -639,7 +639,7 @@ pub struct CharacterCashItemEquipment {
 }
 
 /// A single cash item equipment entry.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct CashItemEquipmentDetail {
     pub cash_item_equipment_part: Option<String>,
     pub cash_item_equipment_slot: Option<String>,
@@ -662,7 +662,7 @@ pub struct CashItemEquipmentDetail {
 }
 
 /// Custom origin entry for cash items.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct CustomOrigin {
     pub custom_origin_no: Option<i64>,
     pub x: Option<String>,
@@ -1593,13 +1593,17 @@ pub struct CharacterCoordination {
 /// Alias for [`CharacterCoordination`].
 pub type CharacterAppearance = CharacterCoordination;
 
-impl CharacterCoordination {
-    /// Synthesizes coordination from separate beauty, cash, and normal equipment models.
-    pub fn from_parts(
+/// Dedicated layering engine for equipment appearance, cash overrides, anvil items, and coordination.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct EquipLayerResolver;
+
+impl EquipLayerResolver {
+    /// Resolves visible equipment items and beauty state into a [`CharacterCoordination`].
+    pub fn resolve(
         beauty: &CharacterBeautyEquipment,
         cash_equip: &CharacterCashItemEquipment,
         normal_equip: &CharacterItemEquipment,
-    ) -> Self {
+    ) -> CharacterCoordination {
         // Standard visual slots in typical display order
         let standard_slots = [
             "모자",
@@ -1644,13 +1648,15 @@ impl CharacterCoordination {
                 .find(|(idx, item)| {
                     !handled_cash_indices.contains(idx)
                         && (item.cash_item_equipment_slot.as_deref() == Some(slot)
-                            || item.cash_item_equipment_part.as_deref() == Some(slot))
+                            || item.cash_item_equipment_part.as_deref() == Some(slot)
+                            || (slot == "상의" && (item.cash_item_equipment_part.as_deref() == Some("한벌옷") || item.cash_item_equipment_slot.as_deref() == Some("한벌옷"))))
                 })
                 .or_else(|| {
                     // Fallback to base cash items if active preset slot is empty
                     base_cash_items.iter().enumerate().find(|(_, item)| {
                         item.cash_item_equipment_slot.as_deref() == Some(slot)
                             || item.cash_item_equipment_part.as_deref() == Some(slot)
+                            || (slot == "상의" && (item.cash_item_equipment_part.as_deref() == Some("한벌옷") || item.cash_item_equipment_slot.as_deref() == Some("한벌옷")))
                     })
                 });
 
@@ -1782,7 +1788,7 @@ impl CharacterCoordination {
             }
         }
 
-        Self {
+        CharacterCoordination {
             character_name: None,
             world_name: None,
             character_class: None,
@@ -1795,6 +1801,17 @@ impl CharacterCoordination {
             cash_preset_no: cash_equip.preset_no,
             visible_items,
         }
+    }
+}
+
+impl CharacterCoordination {
+    /// Synthesizes coordination from separate beauty, cash, and normal equipment models.
+    pub fn from_parts(
+        beauty: &CharacterBeautyEquipment,
+        cash_equip: &CharacterCashItemEquipment,
+        normal_equip: &CharacterItemEquipment,
+    ) -> Self {
+        EquipLayerResolver::resolve(beauty, cash_equip, normal_equip)
     }
 
     /// Synthesizes coordination including basic character profile information.
