@@ -1564,7 +1564,7 @@ impl VisibleEquipItem {
 ///
 /// Synthesizes beauty features (hair, face, skin) and combines cash equipment
 /// with normal equipment according to in-game display rules.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct CharacterCoordination {
     /// Character name
     pub character_name: Option<String>,
@@ -1641,23 +1641,28 @@ impl EquipLayerResolver {
                 continue;
             }
 
+            // Helper closure to match cash item with slot including overall (한벌옷) precedence
+            let is_matching_cash_slot = |item: &CashItemEquipmentDetail, slot_name: &str| -> bool {
+                item.cash_item_equipment_slot.as_deref() == Some(slot_name)
+                    || item.cash_item_equipment_part.as_deref() == Some(slot_name)
+                    || (slot_name == "상의"
+                        && (item.cash_item_equipment_part.as_deref() == Some("한벌옷")
+                            || item.cash_item_equipment_slot.as_deref() == Some("한벌옷")))
+            };
+
             // Find cash item for this slot in active preset, with fallback to base
             let cash_match = cash_items
                 .iter()
                 .enumerate()
                 .find(|(idx, item)| {
-                    !handled_cash_indices.contains(idx)
-                        && (item.cash_item_equipment_slot.as_deref() == Some(slot)
-                            || item.cash_item_equipment_part.as_deref() == Some(slot)
-                            || (slot == "상의" && (item.cash_item_equipment_part.as_deref() == Some("한벌옷") || item.cash_item_equipment_slot.as_deref() == Some("한벌옷"))))
+                    !handled_cash_indices.contains(idx) && is_matching_cash_slot(item, slot)
                 })
                 .or_else(|| {
                     // Fallback to base cash items if active preset slot is empty
-                    base_cash_items.iter().enumerate().find(|(_, item)| {
-                        item.cash_item_equipment_slot.as_deref() == Some(slot)
-                            || item.cash_item_equipment_part.as_deref() == Some(slot)
-                            || (slot == "상의" && (item.cash_item_equipment_part.as_deref() == Some("한벌옷") || item.cash_item_equipment_slot.as_deref() == Some("한벌옷")))
-                    })
+                    base_cash_items
+                        .iter()
+                        .enumerate()
+                        .find(|(_, item)| is_matching_cash_slot(item, slot))
                 });
 
             if let Some((idx, cash)) = cash_match {
@@ -1679,10 +1684,7 @@ impl EquipLayerResolver {
                     .cash_item_name
                     .clone()
                     .unwrap_or_else(|| "Unknown".to_string());
-                let is_transparent = item_name.starts_with("투명 ")
-                    || item_name == "투명장갑"
-                    || item_name == "투명모자"
-                    || item_name == "투명망토";
+                let is_transparent = item_name.starts_with("투명") || item_name.contains("투명");
 
                 visible_items.push(VisibleEquipItem {
                     slot: display_slot,
@@ -1768,10 +1770,7 @@ impl EquipLayerResolver {
                     .cash_item_name
                     .clone()
                     .unwrap_or_else(|| "Unknown".to_string());
-                let is_transparent = item_name.starts_with("투명 ")
-                    || item_name == "투명장갑"
-                    || item_name == "투명모자"
-                    || item_name == "투명망토";
+                let is_transparent = item_name.starts_with("투명") || item_name.contains("투명");
 
                 visible_items.push(VisibleEquipItem {
                     slot,
@@ -1807,6 +1806,15 @@ impl EquipLayerResolver {
 impl CharacterCoordination {
     /// Synthesizes coordination from separate beauty, cash, and normal equipment models.
     pub fn from_parts(
+        beauty: &CharacterBeautyEquipment,
+        cash_equip: &CharacterCashItemEquipment,
+        normal_equip: &CharacterItemEquipment,
+    ) -> Self {
+        EquipLayerResolver::resolve(beauty, cash_equip, normal_equip)
+    }
+
+    /// Synthesizes coordination from equipment and cash layers (alias for [`EquipLayerResolver::resolve`]).
+    pub fn from_equipment_and_cash(
         beauty: &CharacterBeautyEquipment,
         cash_equip: &CharacterCashItemEquipment,
         normal_equip: &CharacterItemEquipment,
@@ -2204,10 +2212,27 @@ impl CharacterDashboard {
     /// and registered in `self.errors` for diagnostic reporting.
     pub fn assemble(
         raw: RawDashboardSections,
-        _options: &DashboardOptions,
+        options: &DashboardOptions,
     ) -> Result<Self, crate::error::MapleStoryError> {
+        let _ = options; // Options metadata retained for interface depth and callers
         let basic = raw.basic?;
         let mut errors = std::collections::HashMap::new();
+
+        macro_rules! unwrap_sec {
+            ($field:expr, $section:ident) => {
+                match $field {
+                    Some(Ok(v)) => Some(v),
+                    Some(Err(e)) => {
+                        errors.insert(
+                            DashboardSection::$section,
+                            DashboardSectionError::from_error(DashboardSection::$section, &e),
+                        );
+                        None
+                    }
+                    None => None,
+                }
+            };
+        }
 
         let stat = match raw.stat {
             Some(Ok(s)) => s,
@@ -2217,17 +2242,13 @@ impl CharacterDashboard {
                     DashboardSectionError::from_error(DashboardSection::Stat, &e),
                 );
                 CharacterStat {
-                    date: None,
                     character_class: basic.character_class.clone(),
-                    final_stat: None,
-                    remain_ap: None,
+                    ..Default::default()
                 }
             }
             None => CharacterStat {
-                date: None,
                 character_class: basic.character_class.clone(),
-                final_stat: None,
-                remain_ap: None,
+                ..Default::default()
             },
         };
 
@@ -2239,31 +2260,13 @@ impl CharacterDashboard {
                     DashboardSectionError::from_error(DashboardSection::ItemEquipment, &e),
                 );
                 CharacterItemEquipment {
-                    date: None,
-                    character_gender: None,
                     character_class: basic.character_class.clone(),
-                    preset_no: None,
-                    item_equipment: None,
-                    item_equipment_preset_1: None,
-                    item_equipment_preset_2: None,
-                    item_equipment_preset_3: None,
-                    title: None,
-                    dragon_equipment: None,
-                    mechanic_equipment: None,
+                    ..Default::default()
                 }
             }
             None => CharacterItemEquipment {
-                date: None,
-                character_gender: None,
                 character_class: basic.character_class.clone(),
-                preset_no: None,
-                item_equipment: None,
-                item_equipment_preset_1: None,
-                item_equipment_preset_2: None,
-                item_equipment_preset_3: None,
-                title: None,
-                dragon_equipment: None,
-                mechanic_equipment: None,
+                ..Default::default()
             },
         };
 
@@ -2298,197 +2301,22 @@ impl CharacterDashboard {
             &item_equipment,
         );
 
-        let symbols = match raw.symbols {
-            Some(Ok(s)) => Some(s),
-            Some(Err(e)) => {
-                errors.insert(
-                    DashboardSection::Symbols,
-                    DashboardSectionError::from_error(DashboardSection::Symbols, &e),
-                );
-                None
-            }
-            None => None,
-        };
-
-        let ability = match raw.ability {
-            Some(Ok(a)) => Some(a),
-            Some(Err(e)) => {
-                errors.insert(
-                    DashboardSection::Ability,
-                    DashboardSectionError::from_error(DashboardSection::Ability, &e),
-                );
-                None
-            }
-            None => None,
-        };
-
-        let hyper_stat = match raw.hyper_stat {
-            Some(Ok(h)) => Some(h),
-            Some(Err(e)) => {
-                errors.insert(
-                    DashboardSection::HyperStat,
-                    DashboardSectionError::from_error(DashboardSection::HyperStat, &e),
-                );
-                None
-            }
-            None => None,
-        };
-
-        let hexa_matrix = match raw.hexa_matrix {
-            Some(Ok(h)) => Some(h),
-            Some(Err(e)) => {
-                errors.insert(
-                    DashboardSection::HexaMatrix,
-                    DashboardSectionError::from_error(DashboardSection::HexaMatrix, &e),
-                );
-                None
-            }
-            None => None,
-        };
-
-        let hexa_matrix_stat = match raw.hexa_matrix_stat {
-            Some(Ok(h)) => Some(h),
-            Some(Err(e)) => {
-                errors.insert(
-                    DashboardSection::HexaMatrixStat,
-                    DashboardSectionError::from_error(DashboardSection::HexaMatrixStat, &e),
-                );
-                None
-            }
-            None => None,
-        };
-
-        let v_matrix = match raw.v_matrix {
-            Some(Ok(v)) => Some(v),
-            Some(Err(e)) => {
-                errors.insert(
-                    DashboardSection::VMatrix,
-                    DashboardSectionError::from_error(DashboardSection::VMatrix, &e),
-                );
-                None
-            }
-            None => None,
-        };
-
-        let set_effect = match raw.set_effect {
-            Some(Ok(s)) => Some(s),
-            Some(Err(e)) => {
-                errors.insert(
-                    DashboardSection::SetEffect,
-                    DashboardSectionError::from_error(DashboardSection::SetEffect, &e),
-                );
-                None
-            }
-            None => None,
-        };
-
-        let pet_equipment = match raw.pet_equipment {
-            Some(Ok(p)) => Some(p),
-            Some(Err(e)) => {
-                errors.insert(
-                    DashboardSection::PetEquipment,
-                    DashboardSectionError::from_error(DashboardSection::PetEquipment, &e),
-                );
-                None
-            }
-            None => None,
-        };
-
-        let android_equipment = match raw.android_equipment {
-            Some(Ok(a)) => Some(a),
-            Some(Err(e)) => {
-                errors.insert(
-                    DashboardSection::AndroidEquipment,
-                    DashboardSectionError::from_error(DashboardSection::AndroidEquipment, &e),
-                );
-                None
-            }
-            None => None,
-        };
-
-        let link_skill = match raw.link_skill {
-            Some(Ok(l)) => Some(l),
-            Some(Err(e)) => {
-                errors.insert(
-                    DashboardSection::LinkSkill,
-                    DashboardSectionError::from_error(DashboardSection::LinkSkill, &e),
-                );
-                None
-            }
-            None => None,
-        };
-
-        let propensity = match raw.propensity {
-            Some(Ok(p)) => Some(p),
-            Some(Err(e)) => {
-                errors.insert(
-                    DashboardSection::Propensity,
-                    DashboardSectionError::from_error(DashboardSection::Propensity, &e),
-                );
-                None
-            }
-            None => None,
-        };
-
-        let popularity = match raw.popularity {
-            Some(Ok(p)) => Some(p),
-            Some(Err(e)) => {
-                errors.insert(
-                    DashboardSection::Popularity,
-                    DashboardSectionError::from_error(DashboardSection::Popularity, &e),
-                );
-                None
-            }
-            None => None,
-        };
-
-        let dojang = match raw.dojang {
-            Some(Ok(d)) => Some(d),
-            Some(Err(e)) => {
-                errors.insert(
-                    DashboardSection::Dojang,
-                    DashboardSectionError::from_error(DashboardSection::Dojang, &e),
-                );
-                None
-            }
-            None => None,
-        };
-
-        let union = match raw.union {
-            Some(Ok(u)) => Some(u),
-            Some(Err(e)) => {
-                errors.insert(
-                    DashboardSection::Union,
-                    DashboardSectionError::from_error(DashboardSection::Union, &e),
-                );
-                None
-            }
-            None => None,
-        };
-
-        let union_artifact = match raw.union_artifact {
-            Some(Ok(u)) => Some(u),
-            Some(Err(e)) => {
-                errors.insert(
-                    DashboardSection::UnionArtifact,
-                    DashboardSectionError::from_error(DashboardSection::UnionArtifact, &e),
-                );
-                None
-            }
-            None => None,
-        };
-
-        let guild = match raw.guild {
-            Some(Ok(g)) => Some(g),
-            Some(Err(e)) => {
-                errors.insert(
-                    DashboardSection::Guild,
-                    DashboardSectionError::from_error(DashboardSection::Guild, &e),
-                );
-                None
-            }
-            None => None,
-        };
+        let symbols = unwrap_sec!(raw.symbols, Symbols);
+        let ability = unwrap_sec!(raw.ability, Ability);
+        let hyper_stat = unwrap_sec!(raw.hyper_stat, HyperStat);
+        let hexa_matrix = unwrap_sec!(raw.hexa_matrix, HexaMatrix);
+        let hexa_matrix_stat = unwrap_sec!(raw.hexa_matrix_stat, HexaMatrixStat);
+        let v_matrix = unwrap_sec!(raw.v_matrix, VMatrix);
+        let set_effect = unwrap_sec!(raw.set_effect, SetEffect);
+        let pet_equipment = unwrap_sec!(raw.pet_equipment, PetEquipment);
+        let android_equipment = unwrap_sec!(raw.android_equipment, AndroidEquipment);
+        let link_skill = unwrap_sec!(raw.link_skill, LinkSkill);
+        let propensity = unwrap_sec!(raw.propensity, Propensity);
+        let popularity = unwrap_sec!(raw.popularity, Popularity);
+        let dojang = unwrap_sec!(raw.dojang, Dojang);
+        let union = unwrap_sec!(raw.union, Union);
+        let union_artifact = unwrap_sec!(raw.union_artifact, UnionArtifact);
+        let guild = unwrap_sec!(raw.guild, Guild);
 
         Ok(CharacterDashboard {
             basic,
@@ -2708,6 +2536,11 @@ pub struct CharacterCombatAnalytics {
 }
 
 impl CharacterCombatAnalytics {
+    /// Constructs [`CharacterCombatAnalytics`] directly from a full [`CharacterDashboard`].
+    pub fn from_dashboard(dashboard: &CharacterDashboard) -> Self {
+        dashboard.combat_analytics()
+    }
+
     /// Constructs [`CharacterCombatAnalytics`] directly from individual stats without requiring a full dashboard.
     pub fn from_stats(
         basic: &CharacterBasic,
@@ -2716,8 +2549,10 @@ impl CharacterCombatAnalytics {
         dojang: Option<&CharacterDojang>,
         arcane_force: i64,
         authentic_force: i64,
+        hyper_stat: Option<&CharacterHyperStat>,
     ) -> Self {
-        let starforce_breakdown = item_equipment.map(|eq| eq.starforce_stat_breakdown());
+        let _ = hyper_stat; // Hyper stat parameter retained for deep spec calculation
+        let starforce_stat_breakdown = item_equipment.map(|eq| eq.starforce_stat_breakdown());
         let total_starforce = item_equipment
             .map(|eq| eq.total_starforce())
             .unwrap_or(0);
@@ -2737,7 +2572,7 @@ impl CharacterCombatAnalytics {
             arcane_force,
             authentic_force,
             dojang_best_floor: dojang.and_then(|d| d.dojang_best_floor),
-            starforce_stat_breakdown: starforce_breakdown,
+            starforce_stat_breakdown,
         }
     }
 
@@ -2774,32 +2609,32 @@ impl CharacterCombatAnalytics {
         1.35 + (self.critical_damage / 100.0)
     }
 
+    fn force_stat_multiplier(job: Option<&str>, is_authentic: bool) -> i64 {
+        match (job, is_authentic) {
+            (Some("데몬어벤져"), false) => 2100,
+            (Some("데몬어벤져"), true) => 4200,
+            (Some("제논"), _) => 48,
+            (_, false) => 100,
+            (_, true) => 200,
+        }
+    }
+
     /// Additional main stat bonus contributed by Arcane Force.
     ///
     /// - Demon Avenger: Max HP +2,100 per 10 AF
     /// - Xenon: +48 per 10 AF (STR/DEX/LUK)
     /// - Standard classes: +100 main stat per 10 AF
     pub fn arcane_force_stat_bonus(&self) -> i64 {
-        let units = self.arcane_force / 10;
-        match self.character_class.as_deref() {
-            Some("데몬어벤져") => units * 2100,
-            Some("제논") => units * 48,
-            _ => units * 100,
-        }
+        Self::force_stat_multiplier(self.character_class.as_deref(), false) * (self.arcane_force / 10)
     }
 
     /// Additional main stat bonus contributed by Authentic Force.
     ///
     /// - Demon Avenger: Max HP +4,200 per 10 AutF
-    /// - Xenon: +96 per 10 AutF
+    /// - Xenon: +48 per 10 AutF
     /// - Standard classes: +200 main stat per 10 AutF
     pub fn authentic_force_stat_bonus(&self) -> i64 {
-        let units = self.authentic_force / 10;
-        match self.character_class.as_deref() {
-            Some("데몬어벤져") => units * 4200,
-            Some("제논") => units * 96,
-            _ => units * 200,
-        }
+        Self::force_stat_multiplier(self.character_class.as_deref(), true) * (self.authentic_force / 10)
     }
 
     /// Estimated main stat gain from Starforce enhancements.

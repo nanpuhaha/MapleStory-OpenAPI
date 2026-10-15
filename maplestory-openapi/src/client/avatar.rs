@@ -95,4 +95,38 @@ impl<'a> AvatarClient<'a> {
         }
         Ok(resp.bytes().await?.to_vec())
     }
+
+    /// Fetches and renders a custom sequence of [`crate::avatar::AnimationFrame`] into an animated GIF.
+    #[cfg(feature = "animation")]
+    pub async fn render_custom_gif(
+        &self,
+        avatar_code: &AvatarCode,
+        frames: &[crate::avatar::AnimationFrame],
+        width: Option<u32>,
+        height: Option<u32>,
+    ) -> Result<Vec<u8>> {
+        let preset = AnimationPreset::Custom(frames.to_vec());
+        self.render_gif(avatar_code, &preset, width, height).await
+    }
+
+    /// Fetches a single frame of an avatar given frame configuration.
+    pub async fn fetch_frame(
+        &self,
+        avatar_code: &AvatarCode,
+        frame: &crate::avatar::AnimationFrame,
+        width: Option<u32>,
+        height: Option<u32>,
+    ) -> Result<Vec<u8>> {
+        let mut query = crate::avatar::AvatarLookQuery::default()
+            .action(frame.action.clone())
+            .emotion(frame.emotion.clone())
+            .weapon_motion(frame.wmotion.clone());
+        if let Some(w) = width {
+            query = query.width(w);
+        }
+        if let Some(h) = height {
+            query = query.height(h);
+        }
+        self.fetch_frame_bytes(avatar_code, &query).await
+    }
 }

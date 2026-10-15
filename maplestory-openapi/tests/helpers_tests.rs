@@ -743,6 +743,49 @@ fn test_equip_layer_resolver_direct_and_custom_rules() {
     assert_eq!(overall.name, "인형의 꿈");
     assert!(overall.is_cash);
     assert_eq!(overall.cash_label.as_deref(), Some("마스터라벨"));
+
+    // 2. Anvil and Transparent items layering
+    use maplestory_openapi::models::character::CharacterCoordination;
+    let cash_with_transparent = CharacterCashItemEquipment {
+        preset_no: Some(1),
+        cash_item_equipment_preset_1: Some(vec![
+            CashItemEquipmentDetail {
+                cash_item_equipment_part: Some("눈장식".to_string()),
+                cash_item_equipment_slot: Some("눈장식".to_string()),
+                cash_item_name: Some("투명안경".to_string()),
+                ..Default::default()
+            },
+        ]),
+        ..Default::default()
+    };
+    let normal_with_anvil = CharacterItemEquipment {
+        item_equipment: Some(vec![
+            ItemEquipmentDetail {
+                item_equipment_part: Some("모자".to_string()),
+                item_equipment_slot: Some("모자".to_string()),
+                item_name: Some("하이네스 던위치햇".to_string()),
+                item_shape_name: Some("빨간 산타모자".to_string()),
+                item_shape_icon: Some("https://example.com/santa.png".to_string()),
+                ..Default::default()
+            },
+        ]),
+        ..Default::default()
+    };
+
+    let coord_alias = CharacterCoordination::from_equipment_and_cash(
+        &beauty,
+        &cash_with_transparent,
+        &normal_with_anvil,
+    );
+
+    let transparent_item = coord_alias.visible_items.iter().find(|i| i.slot == "눈장식").unwrap();
+    assert!(transparent_item.is_transparent);
+    assert_eq!(transparent_item.name, "투명안경");
+
+    let anvil_item = coord_alias.visible_items.iter().find(|i| i.slot == "모자").unwrap();
+    assert!(anvil_item.is_anvil);
+    assert_eq!(anvil_item.name, "빨간 산타모자");
+    assert_eq!(anvil_item.original_name.as_deref(), Some("하이네스 던위치햇"));
 }
 
 #[tokio::test]
@@ -2476,14 +2519,15 @@ fn test_combat_analytics_decoupled_and_job_specific_force_scaling() {
         None,
         1320, // Arcane Force
         400,  // Authentic Force
+        None, // Hyper Stat
     );
 
     assert_eq!(xenon_analytics.character_name, "제논유저");
     assert_eq!(xenon_analytics.combat_power, 80_000_000);
     // Xenon: 1320 / 10 = 132 * 48 = 6336 main stat bonus
     assert_eq!(xenon_analytics.arcane_force_stat_bonus(), 6336);
-    // Xenon: 400 / 10 = 40 * 96 = 3840 main stat bonus
-    assert_eq!(xenon_analytics.authentic_force_stat_bonus(), 3840);
+    // Xenon: 400 / 10 = 40 * 48 = 1920 main stat bonus (Ticket 21 spec)
+    assert_eq!(xenon_analytics.authentic_force_stat_bonus(), 1920);
 
     // 2. Decoupled construction for Demon Avenger
     let da_basic = CharacterBasic {
@@ -2500,6 +2544,7 @@ fn test_combat_analytics_decoupled_and_job_specific_force_scaling() {
         None,
         1320,
         400,
+        None,
     );
     // Demon Avenger: 1320 / 10 = 132 * 2100 = 277,200 Max HP
     assert_eq!(da_analytics.arcane_force_stat_bonus(), 277_200);
@@ -2519,7 +2564,70 @@ fn test_combat_analytics_decoupled_and_job_specific_force_scaling() {
         None,
         1320,
         400,
+        None,
     );
     assert_eq!(hero_analytics.arcane_force_stat_bonus(), 13_200);
     assert_eq!(hero_analytics.authentic_force_stat_bonus(), 8_000);
+
+    // 4. from_dashboard convenience constructor
+    let dash = maplestory_openapi::models::character::CharacterDashboard {
+        basic: hero_basic,
+        stat,
+        item_equipment: equip,
+        cash_item_equipment: Default::default(),
+        beauty_equipment: Default::default(),
+        coordination: Default::default(),
+        symbols: None,
+        ability: None,
+        hyper_stat: None,
+        hexa_matrix: None,
+        hexa_matrix_stat: None,
+        v_matrix: None,
+        set_effect: None,
+        pet_equipment: None,
+        android_equipment: None,
+        link_skill: None,
+        propensity: None,
+        popularity: None,
+        dojang: None,
+        union: None,
+        union_artifact: None,
+        guild: None,
+        errors: std::collections::HashMap::new(),
+    };
+    let from_dash = CharacterCombatAnalytics::from_dashboard(&dash);
+    assert_eq!(from_dash.character_name, "히어로유저");
+}
+
+#[tokio::test]
+async fn test_avatar_client_pipeline_and_custom_frames() {
+    use maplestory_openapi::MapleStoryClient;
+    use maplestory_openapi::avatar::{AvatarAction, AvatarCode, AvatarEmotion, FrameConfig, WeaponMotion};
+
+    let client = MapleStoryClient::builder().api_key("test").build().unwrap();
+    let avatar = client.avatar();
+
+    let code_str = "ABCD".repeat(32);
+    let avatar_code = AvatarCode::new(&code_str);
+
+    let frame = FrameConfig {
+        action: AvatarAction::Stand1,
+        emotion: AvatarEmotion::Default,
+        wmotion: WeaponMotion::Default,
+        delay_ms: 500,
+    };
+
+    // Verify avatar pipeline URL construction and frame query formatting
+    let mut query = maplestory_openapi::avatar::AvatarLookQuery::default()
+        .action(frame.action)
+        .emotion(frame.emotion)
+        .weapon_motion(frame.wmotion);
+    query = query.width(120).height(120);
+    let frame_url = avatar_code.unwrap().to_look_url(&query);
+    assert!(frame_url.contains("width=120"));
+    assert!(frame_url.contains("height=120"));
+    assert!(frame_url.contains("action=A00"));
+
+    // Verify that AvatarClient sub-client is accessible
+    let _ = avatar;
 }

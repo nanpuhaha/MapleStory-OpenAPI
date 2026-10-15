@@ -356,6 +356,9 @@ pub struct AnimationFrame {
     pub delay_ms: u32,
 }
 
+/// Alias for [`AnimationFrame`] used in frame configuration.
+pub type FrameConfig = AnimationFrame;
+
 impl AnimationPreset {
     /// Returns the sequence of frames comprising this animation preset.
     pub fn frames(&self) -> Vec<AnimationFrame> {
@@ -532,6 +535,16 @@ impl AvatarLookQuery {
 
     pub fn size(mut self, width: u32, height: u32) -> Self {
         self.width = Some(width);
+        self.height = Some(height);
+        self
+    }
+
+    pub fn width(mut self, width: u32) -> Self {
+        self.width = Some(width);
+        self
+    }
+
+    pub fn height(mut self, height: u32) -> Self {
         self.height = Some(height);
         self
     }

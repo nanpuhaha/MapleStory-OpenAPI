@@ -200,16 +200,73 @@ pub struct MapleStoryCombatSummary {
     pub damage: f64,
     pub critical_rate: f64,
     pub critical_damage: f64,
-    pub total_starforce: i64,
-    pub arcane_force: i64,
-    pub authentic_force: i64,
-    pub dojang_best_floor: i64,
-    pub estimated_dojang_floor: i64,
+    pub total_starforce: i32,
+    pub arcane_force: i32,
+    pub authentic_force: i32,
+    pub dojang_best_floor: i32,
+    pub estimated_dojang_floor: i32,
     pub effective_damage_multiplier_300: f64,
     pub effective_damage_multiplier_380: f64,
 }
 
-/// Fetch character combat analytics summary directly into a typed C struct.
+impl MapleStoryCombatSummary {
+    fn from_analytics(
+        analytics: &maplestory_openapi::models::character::CharacterCombatAnalytics,
+    ) -> Self {
+        Self {
+            combat_power: analytics.combat_power,
+            boss_damage: analytics.boss_damage,
+            ignore_monster_armor: analytics.ignore_monster_armor,
+            damage: analytics.damage,
+            critical_rate: analytics.critical_rate,
+            critical_damage: analytics.critical_damage,
+            total_starforce: analytics.total_starforce as i32,
+            arcane_force: analytics.arcane_force as i32,
+            authentic_force: analytics.authentic_force as i32,
+            dojang_best_floor: analytics.dojang_best_floor.unwrap_or(0) as i32,
+            estimated_dojang_floor: analytics.estimated_dojang_floor() as i32,
+            effective_damage_multiplier_300: analytics.effective_damage_multiplier_300(),
+            effective_damage_multiplier_380: analytics.effective_damage_multiplier_380(),
+        }
+    }
+}
+
+/// Fetch character combat analytics summary by OCID directly into a typed C struct.
+/// Returns 0 on success.
+#[no_mangle]
+pub unsafe extern "C" fn maplestory_character_get_combat_summary(
+    handle: *mut ClientHandle,
+    ocid: *const c_char,
+    out_summary: *mut MapleStoryCombatSummary,
+) -> i32 {
+    let ocid_str = match parse_required_cstr(ocid, "ocid") {
+        Ok(s) => s,
+        Err(code) => return code,
+    };
+    if handle.is_null() || out_summary.is_null() {
+        set_last_error("Null pointer passed for handle or out_summary");
+        return -1;
+    }
+    let h = &*handle;
+
+    let res = h
+        .runtime
+        .block_on(h.client.character().get_combat_analytics(ocid_str, None));
+
+    match res {
+        Ok(analytics) => {
+            *out_summary = MapleStoryCombatSummary::from_analytics(&analytics);
+            clear_last_error();
+            0
+        }
+        Err(e) => {
+            set_last_error(e.to_string());
+            -3
+        }
+    }
+}
+
+/// Fetch character combat analytics summary directly by character name into a typed C struct.
 /// Returns 0 on success.
 #[no_mangle]
 pub unsafe extern "C" fn maplestory_get_character_combat_summary(
@@ -233,21 +290,7 @@ pub unsafe extern "C" fn maplestory_get_character_combat_summary(
 
     match res {
         Ok(analytics) => {
-            *out_summary = MapleStoryCombatSummary {
-                combat_power: analytics.combat_power,
-                boss_damage: analytics.boss_damage,
-                ignore_monster_armor: analytics.ignore_monster_armor,
-                damage: analytics.damage,
-                critical_rate: analytics.critical_rate,
-                critical_damage: analytics.critical_damage,
-                total_starforce: analytics.total_starforce,
-                arcane_force: analytics.arcane_force,
-                authentic_force: analytics.authentic_force,
-                dojang_best_floor: analytics.dojang_best_floor.unwrap_or(0),
-                estimated_dojang_floor: analytics.estimated_dojang_floor(),
-                effective_damage_multiplier_300: analytics.effective_damage_multiplier_300(),
-                effective_damage_multiplier_380: analytics.effective_damage_multiplier_380(),
-            };
+            *out_summary = MapleStoryCombatSummary::from_analytics(&analytics);
             clear_last_error();
             0
         }
@@ -258,7 +301,30 @@ pub unsafe extern "C" fn maplestory_get_character_combat_summary(
     }
 }
 
-/// Fetch synthesized character coordination (visible equipment and appearance) as a JSON string.
+/// Fetch synthesized character coordination (visible equipment and appearance) by OCID as a JSON string.
+/// On success, returns 0 and sets `*out_json` to a heap-allocated C string (must be freed with `maplestory_free_string`).
+#[no_mangle]
+pub unsafe extern "C" fn maplestory_character_get_coordination(
+    handle: *mut ClientHandle,
+    ocid: *const c_char,
+    out_json: *mut *mut c_char,
+) -> i32 {
+    let ocid_str = match parse_required_cstr(ocid, "ocid") {
+        Ok(s) => s,
+        Err(code) => return code,
+    };
+    let h = match validate_handle(handle, out_json) {
+        Ok(h) => h,
+        Err(code) => return code,
+    };
+
+    let res = h
+        .runtime
+        .block_on(h.client.character().get_coordination(ocid_str, None));
+    serialize_json_result(res, out_json)
+}
+
+/// Fetch synthesized character coordination (visible equipment and appearance) directly by character name as a JSON string.
 /// On success, returns 0 and sets `*out_json` to a heap-allocated C string (must be freed with `maplestory_free_string`).
 #[no_mangle]
 pub unsafe extern "C" fn maplestory_get_character_coordination(
@@ -985,7 +1051,7 @@ mod tests {
                 "Expected date error: {err_msg}"
             );
 
-            // 7. Typed Combat Summary
+            // 7. Typed Combat Summary (by name and by OCID)
             let mut summary = MapleStoryCombatSummary {
                 combat_power: 0,
                 boss_damage: 0.0,
@@ -1009,12 +1075,25 @@ mod tests {
             assert_eq!(summary.dojang_best_floor, 65);
             assert!(summary.effective_damage_multiplier_300 > 0.0);
 
-            // 8. Coordination Endpoint
+            // Also test maplestory_character_get_combat_summary by OCID
+            let ocid = CString::new("ocid_123").unwrap();
+            let mut summary_by_ocid = summary;
+            let rc = maplestory_character_get_combat_summary(handle, ocid.as_ptr(), &mut summary_by_ocid);
+            assert_eq!(rc, 0);
+            assert_eq!(summary_by_ocid.combat_power, 200_000_000);
+
+            // 8. Coordination Endpoint (by name and by OCID)
             let mut out_coord_json: *mut c_char = ptr::null_mut();
             let rc = maplestory_get_character_coordination(handle, char_name.as_ptr(), &mut out_coord_json);
             assert_eq!(rc, 0);
             let coord_json = take_c_string(out_coord_json);
             assert!(coord_json.contains("visible_items") || coord_json.contains("character_name"));
+
+            let mut out_coord_by_ocid: *mut c_char = ptr::null_mut();
+            let rc = maplestory_character_get_coordination(handle, ocid.as_ptr(), &mut out_coord_by_ocid);
+            assert_eq!(rc, 0);
+            let coord_by_ocid = take_c_string(out_coord_by_ocid);
+            assert!(coord_by_ocid.contains("visible_items"));
 
             maplestory_client_free(handle);
         }

@@ -21,11 +21,11 @@ typedef struct {
     double damage;
     double critical_rate;
     double critical_damage;
-    int64_t total_starforce;
-    int64_t arcane_force;
-    int64_t authentic_force;
-    int64_t dojang_best_floor;
-    int64_t estimated_dojang_floor;
+    int32_t total_starforce;
+    int32_t arcane_force;
+    int32_t authentic_force;
+    int32_t dojang_best_floor;
+    int32_t estimated_dojang_floor;
     double effective_damage_multiplier_300;
     double effective_damage_multiplier_380;
 } MapleStoryCombatSummary;
@@ -60,7 +60,17 @@ ClientHandle* maplestory_client_from_env(void);
 void maplestory_client_free(ClientHandle* handle);
 
 /**
- * Fetch character combat analytics summary directly into a typed C struct.
+ * Fetch character combat analytics summary by OCID directly into a typed C struct.
+ * Returns 0 on success.
+ */
+int32_t maplestory_character_get_combat_summary(
+    ClientHandle* handle,
+    const char* ocid,
+    MapleStoryCombatSummary* out_summary
+);
+
+/**
+ * Fetch character combat analytics summary directly by character name into a typed C struct.
  * Returns 0 on success.
  */
 int32_t maplestory_get_character_combat_summary(
@@ -70,7 +80,17 @@ int32_t maplestory_get_character_combat_summary(
 );
 
 /**
- * Fetch synthesized character coordination (visible equipment and appearance) as a JSON string.
+ * Fetch synthesized character coordination (visible equipment and appearance) by OCID as a JSON string.
+ * Returns 0 on success. The caller must free *out_json using maplestory_free_string.
+ */
+int32_t maplestory_character_get_coordination(
+    ClientHandle* handle,
+    const char* ocid,
+    char** out_json
+);
+
+/**
+ * Fetch synthesized character coordination (visible equipment and appearance) directly by character name as a JSON string.
  * Returns 0 on success. The caller must free *out_json using maplestory_free_string.
  */
 int32_t maplestory_get_character_coordination(
