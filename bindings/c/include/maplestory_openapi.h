@@ -11,6 +11,26 @@ extern "C" {
 typedef struct ClientHandle ClientHandle;
 
 /**
+ * High-leverage typed combat analytics summary.
+ * Eliminates the need for C/C++ callers to parse JSON for combat calculations.
+ */
+typedef struct {
+    int64_t combat_power;
+    double boss_damage;
+    double ignore_monster_armor;
+    double damage;
+    double critical_rate;
+    double critical_damage;
+    int64_t total_starforce;
+    int64_t arcane_force;
+    int64_t authentic_force;
+    int64_t dojang_best_floor;
+    int64_t estimated_dojang_floor;
+    double effective_damage_multiplier_300;
+    double effective_damage_multiplier_380;
+} MapleStoryCombatSummary;
+
+/**
  * Retrieve the last error message recorded on the current thread.
  * Returns a newly allocated UTF-8 C string (free with maplestory_free_string),
  * or NULL if no error has occurred.
@@ -38,6 +58,26 @@ ClientHandle* maplestory_client_from_env(void);
  * Free a MapleStory client handle.
  */
 void maplestory_client_free(ClientHandle* handle);
+
+/**
+ * Fetch character combat analytics summary directly into a typed C struct.
+ * Returns 0 on success.
+ */
+int32_t maplestory_get_character_combat_summary(
+    ClientHandle* handle,
+    const char* character_name,
+    MapleStoryCombatSummary* out_summary
+);
+
+/**
+ * Fetch synthesized character coordination (visible equipment and appearance) as a JSON string.
+ * Returns 0 on success. The caller must free *out_json using maplestory_free_string.
+ */
+int32_t maplestory_get_character_coordination(
+    ClientHandle* handle,
+    const char* character_name,
+    char** out_json
+);
 
 /**
  * Fetch character dashboard JSON string.
