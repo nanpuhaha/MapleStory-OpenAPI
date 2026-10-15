@@ -641,31 +641,7 @@ impl MapleStoryClient {
         width: Option<u32>,
         height: Option<u32>,
     ) -> Result<Vec<u8>> {
-        let frame_specs = avatar_code.animation_frame_urls(preset, width, height);
-
-        let fetch_futures = frame_specs.into_iter().map(|(url, delay_ms)| {
-            let http = self.http.clone();
-            async move {
-                let resp = http.get(&url).send().await?;
-                let status = resp.status();
-                if !status.is_success() {
-                    return Err(crate::MapleStoryError::Other(format!(
-                        "Failed to fetch avatar frame from {}: HTTP {}",
-                        url, status
-                    )));
-                }
-                let bytes = resp.bytes().await?.to_vec();
-                Ok::<_, crate::MapleStoryError>((bytes, delay_ms))
-            }
-        });
-
-        let results = futures_util::future::join_all(fetch_futures).await;
-        let mut frames_data = Vec::with_capacity(results.len());
-        for res in results {
-            frames_data.push(res?);
-        }
-
-        crate::avatar::encode_animated_gif(&frames_data)
+        self.avatar().render_gif(avatar_code, preset, width, height).await
     }
 
     /// Fetches the character's current look and renders an animated GIF directly by character name.
@@ -685,15 +661,8 @@ impl MapleStoryClient {
         width: Option<u32>,
         height: Option<u32>,
     ) -> Result<Vec<u8>> {
-        let basic = self.get_character_by_name(character_name).await?;
-        let img_url = basic.character_image.ok_or_else(|| {
-            crate::MapleStoryError::Other(format!(
-                "Character '{}' does not have a valid character image URL",
-                character_name
-            ))
-        })?;
-        let avatar_code = crate::avatar::AvatarCode::from_url_or_code(&img_url)?;
-        self.render_avatar_gif(&avatar_code, preset, width, height)
+        self.avatar()
+            .render_gif_by_name(character_name, preset, width, height)
             .await
     }
 
@@ -1427,5 +1396,32 @@ impl<'a> CharacterClient<'a> {
     ) -> Result<CharacterCombatAnalytics> {
         let ocid = self.get_ocid(character_name).await?;
         self.get_combat_analytics(&ocid, None).await
+    }
+
+    /// Render character avatar GIF. Delegates to [`AvatarClient::render_gif`].
+    #[cfg(feature = "animation")]
+    pub async fn render_avatar_gif(
+        &self,
+        avatar_code: &crate::avatar::AvatarCode,
+        preset: &crate::avatar::AnimationPreset,
+        width: Option<u32>,
+        height: Option<u32>,
+    ) -> Result<Vec<u8>> {
+        self.client.avatar().render_gif(avatar_code, preset, width, height).await
+    }
+
+    /// Render character avatar GIF directly by name. Delegates to [`AvatarClient::render_gif_by_name`].
+    #[cfg(feature = "animation")]
+    pub async fn render_character_gif_by_name(
+        &self,
+        character_name: &str,
+        preset: &crate::avatar::AnimationPreset,
+        width: Option<u32>,
+        height: Option<u32>,
+    ) -> Result<Vec<u8>> {
+        self.client
+            .avatar()
+            .render_gif_by_name(character_name, preset, width, height)
+            .await
     }
 }

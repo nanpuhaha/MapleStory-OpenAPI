@@ -6,6 +6,7 @@ pub mod cache;
 pub use cache::MokaIdentityCache;
 pub use cache::{BoxFuture, IdentityCache, NoopIdentityCache};
 
+mod avatar;
 mod battle_practice;
 mod character;
 mod guild;
@@ -16,6 +17,7 @@ mod scheduler;
 mod union;
 mod user;
 
+pub use avatar::AvatarClient;
 pub use battle_practice::BattlePracticeClient;
 pub use character::CharacterClient;
 pub use guild::GuildClient;
@@ -321,6 +323,11 @@ impl MapleStoryClient {
     /// Access character domain methods via [`CharacterClient`].
     pub fn character(&self) -> CharacterClient<'_> {
         CharacterClient::new(self)
+    }
+
+    /// Access avatar look and animation domain methods via [`AvatarClient`].
+    pub fn avatar(&self) -> AvatarClient<'_> {
+        AvatarClient::new(self)
     }
 
     /// Access guild domain methods via [`GuildClient`].
