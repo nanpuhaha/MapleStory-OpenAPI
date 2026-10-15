@@ -2113,6 +2113,32 @@ impl DashboardOptionsBuilder {
     }
 }
 
+/// Raw result payloads collected for all character dashboard sections before assembly and degradation.
+#[derive(Debug)]
+pub struct RawDashboardSections {
+    pub basic: Result<CharacterBasic, crate::error::MapleStoryError>,
+    pub stat: Option<Result<CharacterStat, crate::error::MapleStoryError>>,
+    pub item_equipment: Option<Result<CharacterItemEquipment, crate::error::MapleStoryError>>,
+    pub cash_item_equipment: Option<Result<CharacterCashItemEquipment, crate::error::MapleStoryError>>,
+    pub beauty_equipment: Option<Result<CharacterBeautyEquipment, crate::error::MapleStoryError>>,
+    pub symbols: Option<Result<CharacterSymbolEquipment, crate::error::MapleStoryError>>,
+    pub ability: Option<Result<CharacterAbility, crate::error::MapleStoryError>>,
+    pub hyper_stat: Option<Result<CharacterHyperStat, crate::error::MapleStoryError>>,
+    pub hexa_matrix: Option<Result<CharacterHexaMatrix, crate::error::MapleStoryError>>,
+    pub hexa_matrix_stat: Option<Result<CharacterHexaMatrixStat, crate::error::MapleStoryError>>,
+    pub v_matrix: Option<Result<CharacterVMatrix, crate::error::MapleStoryError>>,
+    pub set_effect: Option<Result<CharacterSetEffect, crate::error::MapleStoryError>>,
+    pub pet_equipment: Option<Result<CharacterPetEquipment, crate::error::MapleStoryError>>,
+    pub android_equipment: Option<Result<CharacterAndroidEquipment, crate::error::MapleStoryError>>,
+    pub link_skill: Option<Result<CharacterLinkSkill, crate::error::MapleStoryError>>,
+    pub propensity: Option<Result<CharacterPropensity, crate::error::MapleStoryError>>,
+    pub popularity: Option<Result<CharacterPopularity, crate::error::MapleStoryError>>,
+    pub dojang: Option<Result<CharacterDojang, crate::error::MapleStoryError>>,
+    pub union: Option<Result<crate::models::union::UserUnion, crate::error::MapleStoryError>>,
+    pub union_artifact: Option<Result<crate::models::union::UserUnionArtifact, crate::error::MapleStoryError>>,
+    pub guild: Option<Result<crate::models::guild::GuildBasic, crate::error::MapleStoryError>>,
+}
+
 /// Comprehensive all-in-one character dashboard (올인원 캐릭터 종합 대시보드).
 ///
 /// Designed to provide all information required by modern MapleStory ranking &
@@ -2171,6 +2197,326 @@ pub struct CharacterDashboard {
 }
 
 impl CharacterDashboard {
+    /// Pure synchronous assembler that aggregates raw section results into a complete [`CharacterDashboard`].
+    ///
+    /// Essential section (`basic`) error is propagated as a top-level error.
+    /// Non-essential section errors are caught, mapped to default fallback models,
+    /// and registered in `self.errors` for diagnostic reporting.
+    pub fn assemble(
+        raw: RawDashboardSections,
+        _options: &DashboardOptions,
+    ) -> Result<Self, crate::error::MapleStoryError> {
+        let basic = raw.basic?;
+        let mut errors = std::collections::HashMap::new();
+
+        let stat = match raw.stat {
+            Some(Ok(s)) => s,
+            Some(Err(e)) => {
+                errors.insert(
+                    DashboardSection::Stat,
+                    DashboardSectionError::from_error(DashboardSection::Stat, &e),
+                );
+                CharacterStat {
+                    date: None,
+                    character_class: basic.character_class.clone(),
+                    final_stat: None,
+                    remain_ap: None,
+                }
+            }
+            None => CharacterStat {
+                date: None,
+                character_class: basic.character_class.clone(),
+                final_stat: None,
+                remain_ap: None,
+            },
+        };
+
+        let item_equipment = match raw.item_equipment {
+            Some(Ok(eq)) => eq,
+            Some(Err(e)) => {
+                errors.insert(
+                    DashboardSection::ItemEquipment,
+                    DashboardSectionError::from_error(DashboardSection::ItemEquipment, &e),
+                );
+                CharacterItemEquipment {
+                    date: None,
+                    character_gender: None,
+                    character_class: basic.character_class.clone(),
+                    preset_no: None,
+                    item_equipment: None,
+                    item_equipment_preset_1: None,
+                    item_equipment_preset_2: None,
+                    item_equipment_preset_3: None,
+                    title: None,
+                    dragon_equipment: None,
+                    mechanic_equipment: None,
+                }
+            }
+            None => CharacterItemEquipment {
+                date: None,
+                character_gender: None,
+                character_class: basic.character_class.clone(),
+                preset_no: None,
+                item_equipment: None,
+                item_equipment_preset_1: None,
+                item_equipment_preset_2: None,
+                item_equipment_preset_3: None,
+                title: None,
+                dragon_equipment: None,
+                mechanic_equipment: None,
+            },
+        };
+
+        let cash_item_equipment = match raw.cash_item_equipment {
+            Some(Ok(c)) => c,
+            Some(Err(e)) => {
+                errors.insert(
+                    DashboardSection::CashItemEquipment,
+                    DashboardSectionError::from_error(DashboardSection::CashItemEquipment, &e),
+                );
+                CharacterCashItemEquipment::default()
+            }
+            None => CharacterCashItemEquipment::default(),
+        };
+
+        let beauty_equipment = match raw.beauty_equipment {
+            Some(Ok(b)) => b,
+            Some(Err(e)) => {
+                errors.insert(
+                    DashboardSection::BeautyEquipment,
+                    DashboardSectionError::from_error(DashboardSection::BeautyEquipment, &e),
+                );
+                CharacterBeautyEquipment::default()
+            }
+            None => CharacterBeautyEquipment::default(),
+        };
+
+        let coordination = CharacterCoordination::from_full_parts(
+            &basic,
+            &beauty_equipment,
+            &cash_item_equipment,
+            &item_equipment,
+        );
+
+        let symbols = match raw.symbols {
+            Some(Ok(s)) => Some(s),
+            Some(Err(e)) => {
+                errors.insert(
+                    DashboardSection::Symbols,
+                    DashboardSectionError::from_error(DashboardSection::Symbols, &e),
+                );
+                None
+            }
+            None => None,
+        };
+
+        let ability = match raw.ability {
+            Some(Ok(a)) => Some(a),
+            Some(Err(e)) => {
+                errors.insert(
+                    DashboardSection::Ability,
+                    DashboardSectionError::from_error(DashboardSection::Ability, &e),
+                );
+                None
+            }
+            None => None,
+        };
+
+        let hyper_stat = match raw.hyper_stat {
+            Some(Ok(h)) => Some(h),
+            Some(Err(e)) => {
+                errors.insert(
+                    DashboardSection::HyperStat,
+                    DashboardSectionError::from_error(DashboardSection::HyperStat, &e),
+                );
+                None
+            }
+            None => None,
+        };
+
+        let hexa_matrix = match raw.hexa_matrix {
+            Some(Ok(h)) => Some(h),
+            Some(Err(e)) => {
+                errors.insert(
+                    DashboardSection::HexaMatrix,
+                    DashboardSectionError::from_error(DashboardSection::HexaMatrix, &e),
+                );
+                None
+            }
+            None => None,
+        };
+
+        let hexa_matrix_stat = match raw.hexa_matrix_stat {
+            Some(Ok(h)) => Some(h),
+            Some(Err(e)) => {
+                errors.insert(
+                    DashboardSection::HexaMatrixStat,
+                    DashboardSectionError::from_error(DashboardSection::HexaMatrixStat, &e),
+                );
+                None
+            }
+            None => None,
+        };
+
+        let v_matrix = match raw.v_matrix {
+            Some(Ok(v)) => Some(v),
+            Some(Err(e)) => {
+                errors.insert(
+                    DashboardSection::VMatrix,
+                    DashboardSectionError::from_error(DashboardSection::VMatrix, &e),
+                );
+                None
+            }
+            None => None,
+        };
+
+        let set_effect = match raw.set_effect {
+            Some(Ok(s)) => Some(s),
+            Some(Err(e)) => {
+                errors.insert(
+                    DashboardSection::SetEffect,
+                    DashboardSectionError::from_error(DashboardSection::SetEffect, &e),
+                );
+                None
+            }
+            None => None,
+        };
+
+        let pet_equipment = match raw.pet_equipment {
+            Some(Ok(p)) => Some(p),
+            Some(Err(e)) => {
+                errors.insert(
+                    DashboardSection::PetEquipment,
+                    DashboardSectionError::from_error(DashboardSection::PetEquipment, &e),
+                );
+                None
+            }
+            None => None,
+        };
+
+        let android_equipment = match raw.android_equipment {
+            Some(Ok(a)) => Some(a),
+            Some(Err(e)) => {
+                errors.insert(
+                    DashboardSection::AndroidEquipment,
+                    DashboardSectionError::from_error(DashboardSection::AndroidEquipment, &e),
+                );
+                None
+            }
+            None => None,
+        };
+
+        let link_skill = match raw.link_skill {
+            Some(Ok(l)) => Some(l),
+            Some(Err(e)) => {
+                errors.insert(
+                    DashboardSection::LinkSkill,
+                    DashboardSectionError::from_error(DashboardSection::LinkSkill, &e),
+                );
+                None
+            }
+            None => None,
+        };
+
+        let propensity = match raw.propensity {
+            Some(Ok(p)) => Some(p),
+            Some(Err(e)) => {
+                errors.insert(
+                    DashboardSection::Propensity,
+                    DashboardSectionError::from_error(DashboardSection::Propensity, &e),
+                );
+                None
+            }
+            None => None,
+        };
+
+        let popularity = match raw.popularity {
+            Some(Ok(p)) => Some(p),
+            Some(Err(e)) => {
+                errors.insert(
+                    DashboardSection::Popularity,
+                    DashboardSectionError::from_error(DashboardSection::Popularity, &e),
+                );
+                None
+            }
+            None => None,
+        };
+
+        let dojang = match raw.dojang {
+            Some(Ok(d)) => Some(d),
+            Some(Err(e)) => {
+                errors.insert(
+                    DashboardSection::Dojang,
+                    DashboardSectionError::from_error(DashboardSection::Dojang, &e),
+                );
+                None
+            }
+            None => None,
+        };
+
+        let union = match raw.union {
+            Some(Ok(u)) => Some(u),
+            Some(Err(e)) => {
+                errors.insert(
+                    DashboardSection::Union,
+                    DashboardSectionError::from_error(DashboardSection::Union, &e),
+                );
+                None
+            }
+            None => None,
+        };
+
+        let union_artifact = match raw.union_artifact {
+            Some(Ok(u)) => Some(u),
+            Some(Err(e)) => {
+                errors.insert(
+                    DashboardSection::UnionArtifact,
+                    DashboardSectionError::from_error(DashboardSection::UnionArtifact, &e),
+                );
+                None
+            }
+            None => None,
+        };
+
+        let guild = match raw.guild {
+            Some(Ok(g)) => Some(g),
+            Some(Err(e)) => {
+                errors.insert(
+                    DashboardSection::Guild,
+                    DashboardSectionError::from_error(DashboardSection::Guild, &e),
+                );
+                None
+            }
+            None => None,
+        };
+
+        Ok(CharacterDashboard {
+            basic,
+            stat,
+            item_equipment,
+            cash_item_equipment,
+            beauty_equipment,
+            coordination,
+            symbols,
+            ability,
+            hyper_stat,
+            hexa_matrix,
+            hexa_matrix_stat,
+            v_matrix,
+            set_effect,
+            pet_equipment,
+            android_equipment,
+            link_skill,
+            propensity,
+            popularity,
+            dojang,
+            union,
+            union_artifact,
+            guild,
+            errors,
+        })
+    }
+
     /// Character name.
     pub fn character_name(&self) -> &str {
         self.basic.character_name.as_deref().unwrap_or("")

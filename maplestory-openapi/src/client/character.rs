@@ -15,7 +15,7 @@ use crate::{
         CharacterOcid, CharacterOtherStat, CharacterPetEquipment, CharacterPopularity,
         CharacterProfile, CharacterPropensity, CharacterSetEffect, CharacterSkill, CharacterStat,
         CharacterSymbolEquipment, CharacterVMatrix, DashboardOptions, DashboardSection,
-        DashboardSectionError, RingExchangeSkillEquipment, RingReserveSkillEquipment,
+        RingExchangeSkillEquipment, RingReserveSkillEquipment,
     },
     models::common::{DateParam, SkillGrade},
 };
@@ -540,315 +540,31 @@ impl MapleStoryClient {
             union_artifact_fut,
         );
 
-        let basic = basic_res?;
-        let mut errors = std::collections::HashMap::new();
-
-        let stat = match stat_res {
-            Some(Ok(s)) => s,
-            Some(Err(e)) => {
-                errors.insert(
-                    DashboardSection::Stat,
-                    DashboardSectionError::from_error(DashboardSection::Stat, &e),
-                );
-                CharacterStat {
-                    date: None,
-                    character_class: basic.character_class.clone(),
-                    final_stat: None,
-                    remain_ap: None,
-                }
-            }
-            None => CharacterStat {
-                date: None,
-                character_class: basic.character_class.clone(),
-                final_stat: None,
-                remain_ap: None,
-            },
+        let raw_sections = crate::models::character::RawDashboardSections {
+            basic: basic_res,
+            stat: stat_res,
+            item_equipment: equip_res,
+            cash_item_equipment: cash_res,
+            beauty_equipment: beauty_res,
+            symbols: symbols_res,
+            ability: ability_res,
+            hyper_stat: hyper_stat_res,
+            hexa_matrix: hexa_matrix_res,
+            hexa_matrix_stat: hexa_matrix_stat_res,
+            v_matrix: v_matrix_res,
+            set_effect: set_effect_res,
+            pet_equipment: pet_res,
+            android_equipment: android_res,
+            link_skill: link_res,
+            propensity: propensity_res,
+            popularity: popularity_res,
+            dojang: dojang_res,
+            union: union_res,
+            union_artifact: union_artifact_res,
+            guild: guild_res,
         };
 
-        let item_equipment = match equip_res {
-            Some(Ok(eq)) => eq,
-            Some(Err(e)) => {
-                errors.insert(
-                    DashboardSection::ItemEquipment,
-                    DashboardSectionError::from_error(DashboardSection::ItemEquipment, &e),
-                );
-                CharacterItemEquipment {
-                    date: None,
-                    character_gender: None,
-                    character_class: basic.character_class.clone(),
-                    preset_no: None,
-                    item_equipment: None,
-                    item_equipment_preset_1: None,
-                    item_equipment_preset_2: None,
-                    item_equipment_preset_3: None,
-                    title: None,
-                    dragon_equipment: None,
-                    mechanic_equipment: None,
-                }
-            }
-            None => CharacterItemEquipment {
-                date: None,
-                character_gender: None,
-                character_class: basic.character_class.clone(),
-                preset_no: None,
-                item_equipment: None,
-                item_equipment_preset_1: None,
-                item_equipment_preset_2: None,
-                item_equipment_preset_3: None,
-                title: None,
-                dragon_equipment: None,
-                mechanic_equipment: None,
-            },
-        };
-
-        let cash_item_equipment = match cash_res {
-            Some(Ok(c)) => c,
-            Some(Err(e)) => {
-                errors.insert(
-                    DashboardSection::CashItemEquipment,
-                    DashboardSectionError::from_error(DashboardSection::CashItemEquipment, &e),
-                );
-                CharacterCashItemEquipment::default()
-            }
-            None => CharacterCashItemEquipment::default(),
-        };
-
-        let beauty_equipment = match beauty_res {
-            Some(Ok(b)) => b,
-            Some(Err(e)) => {
-                errors.insert(
-                    DashboardSection::BeautyEquipment,
-                    DashboardSectionError::from_error(DashboardSection::BeautyEquipment, &e),
-                );
-                CharacterBeautyEquipment::default()
-            }
-            None => CharacterBeautyEquipment::default(),
-        };
-
-        let coordination = CharacterCoordination::from_full_parts(
-            &basic,
-            &beauty_equipment,
-            &cash_item_equipment,
-            &item_equipment,
-        );
-
-        let symbols = match symbols_res {
-            Some(Ok(s)) => Some(s),
-            Some(Err(e)) => {
-                errors.insert(
-                    DashboardSection::Symbols,
-                    DashboardSectionError::from_error(DashboardSection::Symbols, &e),
-                );
-                None
-            }
-            None => None,
-        };
-
-        let ability = match ability_res {
-            Some(Ok(a)) => Some(a),
-            Some(Err(e)) => {
-                errors.insert(
-                    DashboardSection::Ability,
-                    DashboardSectionError::from_error(DashboardSection::Ability, &e),
-                );
-                None
-            }
-            None => None,
-        };
-
-        let hyper_stat = match hyper_stat_res {
-            Some(Ok(h)) => Some(h),
-            Some(Err(e)) => {
-                errors.insert(
-                    DashboardSection::HyperStat,
-                    DashboardSectionError::from_error(DashboardSection::HyperStat, &e),
-                );
-                None
-            }
-            None => None,
-        };
-
-        let hexa_matrix = match hexa_matrix_res {
-            Some(Ok(h)) => Some(h),
-            Some(Err(e)) => {
-                errors.insert(
-                    DashboardSection::HexaMatrix,
-                    DashboardSectionError::from_error(DashboardSection::HexaMatrix, &e),
-                );
-                None
-            }
-            None => None,
-        };
-
-        let hexa_matrix_stat = match hexa_matrix_stat_res {
-            Some(Ok(h)) => Some(h),
-            Some(Err(e)) => {
-                errors.insert(
-                    DashboardSection::HexaMatrixStat,
-                    DashboardSectionError::from_error(DashboardSection::HexaMatrixStat, &e),
-                );
-                None
-            }
-            None => None,
-        };
-
-        let v_matrix = match v_matrix_res {
-            Some(Ok(v)) => Some(v),
-            Some(Err(e)) => {
-                errors.insert(
-                    DashboardSection::VMatrix,
-                    DashboardSectionError::from_error(DashboardSection::VMatrix, &e),
-                );
-                None
-            }
-            None => None,
-        };
-
-        let set_effect = match set_effect_res {
-            Some(Ok(s)) => Some(s),
-            Some(Err(e)) => {
-                errors.insert(
-                    DashboardSection::SetEffect,
-                    DashboardSectionError::from_error(DashboardSection::SetEffect, &e),
-                );
-                None
-            }
-            None => None,
-        };
-
-        let pet_equipment = match pet_res {
-            Some(Ok(p)) => Some(p),
-            Some(Err(e)) => {
-                errors.insert(
-                    DashboardSection::PetEquipment,
-                    DashboardSectionError::from_error(DashboardSection::PetEquipment, &e),
-                );
-                None
-            }
-            None => None,
-        };
-
-        let android_equipment = match android_res {
-            Some(Ok(a)) => Some(a),
-            Some(Err(e)) => {
-                errors.insert(
-                    DashboardSection::AndroidEquipment,
-                    DashboardSectionError::from_error(DashboardSection::AndroidEquipment, &e),
-                );
-                None
-            }
-            None => None,
-        };
-
-        let link_skill = match link_res {
-            Some(Ok(l)) => Some(l),
-            Some(Err(e)) => {
-                errors.insert(
-                    DashboardSection::LinkSkill,
-                    DashboardSectionError::from_error(DashboardSection::LinkSkill, &e),
-                );
-                None
-            }
-            None => None,
-        };
-
-        let propensity = match propensity_res {
-            Some(Ok(p)) => Some(p),
-            Some(Err(e)) => {
-                errors.insert(
-                    DashboardSection::Propensity,
-                    DashboardSectionError::from_error(DashboardSection::Propensity, &e),
-                );
-                None
-            }
-            None => None,
-        };
-
-        let popularity = match popularity_res {
-            Some(Ok(p)) => Some(p),
-            Some(Err(e)) => {
-                errors.insert(
-                    DashboardSection::Popularity,
-                    DashboardSectionError::from_error(DashboardSection::Popularity, &e),
-                );
-                None
-            }
-            None => None,
-        };
-
-        let dojang = match dojang_res {
-            Some(Ok(d)) => Some(d),
-            Some(Err(e)) => {
-                errors.insert(
-                    DashboardSection::Dojang,
-                    DashboardSectionError::from_error(DashboardSection::Dojang, &e),
-                );
-                None
-            }
-            None => None,
-        };
-
-        let union = match union_res {
-            Some(Ok(u)) => Some(u),
-            Some(Err(e)) => {
-                errors.insert(
-                    DashboardSection::Union,
-                    DashboardSectionError::from_error(DashboardSection::Union, &e),
-                );
-                None
-            }
-            None => None,
-        };
-
-        let union_artifact = match union_artifact_res {
-            Some(Ok(u)) => Some(u),
-            Some(Err(e)) => {
-                errors.insert(
-                    DashboardSection::UnionArtifact,
-                    DashboardSectionError::from_error(DashboardSection::UnionArtifact, &e),
-                );
-                None
-            }
-            None => None,
-        };
-
-        let guild = match guild_res {
-            Some(Ok(g)) => Some(g),
-            Some(Err(e)) => {
-                errors.insert(
-                    DashboardSection::Guild,
-                    DashboardSectionError::from_error(DashboardSection::Guild, &e),
-                );
-                None
-            }
-            None => None,
-        };
-
-        Ok(CharacterDashboard {
-            basic,
-            stat,
-            item_equipment,
-            cash_item_equipment,
-            beauty_equipment,
-            coordination,
-            symbols,
-            ability,
-            hyper_stat,
-            hexa_matrix,
-            hexa_matrix_stat,
-            v_matrix,
-            set_effect,
-            pet_equipment,
-            android_equipment,
-            link_skill,
-            propensity,
-            popularity,
-            dojang,
-            union,
-            union_artifact,
-            guild,
-            errors,
-        })
+        CharacterDashboard::assemble(raw_sections, options)
     }
 
     /// Retrieve a comprehensive all-in-one character dashboard (올인원 캐릭터 종합 대시보드).

@@ -947,6 +947,72 @@ fn test_dashboard_partial_failure_diagnostics() {
     assert_eq!(err.api_code.as_deref(), Some("OPENAPI00004"));
 }
 
+#[test]
+fn test_pure_character_dashboard_assemble_and_partial_failures() {
+    use maplestory_openapi::models::character::{
+        CharacterBasic, CharacterDashboard, DashboardOptions, DashboardSection, RawDashboardSections,
+    };
+    use maplestory_openapi::MapleStoryError;
+
+    let basic = CharacterBasic {
+        character_name: Some("순수대시보드".to_string()),
+        world_name: Some("베라".to_string()),
+        character_class: Some("나이트로드".to_string()),
+        character_level: Some(250),
+        ..Default::default()
+    };
+
+    // Simulate 6th job not unlocked (HTTP 400 with OPENAPI00003) and union service unavailable (HTTP 503)
+    let raw = RawDashboardSections {
+        basic: Ok(basic),
+        stat: None,
+        item_equipment: None,
+        cash_item_equipment: None,
+        beauty_equipment: None,
+        symbols: None,
+        ability: None,
+        hyper_stat: None,
+        hexa_matrix: Some(Err(MapleStoryError::ApiError {
+            status: 400,
+            code: "OPENAPI00003".to_string(),
+            message: "Hexa matrix not available for level < 260".to_string(),
+        })),
+        hexa_matrix_stat: None,
+        v_matrix: None,
+        set_effect: None,
+        pet_equipment: None,
+        android_equipment: None,
+        link_skill: None,
+        propensity: None,
+        popularity: None,
+        dojang: None,
+        union: Some(Err(MapleStoryError::ServiceUnavailable {
+            code: "OPENAPI00005".to_string(),
+            message: "Service Unavailable".to_string(),
+        })),
+        union_artifact: None,
+        guild: None,
+    };
+
+    let dashboard = CharacterDashboard::assemble(raw, &DashboardOptions::all())
+        .expect("dashboard assembly must succeed with degraded sections");
+
+    assert_eq!(dashboard.character_name(), "순수대시보드");
+    assert_eq!(dashboard.character_level(), 250);
+    assert!(dashboard.has_errors());
+
+    // Verify HexaMatrix degradation error recorded
+    let hexa_err = dashboard.section_error(DashboardSection::HexaMatrix).unwrap();
+    assert_eq!(hexa_err.api_code.as_deref(), Some("OPENAPI00003"));
+    assert_eq!(hexa_err.status_code, Some(400));
+    assert!(dashboard.hexa_matrix.is_none());
+
+    // Verify Union degradation error recorded
+    let union_err = dashboard.section_error(DashboardSection::Union).unwrap();
+    assert_eq!(union_err.status_code, Some(503));
+    assert!(dashboard.union.is_none());
+}
+
 #[tokio::test]
 async fn test_client_retry_and_recovery_on_transient_503() {
     use std::sync::atomic::{AtomicUsize, Ordering};
