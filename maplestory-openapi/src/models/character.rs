@@ -23,7 +23,7 @@ pub struct CharacterOcid {
 // ─── Basic ───────────────────────────────────────────────────────────────────
 
 /// Response from `GET /maplestory/v1/character/basic`.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct CharacterBasic {
     /// Query reference date (KST)
     pub date: Option<String>,
@@ -69,7 +69,7 @@ pub struct CharacterPopularity {
 // ─── Stat ────────────────────────────────────────────────────────────────────
 
 /// Response from `GET /maplestory/v1/character/stat`.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct CharacterStat {
     /// Query reference date (KST)
     pub date: Option<String>,
@@ -82,7 +82,7 @@ pub struct CharacterStat {
 }
 
 /// A single stat entry in the final stat list.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct FinalStatEntry {
     pub stat_name: Option<String>,
     pub stat_value: Option<String>,
@@ -2362,6 +2362,39 @@ pub struct CharacterCombatAnalytics {
 }
 
 impl CharacterCombatAnalytics {
+    /// Constructs [`CharacterCombatAnalytics`] directly from individual stats without requiring a full dashboard.
+    pub fn from_stats(
+        basic: &CharacterBasic,
+        stat: &CharacterStat,
+        item_equipment: Option<&CharacterItemEquipment>,
+        dojang: Option<&CharacterDojang>,
+        arcane_force: i64,
+        authentic_force: i64,
+    ) -> Self {
+        let starforce_breakdown = item_equipment.map(|eq| eq.starforce_stat_breakdown());
+        let total_starforce = item_equipment
+            .map(|eq| eq.total_starforce())
+            .unwrap_or(0);
+
+        Self {
+            character_name: basic.character_name.clone().unwrap_or_default(),
+            world_name: basic.world_name.clone(),
+            character_class: basic.character_class.clone(),
+            character_level: basic.character_level.unwrap_or(0),
+            combat_power: stat.combat_power().unwrap_or(0),
+            boss_damage: stat.boss_damage().unwrap_or(0.0),
+            ignore_monster_armor: stat.ignore_monster_armor().unwrap_or(0.0),
+            damage: stat.damage().unwrap_or(0.0),
+            critical_rate: stat.critical_rate().unwrap_or(0.0),
+            critical_damage: stat.critical_damage().unwrap_or(0.0),
+            total_starforce,
+            arcane_force,
+            authentic_force,
+            dojang_best_floor: dojang.and_then(|d| d.dojang_best_floor),
+            starforce_stat_breakdown: starforce_breakdown,
+        }
+    }
+
     /// Calculate effective damage multiplier against a monster with the given armor/defense rate percentage.
     ///
     /// For example, against a 300% defense boss (`defense_rate_pct = 300.0`):
@@ -2395,16 +2428,32 @@ impl CharacterCombatAnalytics {
         1.35 + (self.critical_damage / 100.0)
     }
 
-    /// Additional main stat bonus contributed by Arcane Force (`(arcane_force / 10) * 100`).
-    /// (For Demon Avenger: HP +2,100 per 10 AF; Xenon: +48 per 10 AF; standard jobs: +100 main stat per 10 AF).
+    /// Additional main stat bonus contributed by Arcane Force.
+    ///
+    /// - Demon Avenger: Max HP +2,100 per 10 AF
+    /// - Xenon: +48 per 10 AF (STR/DEX/LUK)
+    /// - Standard classes: +100 main stat per 10 AF
     pub fn arcane_force_stat_bonus(&self) -> i64 {
-        (self.arcane_force / 10) * 100
+        let units = self.arcane_force / 10;
+        match self.character_class.as_deref() {
+            Some("데몬어벤져") => units * 2100,
+            Some("제논") => units * 48,
+            _ => units * 100,
+        }
     }
 
-    /// Additional main stat bonus contributed by Authentic Force (`(authentic_force / 10) * 200`).
-    /// (Standard jobs: +200 main stat per 10 AutF).
+    /// Additional main stat bonus contributed by Authentic Force.
+    ///
+    /// - Demon Avenger: Max HP +4,200 per 10 AutF
+    /// - Xenon: +96 per 10 AutF
+    /// - Standard classes: +200 main stat per 10 AutF
     pub fn authentic_force_stat_bonus(&self) -> i64 {
-        (self.authentic_force / 10) * 200
+        let units = self.authentic_force / 10;
+        match self.character_class.as_deref() {
+            Some("데몬어벤져") => units * 4200,
+            Some("제논") => units * 96,
+            _ => units * 200,
+        }
     }
 
     /// Estimated main stat gain from Starforce enhancements.

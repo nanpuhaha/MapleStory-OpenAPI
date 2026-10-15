@@ -2368,3 +2368,92 @@ fn test_character_combat_analytics() {
     assert_eq!(extracted.estimated_dojang_floor(), 60);
     assert!(extracted.starforce_stat_breakdown.is_some());
 }
+
+#[test]
+fn test_combat_analytics_decoupled_and_job_specific_force_scaling() {
+    use maplestory_openapi::models::character::{
+        CharacterBasic, CharacterCombatAnalytics, CharacterItemEquipment, CharacterStat,
+        FinalStatEntry,
+    };
+
+    let basic = CharacterBasic {
+        character_name: Some("제논유저".to_string()),
+        world_name: Some("스카니아".to_string()),
+        character_class: Some("제논".to_string()),
+        character_level: Some(270),
+        ..Default::default()
+    };
+    let stat = CharacterStat {
+        final_stat: Some(vec![
+            FinalStatEntry {
+                stat_name: Some("전투력".to_string()),
+                stat_value: Some("80000000".to_string()),
+            },
+            FinalStatEntry {
+                stat_name: Some("보스 몬스터 데미지".to_string()),
+                stat_value: Some("300.0".to_string()),
+            },
+            FinalStatEntry {
+                stat_name: Some("방어율 무시".to_string()),
+                stat_value: Some("94.0".to_string()),
+            },
+        ]),
+        ..Default::default()
+    };
+    let equip = CharacterItemEquipment::default();
+
+    // 1. Decoupled construction for Xenon
+    let xenon_analytics = CharacterCombatAnalytics::from_stats(
+        &basic,
+        &stat,
+        Some(&equip),
+        None,
+        1320, // Arcane Force
+        400,  // Authentic Force
+    );
+
+    assert_eq!(xenon_analytics.character_name, "제논유저");
+    assert_eq!(xenon_analytics.combat_power, 80_000_000);
+    // Xenon: 1320 / 10 = 132 * 48 = 6336 main stat bonus
+    assert_eq!(xenon_analytics.arcane_force_stat_bonus(), 6336);
+    // Xenon: 400 / 10 = 40 * 96 = 3840 main stat bonus
+    assert_eq!(xenon_analytics.authentic_force_stat_bonus(), 3840);
+
+    // 2. Decoupled construction for Demon Avenger
+    let da_basic = CharacterBasic {
+        character_name: Some("데벤유저".to_string()),
+        world_name: Some("루나".to_string()),
+        character_class: Some("데몬어벤져".to_string()),
+        character_level: Some(275),
+        ..Default::default()
+    };
+    let da_analytics = CharacterCombatAnalytics::from_stats(
+        &da_basic,
+        &stat,
+        Some(&equip),
+        None,
+        1320,
+        400,
+    );
+    // Demon Avenger: 1320 / 10 = 132 * 2100 = 277,200 Max HP
+    assert_eq!(da_analytics.arcane_force_stat_bonus(), 277_200);
+    // Demon Avenger: 400 / 10 = 40 * 4200 = 168,000 Max HP
+    assert_eq!(da_analytics.authentic_force_stat_bonus(), 168_000);
+
+    // 3. Standard class (e.g. 히어로)
+    let hero_basic = CharacterBasic {
+        character_name: Some("히어로유저".to_string()),
+        character_class: Some("히어로".to_string()),
+        ..Default::default()
+    };
+    let hero_analytics = CharacterCombatAnalytics::from_stats(
+        &hero_basic,
+        &stat,
+        Some(&equip),
+        None,
+        1320,
+        400,
+    );
+    assert_eq!(hero_analytics.arcane_force_stat_bonus(), 13_200);
+    assert_eq!(hero_analytics.authentic_force_stat_bonus(), 8_000);
+}
