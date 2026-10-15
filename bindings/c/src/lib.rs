@@ -191,6 +191,162 @@ pub unsafe extern "C" fn maplestory_client_free(handle: *mut ClientHandle) {
     }
 }
 
+#[repr(C)]
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct MapleStoryCombatSummary {
+    pub combat_power: i64,
+    pub boss_damage: f64,
+    pub ignore_monster_armor: f64,
+    pub damage: f64,
+    pub critical_rate: f64,
+    pub critical_damage: f64,
+    pub total_starforce: i32,
+    pub arcane_force: i32,
+    pub authentic_force: i32,
+    pub dojang_best_floor: i32,
+    pub estimated_dojang_floor: i32,
+    pub effective_damage_multiplier_300: f64,
+    pub effective_damage_multiplier_380: f64,
+}
+
+impl MapleStoryCombatSummary {
+    fn from_analytics(
+        analytics: &maplestory_openapi::models::character::CharacterCombatAnalytics,
+    ) -> Self {
+        Self {
+            combat_power: analytics.combat_power,
+            boss_damage: analytics.boss_damage,
+            ignore_monster_armor: analytics.ignore_monster_armor,
+            damage: analytics.damage,
+            critical_rate: analytics.critical_rate,
+            critical_damage: analytics.critical_damage,
+            total_starforce: analytics.total_starforce as i32,
+            arcane_force: analytics.arcane_force as i32,
+            authentic_force: analytics.authentic_force as i32,
+            dojang_best_floor: analytics.dojang_best_floor.unwrap_or(0) as i32,
+            estimated_dojang_floor: analytics.estimated_dojang_floor() as i32,
+            effective_damage_multiplier_300: analytics.effective_damage_multiplier_300(),
+            effective_damage_multiplier_380: analytics.effective_damage_multiplier_380(),
+        }
+    }
+}
+
+/// Fetch character combat analytics summary by OCID directly into a typed C struct.
+/// Returns 0 on success.
+#[no_mangle]
+pub unsafe extern "C" fn maplestory_character_get_combat_summary(
+    handle: *mut ClientHandle,
+    ocid: *const c_char,
+    out_summary: *mut MapleStoryCombatSummary,
+) -> i32 {
+    let ocid_str = match parse_required_cstr(ocid, "ocid") {
+        Ok(s) => s,
+        Err(code) => return code,
+    };
+    if handle.is_null() || out_summary.is_null() {
+        set_last_error("Null pointer passed for handle or out_summary");
+        return -1;
+    }
+    let h = &*handle;
+
+    let res = h
+        .runtime
+        .block_on(h.client.character().get_combat_analytics(ocid_str, None));
+
+    match res {
+        Ok(analytics) => {
+            *out_summary = MapleStoryCombatSummary::from_analytics(&analytics);
+            clear_last_error();
+            0
+        }
+        Err(e) => {
+            set_last_error(e.to_string());
+            -3
+        }
+    }
+}
+
+/// Fetch character combat analytics summary directly by character name into a typed C struct.
+/// Returns 0 on success.
+#[no_mangle]
+pub unsafe extern "C" fn maplestory_get_character_combat_summary(
+    handle: *mut ClientHandle,
+    character_name: *const c_char,
+    out_summary: *mut MapleStoryCombatSummary,
+) -> i32 {
+    let name = match parse_required_cstr(character_name, "character_name") {
+        Ok(s) => s,
+        Err(code) => return code,
+    };
+    if handle.is_null() || out_summary.is_null() {
+        set_last_error("Null pointer passed for handle or out_summary");
+        return -1;
+    }
+    let h = &*handle;
+
+    let res = h
+        .runtime
+        .block_on(h.client.character().get_combat_analytics_by_name(name));
+
+    match res {
+        Ok(analytics) => {
+            *out_summary = MapleStoryCombatSummary::from_analytics(&analytics);
+            clear_last_error();
+            0
+        }
+        Err(e) => {
+            set_last_error(e.to_string());
+            -3
+        }
+    }
+}
+
+/// Fetch synthesized character coordination (visible equipment and appearance) by OCID as a JSON string.
+/// On success, returns 0 and sets `*out_json` to a heap-allocated C string (must be freed with `maplestory_free_string`).
+#[no_mangle]
+pub unsafe extern "C" fn maplestory_character_get_coordination(
+    handle: *mut ClientHandle,
+    ocid: *const c_char,
+    out_json: *mut *mut c_char,
+) -> i32 {
+    let ocid_str = match parse_required_cstr(ocid, "ocid") {
+        Ok(s) => s,
+        Err(code) => return code,
+    };
+    let h = match validate_handle(handle, out_json) {
+        Ok(h) => h,
+        Err(code) => return code,
+    };
+
+    let res = h
+        .runtime
+        .block_on(h.client.character().get_coordination(ocid_str, None));
+    serialize_json_result(res, out_json)
+}
+
+/// Fetch synthesized character coordination (visible equipment and appearance) directly by character name as a JSON string.
+/// On success, returns 0 and sets `*out_json` to a heap-allocated C string (must be freed with `maplestory_free_string`).
+#[no_mangle]
+pub unsafe extern "C" fn maplestory_get_character_coordination(
+    handle: *mut ClientHandle,
+    character_name: *const c_char,
+    out_json: *mut *mut c_char,
+) -> i32 {
+    let name = match parse_required_cstr(character_name, "character_name") {
+        Ok(s) => s,
+        Err(code) => return code,
+    };
+    let h = match validate_handle(handle, out_json) {
+        Ok(h) => h,
+        Err(code) => return code,
+    };
+
+    let res = h
+        .runtime
+        .block_on(h.client.character().get_coordination_by_name(name));
+    serialize_json_result(res, out_json)
+}
+
 /// Fetch character dashboard JSON string.
 /// On success, returns 0 and sets `*out_json` to a heap-allocated C string (must be freed with `maplestory_free_string`).
 #[no_mangle]
@@ -702,6 +858,113 @@ mod tests {
                 .mount(&server)
                 .await;
 
+            Mock::given(method("GET"))
+                .and(path("/maplestory/v1/character/stat"))
+                .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                    "date": "2024-05-01T00:00+09:00",
+                    "character_class": "배틀메이지",
+                    "final_stat": [
+                        {"stat_name": "전투력", "stat_value": "200000000"},
+                        {"stat_name": "보스 몬스터 데미지", "stat_value": "350"},
+                        {"stat_name": "방어율 무시", "stat_value": "95"},
+                        {"stat_name": "데미지", "stat_value": "50"},
+                        {"stat_name": "크리티컬 확률", "stat_value": "100"},
+                        {"stat_name": "크리티컬 데미지", "stat_value": "80"}
+                    ],
+                    "remain_ap": 0
+                })))
+                .mount(&server)
+                .await;
+
+            Mock::given(method("GET"))
+                .and(path("/maplestory/v1/character/item-equipment"))
+                .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                    "date": "2024-05-01T00:00+09:00",
+                    "character_gender": "남",
+                    "character_class": "배틀메이지",
+                    "preset_no": 1,
+                    "item_equipment": [
+                        {
+                            "item_equipment_part": "모자",
+                            "item_equipment_slot": "모자",
+                            "item_name": "하이네스 던위치햇",
+                            "item_icon": "https://example.com/hat.png",
+                            "starforce": "22"
+                        }
+                    ]
+                })))
+                .mount(&server)
+                .await;
+
+            Mock::given(method("GET"))
+                .and(path("/maplestory/v1/character/symbol-equipment"))
+                .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                    "date": "2024-05-01T00:00+09:00",
+                    "character_class": "배틀메이지",
+                    "symbol": [
+                        {
+                            "symbol_name": "아케인심볼 : 여로",
+                            "symbol_force": "1320"
+                        },
+                        {
+                            "symbol_name": "어센틱심볼 : 세르니움",
+                            "symbol_force": "660"
+                        }
+                    ]
+                })))
+                .mount(&server)
+                .await;
+
+            Mock::given(method("GET"))
+                .and(path("/maplestory/v1/character/dojang"))
+                .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                    "date": "2024-05-01T00:00+09:00",
+                    "character_class": "배틀메이지",
+                    "world_name": "스카니아",
+                    "dojang_best_floor": 65,
+                    "date_dojang_record": "2024-05-01T00:00+09:00",
+                    "dojang_best_time": 800
+                })))
+                .mount(&server)
+                .await;
+
+            Mock::given(method("GET"))
+                .and(path("/maplestory/v1/character/beauty-equipment"))
+                .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                    "date": "2024-05-01T00:00+09:00",
+                    "character_gender": "남",
+                    "character_class": "배틀메이지",
+                    "character_hair": {
+                        "hair_name": "빅 멍뭉이 헤어",
+                        "base_color": "검정"
+                    },
+                    "character_face": {
+                        "face_name": "차분한 헤헤 얼굴",
+                        "base_color": "자주"
+                    }
+                })))
+                .mount(&server)
+                .await;
+
+            Mock::given(method("GET"))
+                .and(path("/maplestory/v1/character/cashitem-equipment"))
+                .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                    "date": "2024-05-01T00:00+09:00",
+                    "character_gender": "남",
+                    "character_class": "배틀메이지",
+                    "preset_no": 1,
+                    "cash_item_equipment_base": [
+                        {
+                            "cash_item_equipment_part": "모자",
+                            "cash_item_equipment_slot": "모자",
+                            "cash_item_name": "토끼귀",
+                            "cash_item_icon": "https://example.com/ears.png"
+                        }
+                    ]
+                })))
+                .mount(&server)
+                .await;
+
             server
         });
 
@@ -787,6 +1050,50 @@ mod tests {
                 err_msg.contains("2023-12-21"),
                 "Expected date error: {err_msg}"
             );
+
+            // 7. Typed Combat Summary (by name and by OCID)
+            let mut summary = MapleStoryCombatSummary {
+                combat_power: 0,
+                boss_damage: 0.0,
+                ignore_monster_armor: 0.0,
+                damage: 0.0,
+                critical_rate: 0.0,
+                critical_damage: 0.0,
+                total_starforce: 0,
+                arcane_force: 0,
+                authentic_force: 0,
+                dojang_best_floor: 0,
+                estimated_dojang_floor: 0,
+                effective_damage_multiplier_300: 0.0,
+                effective_damage_multiplier_380: 0.0,
+            };
+            let rc = maplestory_get_character_combat_summary(handle, char_name.as_ptr(), &mut summary);
+            assert_eq!(rc, 0);
+            assert_eq!(summary.combat_power, 200_000_000);
+            assert_eq!(summary.arcane_force, 1320);
+            assert_eq!(summary.authentic_force, 660);
+            assert_eq!(summary.dojang_best_floor, 65);
+            assert!(summary.effective_damage_multiplier_300 > 0.0);
+
+            // Also test maplestory_character_get_combat_summary by OCID
+            let ocid = CString::new("ocid_123").unwrap();
+            let mut summary_by_ocid = summary;
+            let rc = maplestory_character_get_combat_summary(handle, ocid.as_ptr(), &mut summary_by_ocid);
+            assert_eq!(rc, 0);
+            assert_eq!(summary_by_ocid.combat_power, 200_000_000);
+
+            // 8. Coordination Endpoint (by name and by OCID)
+            let mut out_coord_json: *mut c_char = ptr::null_mut();
+            let rc = maplestory_get_character_coordination(handle, char_name.as_ptr(), &mut out_coord_json);
+            assert_eq!(rc, 0);
+            let coord_json = take_c_string(out_coord_json);
+            assert!(coord_json.contains("visible_items") || coord_json.contains("character_name"));
+
+            let mut out_coord_by_ocid: *mut c_char = ptr::null_mut();
+            let rc = maplestory_character_get_coordination(handle, ocid.as_ptr(), &mut out_coord_by_ocid);
+            assert_eq!(rc, 0);
+            let coord_by_ocid = take_c_string(out_coord_by_ocid);
+            assert!(coord_by_ocid.contains("visible_items"));
 
             maplestory_client_free(handle);
         }

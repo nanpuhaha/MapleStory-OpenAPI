@@ -23,7 +23,7 @@ pub struct CharacterOcid {
 // ─── Basic ───────────────────────────────────────────────────────────────────
 
 /// Response from `GET /maplestory/v1/character/basic`.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct CharacterBasic {
     /// Query reference date (KST)
     pub date: Option<String>,
@@ -69,7 +69,7 @@ pub struct CharacterPopularity {
 // ─── Stat ────────────────────────────────────────────────────────────────────
 
 /// Response from `GET /maplestory/v1/character/stat`.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct CharacterStat {
     /// Query reference date (KST)
     pub date: Option<String>,
@@ -82,7 +82,7 @@ pub struct CharacterStat {
 }
 
 /// A single stat entry in the final stat list.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct FinalStatEntry {
     pub stat_name: Option<String>,
     pub stat_value: Option<String>,
@@ -175,7 +175,7 @@ pub struct AbilityPreset {
 // ─── Item Equipment ───────────────────────────────────────────────────────────
 
 /// Response from `GET /maplestory/v1/character/item-equipment`.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct CharacterItemEquipment {
     /// Query reference date (KST)
     pub date: Option<String>,
@@ -639,7 +639,7 @@ pub struct CharacterCashItemEquipment {
 }
 
 /// A single cash item equipment entry.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct CashItemEquipmentDetail {
     pub cash_item_equipment_part: Option<String>,
     pub cash_item_equipment_slot: Option<String>,
@@ -662,7 +662,7 @@ pub struct CashItemEquipmentDetail {
 }
 
 /// Custom origin entry for cash items.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct CustomOrigin {
     pub custom_origin_no: Option<i64>,
     pub x: Option<String>,
@@ -1564,7 +1564,7 @@ impl VisibleEquipItem {
 ///
 /// Synthesizes beauty features (hair, face, skin) and combines cash equipment
 /// with normal equipment according to in-game display rules.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct CharacterCoordination {
     /// Character name
     pub character_name: Option<String>,
@@ -1593,13 +1593,17 @@ pub struct CharacterCoordination {
 /// Alias for [`CharacterCoordination`].
 pub type CharacterAppearance = CharacterCoordination;
 
-impl CharacterCoordination {
-    /// Synthesizes coordination from separate beauty, cash, and normal equipment models.
-    pub fn from_parts(
+/// Dedicated layering engine for equipment appearance, cash overrides, anvil items, and coordination.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct EquipLayerResolver;
+
+impl EquipLayerResolver {
+    /// Resolves visible equipment items and beauty state into a [`CharacterCoordination`].
+    pub fn resolve(
         beauty: &CharacterBeautyEquipment,
         cash_equip: &CharacterCashItemEquipment,
         normal_equip: &CharacterItemEquipment,
-    ) -> Self {
+    ) -> CharacterCoordination {
         // Standard visual slots in typical display order
         let standard_slots = [
             "모자",
@@ -1637,21 +1641,28 @@ impl CharacterCoordination {
                 continue;
             }
 
+            // Helper closure to match cash item with slot including overall (한벌옷) precedence
+            let is_matching_cash_slot = |item: &CashItemEquipmentDetail, slot_name: &str| -> bool {
+                item.cash_item_equipment_slot.as_deref() == Some(slot_name)
+                    || item.cash_item_equipment_part.as_deref() == Some(slot_name)
+                    || (slot_name == "상의"
+                        && (item.cash_item_equipment_part.as_deref() == Some("한벌옷")
+                            || item.cash_item_equipment_slot.as_deref() == Some("한벌옷")))
+            };
+
             // Find cash item for this slot in active preset, with fallback to base
             let cash_match = cash_items
                 .iter()
                 .enumerate()
                 .find(|(idx, item)| {
-                    !handled_cash_indices.contains(idx)
-                        && (item.cash_item_equipment_slot.as_deref() == Some(slot)
-                            || item.cash_item_equipment_part.as_deref() == Some(slot))
+                    !handled_cash_indices.contains(idx) && is_matching_cash_slot(item, slot)
                 })
                 .or_else(|| {
                     // Fallback to base cash items if active preset slot is empty
-                    base_cash_items.iter().enumerate().find(|(_, item)| {
-                        item.cash_item_equipment_slot.as_deref() == Some(slot)
-                            || item.cash_item_equipment_part.as_deref() == Some(slot)
-                    })
+                    base_cash_items
+                        .iter()
+                        .enumerate()
+                        .find(|(_, item)| is_matching_cash_slot(item, slot))
                 });
 
             if let Some((idx, cash)) = cash_match {
@@ -1673,10 +1684,7 @@ impl CharacterCoordination {
                     .cash_item_name
                     .clone()
                     .unwrap_or_else(|| "Unknown".to_string());
-                let is_transparent = item_name.starts_with("투명 ")
-                    || item_name == "투명장갑"
-                    || item_name == "투명모자"
-                    || item_name == "투명망토";
+                let is_transparent = item_name.starts_with("투명") || item_name.contains("투명");
 
                 visible_items.push(VisibleEquipItem {
                     slot: display_slot,
@@ -1762,10 +1770,7 @@ impl CharacterCoordination {
                     .cash_item_name
                     .clone()
                     .unwrap_or_else(|| "Unknown".to_string());
-                let is_transparent = item_name.starts_with("투명 ")
-                    || item_name == "투명장갑"
-                    || item_name == "투명모자"
-                    || item_name == "투명망토";
+                let is_transparent = item_name.starts_with("투명") || item_name.contains("투명");
 
                 visible_items.push(VisibleEquipItem {
                     slot,
@@ -1782,7 +1787,7 @@ impl CharacterCoordination {
             }
         }
 
-        Self {
+        CharacterCoordination {
             character_name: None,
             world_name: None,
             character_class: None,
@@ -1795,6 +1800,26 @@ impl CharacterCoordination {
             cash_preset_no: cash_equip.preset_no,
             visible_items,
         }
+    }
+}
+
+impl CharacterCoordination {
+    /// Synthesizes coordination from separate beauty, cash, and normal equipment models.
+    pub fn from_parts(
+        beauty: &CharacterBeautyEquipment,
+        cash_equip: &CharacterCashItemEquipment,
+        normal_equip: &CharacterItemEquipment,
+    ) -> Self {
+        EquipLayerResolver::resolve(beauty, cash_equip, normal_equip)
+    }
+
+    /// Synthesizes coordination from equipment and cash layers (alias for [`EquipLayerResolver::resolve`]).
+    pub fn from_equipment_and_cash(
+        beauty: &CharacterBeautyEquipment,
+        cash_equip: &CharacterCashItemEquipment,
+        normal_equip: &CharacterItemEquipment,
+    ) -> Self {
+        EquipLayerResolver::resolve(beauty, cash_equip, normal_equip)
     }
 
     /// Synthesizes coordination including basic character profile information.
@@ -2096,6 +2121,32 @@ impl DashboardOptionsBuilder {
     }
 }
 
+/// Raw result payloads collected for all character dashboard sections before assembly and degradation.
+#[derive(Debug)]
+pub struct RawDashboardSections {
+    pub basic: Result<CharacterBasic, crate::error::MapleStoryError>,
+    pub stat: Option<Result<CharacterStat, crate::error::MapleStoryError>>,
+    pub item_equipment: Option<Result<CharacterItemEquipment, crate::error::MapleStoryError>>,
+    pub cash_item_equipment: Option<Result<CharacterCashItemEquipment, crate::error::MapleStoryError>>,
+    pub beauty_equipment: Option<Result<CharacterBeautyEquipment, crate::error::MapleStoryError>>,
+    pub symbols: Option<Result<CharacterSymbolEquipment, crate::error::MapleStoryError>>,
+    pub ability: Option<Result<CharacterAbility, crate::error::MapleStoryError>>,
+    pub hyper_stat: Option<Result<CharacterHyperStat, crate::error::MapleStoryError>>,
+    pub hexa_matrix: Option<Result<CharacterHexaMatrix, crate::error::MapleStoryError>>,
+    pub hexa_matrix_stat: Option<Result<CharacterHexaMatrixStat, crate::error::MapleStoryError>>,
+    pub v_matrix: Option<Result<CharacterVMatrix, crate::error::MapleStoryError>>,
+    pub set_effect: Option<Result<CharacterSetEffect, crate::error::MapleStoryError>>,
+    pub pet_equipment: Option<Result<CharacterPetEquipment, crate::error::MapleStoryError>>,
+    pub android_equipment: Option<Result<CharacterAndroidEquipment, crate::error::MapleStoryError>>,
+    pub link_skill: Option<Result<CharacterLinkSkill, crate::error::MapleStoryError>>,
+    pub propensity: Option<Result<CharacterPropensity, crate::error::MapleStoryError>>,
+    pub popularity: Option<Result<CharacterPopularity, crate::error::MapleStoryError>>,
+    pub dojang: Option<Result<CharacterDojang, crate::error::MapleStoryError>>,
+    pub union: Option<Result<crate::models::union::UserUnion, crate::error::MapleStoryError>>,
+    pub union_artifact: Option<Result<crate::models::union::UserUnionArtifact, crate::error::MapleStoryError>>,
+    pub guild: Option<Result<crate::models::guild::GuildBasic, crate::error::MapleStoryError>>,
+}
+
 /// Comprehensive all-in-one character dashboard (올인원 캐릭터 종합 대시보드).
 ///
 /// Designed to provide all information required by modern MapleStory ranking &
@@ -2154,6 +2205,146 @@ pub struct CharacterDashboard {
 }
 
 impl CharacterDashboard {
+    /// Pure synchronous assembler that aggregates raw section results into a complete [`CharacterDashboard`].
+    ///
+    /// Essential section (`basic`) error is propagated as a top-level error.
+    /// Non-essential section errors are caught, mapped to default fallback models,
+    /// and registered in `self.errors` for diagnostic reporting.
+    pub fn assemble(
+        raw: RawDashboardSections,
+        options: &DashboardOptions,
+    ) -> Result<Self, crate::error::MapleStoryError> {
+        let _ = options; // Options metadata retained for interface depth and callers
+        let basic = raw.basic?;
+        let mut errors = std::collections::HashMap::new();
+
+        macro_rules! unwrap_sec {
+            ($field:expr, $section:ident) => {
+                match $field {
+                    Some(Ok(v)) => Some(v),
+                    Some(Err(e)) => {
+                        errors.insert(
+                            DashboardSection::$section,
+                            DashboardSectionError::from_error(DashboardSection::$section, &e),
+                        );
+                        None
+                    }
+                    None => None,
+                }
+            };
+        }
+
+        let stat = match raw.stat {
+            Some(Ok(s)) => s,
+            Some(Err(e)) => {
+                errors.insert(
+                    DashboardSection::Stat,
+                    DashboardSectionError::from_error(DashboardSection::Stat, &e),
+                );
+                CharacterStat {
+                    character_class: basic.character_class.clone(),
+                    ..Default::default()
+                }
+            }
+            None => CharacterStat {
+                character_class: basic.character_class.clone(),
+                ..Default::default()
+            },
+        };
+
+        let item_equipment = match raw.item_equipment {
+            Some(Ok(eq)) => eq,
+            Some(Err(e)) => {
+                errors.insert(
+                    DashboardSection::ItemEquipment,
+                    DashboardSectionError::from_error(DashboardSection::ItemEquipment, &e),
+                );
+                CharacterItemEquipment {
+                    character_class: basic.character_class.clone(),
+                    ..Default::default()
+                }
+            }
+            None => CharacterItemEquipment {
+                character_class: basic.character_class.clone(),
+                ..Default::default()
+            },
+        };
+
+        let cash_item_equipment = match raw.cash_item_equipment {
+            Some(Ok(c)) => c,
+            Some(Err(e)) => {
+                errors.insert(
+                    DashboardSection::CashItemEquipment,
+                    DashboardSectionError::from_error(DashboardSection::CashItemEquipment, &e),
+                );
+                CharacterCashItemEquipment::default()
+            }
+            None => CharacterCashItemEquipment::default(),
+        };
+
+        let beauty_equipment = match raw.beauty_equipment {
+            Some(Ok(b)) => b,
+            Some(Err(e)) => {
+                errors.insert(
+                    DashboardSection::BeautyEquipment,
+                    DashboardSectionError::from_error(DashboardSection::BeautyEquipment, &e),
+                );
+                CharacterBeautyEquipment::default()
+            }
+            None => CharacterBeautyEquipment::default(),
+        };
+
+        let coordination = CharacterCoordination::from_full_parts(
+            &basic,
+            &beauty_equipment,
+            &cash_item_equipment,
+            &item_equipment,
+        );
+
+        let symbols = unwrap_sec!(raw.symbols, Symbols);
+        let ability = unwrap_sec!(raw.ability, Ability);
+        let hyper_stat = unwrap_sec!(raw.hyper_stat, HyperStat);
+        let hexa_matrix = unwrap_sec!(raw.hexa_matrix, HexaMatrix);
+        let hexa_matrix_stat = unwrap_sec!(raw.hexa_matrix_stat, HexaMatrixStat);
+        let v_matrix = unwrap_sec!(raw.v_matrix, VMatrix);
+        let set_effect = unwrap_sec!(raw.set_effect, SetEffect);
+        let pet_equipment = unwrap_sec!(raw.pet_equipment, PetEquipment);
+        let android_equipment = unwrap_sec!(raw.android_equipment, AndroidEquipment);
+        let link_skill = unwrap_sec!(raw.link_skill, LinkSkill);
+        let propensity = unwrap_sec!(raw.propensity, Propensity);
+        let popularity = unwrap_sec!(raw.popularity, Popularity);
+        let dojang = unwrap_sec!(raw.dojang, Dojang);
+        let union = unwrap_sec!(raw.union, Union);
+        let union_artifact = unwrap_sec!(raw.union_artifact, UnionArtifact);
+        let guild = unwrap_sec!(raw.guild, Guild);
+
+        Ok(CharacterDashboard {
+            basic,
+            stat,
+            item_equipment,
+            cash_item_equipment,
+            beauty_equipment,
+            coordination,
+            symbols,
+            ability,
+            hyper_stat,
+            hexa_matrix,
+            hexa_matrix_stat,
+            v_matrix,
+            set_effect,
+            pet_equipment,
+            android_equipment,
+            link_skill,
+            propensity,
+            popularity,
+            dojang,
+            union,
+            union_artifact,
+            guild,
+            errors,
+        })
+    }
+
     /// Character name.
     pub fn character_name(&self) -> &str {
         self.basic.character_name.as_deref().unwrap_or("")
@@ -2345,6 +2536,46 @@ pub struct CharacterCombatAnalytics {
 }
 
 impl CharacterCombatAnalytics {
+    /// Constructs [`CharacterCombatAnalytics`] directly from a full [`CharacterDashboard`].
+    pub fn from_dashboard(dashboard: &CharacterDashboard) -> Self {
+        dashboard.combat_analytics()
+    }
+
+    /// Constructs [`CharacterCombatAnalytics`] directly from individual stats without requiring a full dashboard.
+    pub fn from_stats(
+        basic: &CharacterBasic,
+        stat: &CharacterStat,
+        item_equipment: Option<&CharacterItemEquipment>,
+        dojang: Option<&CharacterDojang>,
+        arcane_force: i64,
+        authentic_force: i64,
+        hyper_stat: Option<&CharacterHyperStat>,
+    ) -> Self {
+        let _ = hyper_stat; // Hyper stat parameter retained for deep spec calculation
+        let starforce_stat_breakdown = item_equipment.map(|eq| eq.starforce_stat_breakdown());
+        let total_starforce = item_equipment
+            .map(|eq| eq.total_starforce())
+            .unwrap_or(0);
+
+        Self {
+            character_name: basic.character_name.clone().unwrap_or_default(),
+            world_name: basic.world_name.clone(),
+            character_class: basic.character_class.clone(),
+            character_level: basic.character_level.unwrap_or(0),
+            combat_power: stat.combat_power().unwrap_or(0),
+            boss_damage: stat.boss_damage().unwrap_or(0.0),
+            ignore_monster_armor: stat.ignore_monster_armor().unwrap_or(0.0),
+            damage: stat.damage().unwrap_or(0.0),
+            critical_rate: stat.critical_rate().unwrap_or(0.0),
+            critical_damage: stat.critical_damage().unwrap_or(0.0),
+            total_starforce,
+            arcane_force,
+            authentic_force,
+            dojang_best_floor: dojang.and_then(|d| d.dojang_best_floor),
+            starforce_stat_breakdown,
+        }
+    }
+
     /// Calculate effective damage multiplier against a monster with the given armor/defense rate percentage.
     ///
     /// For example, against a 300% defense boss (`defense_rate_pct = 300.0`):
@@ -2378,16 +2609,32 @@ impl CharacterCombatAnalytics {
         1.35 + (self.critical_damage / 100.0)
     }
 
-    /// Additional main stat bonus contributed by Arcane Force (`(arcane_force / 10) * 100`).
-    /// (For Demon Avenger: HP +2,100 per 10 AF; Xenon: +48 per 10 AF; standard jobs: +100 main stat per 10 AF).
-    pub fn arcane_force_stat_bonus(&self) -> i64 {
-        (self.arcane_force / 10) * 100
+    fn force_stat_multiplier(job: Option<&str>, is_authentic: bool) -> i64 {
+        match (job, is_authentic) {
+            (Some("데몬어벤져"), false) => 2100,
+            (Some("데몬어벤져"), true) => 4200,
+            (Some("제논"), _) => 48,
+            (_, false) => 100,
+            (_, true) => 200,
+        }
     }
 
-    /// Additional main stat bonus contributed by Authentic Force (`(authentic_force / 10) * 200`).
-    /// (Standard jobs: +200 main stat per 10 AutF).
+    /// Additional main stat bonus contributed by Arcane Force.
+    ///
+    /// - Demon Avenger: Max HP +2,100 per 10 AF
+    /// - Xenon: +48 per 10 AF (STR/DEX/LUK)
+    /// - Standard classes: +100 main stat per 10 AF
+    pub fn arcane_force_stat_bonus(&self) -> i64 {
+        Self::force_stat_multiplier(self.character_class.as_deref(), false) * (self.arcane_force / 10)
+    }
+
+    /// Additional main stat bonus contributed by Authentic Force.
+    ///
+    /// - Demon Avenger: Max HP +4,200 per 10 AutF
+    /// - Xenon: +48 per 10 AutF
+    /// - Standard classes: +200 main stat per 10 AutF
     pub fn authentic_force_stat_bonus(&self) -> i64 {
-        (self.authentic_force / 10) * 200
+        Self::force_stat_multiplier(self.character_class.as_deref(), true) * (self.authentic_force / 10)
     }
 
     /// Estimated main stat gain from Starforce enhancements.
