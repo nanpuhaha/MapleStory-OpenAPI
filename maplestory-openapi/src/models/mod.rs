@@ -2,6 +2,7 @@
 //! Response model types for the MapleStory OpenAPI.
 
 pub mod battle_practice;
+pub mod calculator;
 pub mod character;
 pub mod common;
 pub mod guild;
@@ -13,6 +14,7 @@ pub mod union;
 pub mod user;
 
 pub use battle_practice::*;
+pub use calculator::*;
 pub use character::*;
 pub use common::*;
 pub use guild::*;

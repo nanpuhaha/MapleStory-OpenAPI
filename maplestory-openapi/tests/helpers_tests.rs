@@ -2951,3 +2951,145 @@ fn test_gear_swap_simulation_empty_slot() {
     assert_eq!(diff.stat_diff.attack_power, 15);
 }
 
+#[test]
+fn test_starforce_cost_per_attempt_and_discounts() {
+    use maplestory_openapi::models::calculator::{StarforceCalculator, StarforceOptions};
+
+    let default_opts = StarforceOptions::default();
+
+    // Level 150 gear, 0 star -> 1 star
+    // Base formula: 1000 + 150^3 * 1 / 2500 * 100 = 1000 + 135000 = 136,000 meso
+    let cost_0_to_1 = StarforceCalculator::cost_per_attempt(150, 0, &default_opts);
+    assert_eq!(cost_0_to_1, 136_000);
+
+    // 30% discount option
+    let disc_opts = StarforceOptions::default().with_discount_30(true);
+    let cost_disc = StarforceCalculator::cost_per_attempt(150, 0, &disc_opts);
+    assert_eq!(cost_disc, (136_000.0 * 0.7) as u64); // 95,200 meso
+
+    // Safeguard on 15 stars: adds 100% extra base cost (2x)
+    let sf_opts = StarforceOptions::default().with_safeguard(true);
+    let cost_15_normal = StarforceCalculator::cost_per_attempt(150, 15, &default_opts);
+    let cost_15_safeguard = StarforceCalculator::cost_per_attempt(150, 15, &sf_opts);
+    assert_eq!(cost_15_safeguard, cost_15_normal * 2);
+}
+
+#[test]
+fn test_starforce_markov_chain_from_12_to_17() {
+    use maplestory_openapi::models::calculator::{StarforceCalculator, StarforceOptions};
+
+    let opts = StarforceOptions::default()
+        .with_starcatch(true)
+        .with_safeguard(true); // safeguard 15-16 stars
+
+    let estimate = StarforceCalculator::calculate(160, 12, 17, &opts).expect("calculate starforce 12 to 17");
+
+    assert_eq!(estimate.item_level, 160);
+    assert_eq!(estimate.start_star, 12);
+    assert_eq!(estimate.target_star, 17);
+    assert!(estimate.expected_meso_cost > 0.0);
+    assert!(estimate.expected_attempts > 5.0);
+    // Because safeguard was on for 15-16, and 12-14 has no destruction, expected destructions must be 0!
+    assert_eq!(estimate.expected_destructions, 0.0);
+    assert_eq!(estimate.no_destruction_probability, 1.0);
+
+    // Percentiles ordering: 10th <= 50th <= 90th
+    assert!(estimate.percentile_10_cost <= estimate.percentile_50_cost);
+    assert!(estimate.percentile_50_cost <= estimate.percentile_90_cost);
+}
+
+#[test]
+fn test_starforce_markov_chain_from_17_to_22_high_risk() {
+    use maplestory_openapi::models::calculator::{StarforceCalculator, StarforceOptions};
+
+    let opts = StarforceOptions::default()
+        .with_starcatch(true)
+        .with_spare_cost(200_000_000); // 200M spare cost
+
+    let estimate = StarforceCalculator::calculate(200, 17, 22, &opts).expect("calculate starforce 17 to 22");
+
+    assert_eq!(estimate.item_level, 200);
+    assert_eq!(estimate.start_star, 17);
+    assert_eq!(estimate.target_star, 22);
+    assert!(estimate.expected_meso_cost > 1_000_000_000.0); // usually several billion mesos
+    assert!(estimate.expected_destructions > 0.0);
+    assert!(estimate.no_destruction_probability < 1.0);
+    assert!(estimate.percentile_50_cost > 0);
+    assert!(estimate.percentile_90_cost >= estimate.percentile_50_cost);
+    assert!(estimate.std_deviation_cost > 0.0);
+}
+
+#[test]
+fn test_starforce_events_and_options() {
+    use maplestory_openapi::models::calculator::{StarforceCalculator, StarforceOptions};
+
+    // 1+1 event test under 12 stars
+    let normal_opts = StarforceOptions::default().with_starcatch(false);
+    let event_opts = StarforceOptions::default().with_starcatch(false).with_1_plus_1(true);
+
+    let norm_est = StarforceCalculator::calculate(150, 0, 12, &normal_opts).unwrap();
+    let event_est = StarforceCalculator::calculate(150, 0, 12, &event_opts).unwrap();
+
+    // 1+1 should significantly reduce required attempts from 0 to 12
+    assert!(event_est.expected_attempts < norm_est.expected_attempts);
+    assert!(event_est.expected_meso_cost < norm_est.expected_meso_cost);
+
+    // Shining Starforce (30% off + 5/10/15 guarantee)
+    let shining_opts = StarforceOptions::default().with_shining_starforce();
+    assert!(shining_opts.discount_30);
+    assert!(shining_opts.sunday_5_10_15);
+
+    let norm_12_17 = StarforceCalculator::calculate(150, 12, 17, &normal_opts).unwrap();
+    let shining_est = StarforceCalculator::calculate(150, 12, 17, &shining_opts).unwrap();
+
+    // Shining Starforce should significantly reduce cost and attempts due to 30% discount and 15-star guarantee
+    assert!(shining_est.expected_meso_cost < norm_12_17.expected_meso_cost);
+    assert!(shining_est.expected_attempts < norm_12_17.expected_attempts);
+}
+
+#[test]
+fn test_cube_grade_up_nexon_official_probabilities_and_ceiling() {
+    use maplestory_openapi::models::calculator::{CubeCalculator, CubeType, PotentialGrade};
+
+    // Red Cube: Rare -> Epic (6.0%, ceiling 25)
+    let red_rare_to_epic = CubeCalculator::calculate(CubeType::Red, PotentialGrade::Rare, PotentialGrade::Epic, None).unwrap();
+    assert_eq!(red_rare_to_epic.ceiling_cubes, Some(25));
+    assert!(red_rare_to_epic.is_cash);
+    assert_eq!(red_rare_to_epic.ceiling_cost, Some(25 * 1200));
+    assert!(red_rare_to_epic.expected_cubes > 10.0 && red_rare_to_epic.expected_cubes <= 25.0);
+
+    // Black Cube: Unique -> Legendary (1.4%, ceiling 107)
+    let black_unique_to_legendary = CubeCalculator::calculate(CubeType::Black, PotentialGrade::Unique, PotentialGrade::Legendary, None).unwrap();
+    assert_eq!(black_unique_to_legendary.ceiling_cubes, Some(107));
+    assert!(black_unique_to_legendary.expected_cubes < 107.0);
+    assert_eq!(black_unique_to_legendary.ceiling_cost, Some(107 * 2200));
+
+    // Multi-tier grade up: Rare -> Legendary via Black Cube
+    let black_rare_to_leg = CubeCalculator::calculate(CubeType::Black, PotentialGrade::Rare, PotentialGrade::Legendary, None).unwrap();
+    assert_eq!(black_rare_to_leg.step_details.len(), 3); // Rare->Epic, Epic->Unique, Unique->Legendary
+    assert_eq!(black_rare_to_leg.ceiling_cubes, Some(10 + 42 + 107)); // sum of ceilings
+    assert!(black_rare_to_leg.expected_cubes < (10 + 42 + 107) as f64);
+    assert!(black_rare_to_leg.percentile_50_cubes <= black_rare_to_leg.percentile_90_cubes);
+
+    // Additional Cube: Unique -> Legendary (0.7%, ceiling 214)
+    let add_unique_to_leg = CubeCalculator::calculate(CubeType::Additional, PotentialGrade::Unique, PotentialGrade::Legendary, None).unwrap();
+    assert_eq!(add_unique_to_leg.ceiling_cubes, Some(214));
+    assert_eq!(add_unique_to_leg.ceiling_cost, Some(214 * 2400));
+}
+
+#[test]
+fn test_cube_target_option_cost_estimate() {
+    use maplestory_openapi::models::calculator::CubeCalculator;
+
+    // Rolling a 1% probability target option
+    let estimate = CubeCalculator::calculate_target_option(0.01, 2200).unwrap();
+    assert_eq!(estimate.target_probability, 0.01);
+    assert_eq!(estimate.expected_attempts, 100.0);
+    assert_eq!(estimate.expected_cost, 220_000.0);
+    // 50th percentile: ln(0.5)/ln(0.99) = 69 attempts
+    assert_eq!(estimate.percentile_50_attempts, 69);
+    // 90th percentile: ln(0.1)/ln(0.99) = 230 attempts
+    assert_eq!(estimate.percentile_90_attempts, 230);
+}
+
+

@@ -47,7 +47,7 @@
 | **22** | [C-ABI High-Leverage Typed Summaries](issues/22-c-abi-high-leverage-summaries.md) | C 구조체 `MapleStoryCombatSummary`, OCID/닉네임 기반 C-ABI 함수 제공, 무파싱 고속 연동 | `test_c_abi_notice_union_ranking_guild_and_account_summary` | ✅ Done |
 | **23** | [Equip Layering Engine](issues/23-equip-layer-resolver.md) | `EquipLayerResolver::resolve`, 캐시장비 우선, 한벌옷 하의 가림, 투명 장비 감지, 모루 외형 대체 | `test_equip_layer_resolver_direct_and_custom_rules` | ✅ Done |
 | **24** | [Gear Swap Simulation & Stat Diff](issues/24-gear-swap-simulation-and-stat-diff.md) | 장비 교체 시 세트 효과/스탯/전투력 변동치 역산 시뮬레이터 (`EquipmentDiff`, `StatDiff`) | 순수 단위 테스트 (세트 효과 변동, 스탯 역산) | ⏳ Ready |
-| **25** | [Starforce & Cube Expected Cost Calculator](issues/25-starforce-cube-expected-cost-calculator.md) | 스타포스(마르코프 체인) 및 큐브 목표 달성 소요 비용/확률/기댓값 계산 엔진 | 마르코프 체인 비용 수렴 및 컷오프 확률 테스트 | ⏳ Ready |
+| **25** | [Starforce & Cube Expected Cost Calculator](issues/25-starforce-cube-expected-cost-calculator.md) | 스타포스(마르코프 체인) 및 큐브 목표 달성 소요 비용/확률/기댓값 계산 엔진 | 마르코프 체인 비용 수렴 및 컷오프 확률 테스트 | ✅ Done |
 | **26** | [HEXA Matrix Progression Calculator](issues/26-hexa-matrix-progression-calculator.md) | 6차 전직 헥사 매트릭스 코어/스탯별 30레벨 만렙 달성 잔여 솔 에르다/조각 수량 계산 | 코어 타입별 재료 합산 단위 테스트 | ⏳ Ready |
 | **27** | [Persistent Disk Cache Adapter](issues/27-persistent-disk-cache-adapter.md) | 파일 시스템 기반 영속 식별자 캐시 (`DiskIdentityCache`) 구현체 (TTL, 동시성 보장) | 파일 캐시 히트/미스 및 프로세스 재시작 시뮬레이션 | ⏳ Ready |
 | **28** | [Batch Character & Guild Crawler](issues/28-batch-character-and-guild-crawler.md) | 길드원/계정 캐릭터 대량 병렬 수집기 (`client.guild().fetch_roster_profiles()`) | ConcurrencyLimiter 연동 및 부분 실패 내구성 테스트 | ⏳ Ready |
