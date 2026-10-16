@@ -202,7 +202,7 @@ pub struct CharacterItemEquipment {
 }
 
 /// Full detail of a single equipped item.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct ItemEquipmentDetail {
     pub item_equipment_part: Option<String>,
     pub item_equipment_slot: Option<String>,
@@ -2679,7 +2679,610 @@ impl CharacterCombatAnalytics {
         }
         (self.combat_power / 25_000).clamp(1, 29)
     }
+
+    /// Simulates swapping an equipped item in the given slot with `new_item`.
+    ///
+    /// Evaluates:
+    /// - Item total option differences (STR, DEX, INT, LUK, HP, MP, Attack, Magic, Boss Damage, IED, All Stat)
+    /// - Potential and additional potential differences
+    /// - Starforce differences
+    /// - Set effect changes (piece counts, tier activations/deactivations) if `set_effect` is provided
+    /// - Estimated combat power impact
+    pub fn simulate_equipment_swap(
+        &self,
+        current_equipment: &CharacterItemEquipment,
+        new_item: &ItemEquipmentDetail,
+        set_effect: Option<&CharacterSetEffect>,
+    ) -> EquipmentDiff {
+        let slot_name = new_item
+            .item_equipment_slot
+            .as_deref()
+            .or(new_item.item_equipment_part.as_deref())
+            .unwrap_or("")
+            .to_string();
+
+        let previous_item = current_equipment.active_items().iter().find(|item| {
+            if !slot_name.is_empty() {
+                item.item_equipment_slot.as_deref() == Some(&slot_name)
+                    || item.item_equipment_part.as_deref() == Some(&slot_name)
+            } else {
+                false
+            }
+        }).cloned();
+
+        let mut prev_bag = ItemStatBag::default();
+        if let Some(ref prev) = previous_item {
+            fill_item_stat_bag(prev, &mut prev_bag);
+        }
+
+        let mut new_bag = ItemStatBag::default();
+        fill_item_stat_bag(new_item, &mut new_bag);
+
+        // Calculate set effect diff if set_effect is provided
+        let mut set_bag = ItemStatBag::default();
+        let set_effect_diff = set_effect.map(|effects| {
+            let mut set_count_changes = Vec::new();
+            let mut gained_options = Vec::new();
+            let mut lost_options = Vec::new();
+
+            if let Some(list) = &effects.set_effect {
+                for s in list {
+                    let prev_matched = previous_item.as_ref().is_some_and(|it| item_matches_set(it, s));
+                    let new_matched = item_matches_set(new_item, s);
+
+                    if prev_matched != new_matched {
+                        let old_count = s.total_set_count.unwrap_or(0);
+                        let delta = if new_matched { 1 } else { 0 } - if prev_matched { 1 } else { 0 };
+                        let new_count = (old_count + delta).max(0);
+
+                        set_count_changes.push(SetCountChange {
+                            set_name: s.set_name.clone().unwrap_or_default(),
+                            previous_count: old_count,
+                            new_count,
+                        });
+
+                        // Check tier options
+                        let empty_vec = Vec::new();
+                        let all_tiers = s.set_option_full.as_ref().or(s.set_effect_info.as_ref()).unwrap_or(&empty_vec);
+                        for tier in all_tiers {
+                            let req = tier.set_count.unwrap_or(0);
+                            if let Some(opt_str) = &tier.set_option {
+                                if req <= old_count && req > new_count {
+                                    // Lost tier
+                                    lost_options.push(format!("{}-set: {}", req, opt_str));
+                                    parse_set_option_string(opt_str, &mut set_bag, -1.0);
+                                } else if req > old_count && req <= new_count {
+                                    // Gained tier
+                                    gained_options.push(format!("{}-set: {}", req, opt_str));
+                                    parse_set_option_string(opt_str, &mut set_bag, 1.0);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            SetEffectDiff {
+                set_count_changes,
+                gained_options,
+                lost_options,
+            }
+        });
+
+        // Combine item diff + set effect diff
+        let str_diff = (new_bag.str - prev_bag.str) + set_bag.str;
+        let dex_diff = (new_bag.dex - prev_bag.dex) + set_bag.dex;
+        let int_diff = (new_bag.int - prev_bag.int) + set_bag.int;
+        let luk_diff = (new_bag.luk - prev_bag.luk) + set_bag.luk;
+        let max_hp_diff = (new_bag.max_hp - prev_bag.max_hp) + set_bag.max_hp;
+        let max_mp_diff = (new_bag.max_mp - prev_bag.max_mp) + set_bag.max_mp;
+        let attack_power_diff = (new_bag.attack_power - prev_bag.attack_power) + set_bag.attack_power;
+        let magic_power_diff = (new_bag.magic_power - prev_bag.magic_power) + set_bag.magic_power;
+        let armor_diff = (new_bag.armor - prev_bag.armor) + set_bag.armor;
+        let boss_damage_diff = (new_bag.boss_damage - prev_bag.boss_damage) + set_bag.boss_damage;
+        let ignore_monster_armor_diff = (new_bag.ignore_monster_armor - prev_bag.ignore_monster_armor) + set_bag.ignore_monster_armor;
+        let damage_diff = (new_bag.damage - prev_bag.damage) + set_bag.damage;
+        let all_stat_diff = (new_bag.all_stat - prev_bag.all_stat) + set_bag.all_stat;
+        let critical_rate_diff = (new_bag.critical_rate - prev_bag.critical_rate) + set_bag.critical_rate;
+        let critical_damage_diff = (new_bag.critical_damage - prev_bag.critical_damage) + set_bag.critical_damage;
+        let starforce_diff = new_bag.starforce - prev_bag.starforce;
+
+        let mut stat_diff = StatDiff {
+            str: str_diff,
+            dex: dex_diff,
+            int: int_diff,
+            luk: luk_diff,
+            max_hp: max_hp_diff,
+            max_mp: max_mp_diff,
+            attack_power: attack_power_diff,
+            magic_power: magic_power_diff,
+            armor: armor_diff,
+            boss_damage: boss_damage_diff,
+            ignore_monster_armor: ignore_monster_armor_diff,
+            damage: damage_diff,
+            all_stat: all_stat_diff,
+            critical_rate: critical_rate_diff,
+            critical_damage: critical_damage_diff,
+            starforce: starforce_diff,
+            combat_power_diff: 0,
+            estimated_combat_power: 0,
+        };
+
+        // Estimate combat power impact
+        let cp = self.combat_power;
+        if cp > 0 {
+            let current_dmg_factor = (1.0 + (self.damage + self.boss_damage) / 100.0).max(0.01);
+            let new_dmg_factor = (1.0 + (self.damage + self.boss_damage + boss_damage_diff + damage_diff) / 100.0).max(0.01);
+            let dmg_ratio = new_dmg_factor / current_dmg_factor;
+
+            let current_crit_factor = (1.35 + self.critical_damage / 100.0).max(0.01);
+            let new_crit_factor = (1.35 + (self.critical_damage + critical_damage_diff) / 100.0).max(0.01);
+            let crit_ratio = new_crit_factor / current_crit_factor;
+
+            let current_ied = (self.ignore_monster_armor / 100.0).clamp(0.0, 0.999);
+            let new_ied = ((self.ignore_monster_armor + ignore_monster_armor_diff) / 100.0).clamp(0.0, 0.999);
+            let current_ied_factor = 1.0 - 0.5 * (1.0 - current_ied);
+            let new_ied_factor = 1.0 - 0.5 * (1.0 - new_ied);
+            let ied_ratio = new_ied_factor / current_ied_factor;
+
+            let is_magic = self.character_class.as_deref().is_some_and(|job| {
+                job.contains("마법사") || job.contains("메이지") || job.contains("비숍") || job.contains("플레임위자드") || job.contains("에반") || job.contains("배틀메이지") || job.contains("루미너스") || job.contains("일리움") || job.contains("라라") || job.contains("키네시스")
+            });
+            let att_delta = if is_magic { magic_power_diff as f64 } else { attack_power_diff as f64 };
+            let base_att: f64 = current_equipment.active_items().iter().map(|it| {
+                if is_magic {
+                    parse_stat_i64(it.item_total_option.as_ref().and_then(|o| o.magic_power.as_deref())) as f64
+                } else {
+                    parse_stat_i64(it.item_total_option.as_ref().and_then(|o| o.attack_power.as_deref())) as f64
+                }
+            }).sum::<f64>().max(500.0);
+            let att_ratio = (base_att + att_delta).max(0.01) / base_att;
+
+            let main_stat_delta = stat_diff.main_stat_for_class(self.character_class.as_deref()) as f64;
+            let base_stat: f64 = (self.arcane_force_stat_bonus() + self.authentic_force_stat_bonus()).max(5000) as f64;
+            let stat_ratio = (base_stat + main_stat_delta).max(0.01) / base_stat;
+
+            let total_ratio = (dmg_ratio * crit_ratio * ied_ratio * att_ratio * stat_ratio).max(0.0);
+            let estimated_cp = (cp as f64 * total_ratio).round() as i64;
+            stat_diff.estimated_combat_power = estimated_cp;
+            stat_diff.combat_power_diff = estimated_cp - cp;
+        } else {
+            let main_stat_delta = stat_diff.main_stat_for_class(self.character_class.as_deref());
+            let att_delta = attack_power_diff.max(magic_power_diff);
+            let rough_cp = (main_stat_delta * 4 + att_delta * 20).max(0);
+            stat_diff.estimated_combat_power = rough_cp;
+            stat_diff.combat_power_diff = rough_cp;
+        }
+
+        EquipmentDiff {
+            slot: slot_name,
+            previous_item,
+            new_item: new_item.clone(),
+            starforce_diff,
+            stat_diff,
+            set_effect_diff,
+        }
+    }
 }
+
+// ─── Gear Swap Simulation & Stat Diff Engine (장비 교체 및 스펙 비교 엔진) ─────────
+
+/// Result of simulating an equipment item swap.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct EquipmentDiff {
+    /// Slot where the swap occurs (e.g. "무기", "모자", "장갑", "반지4")
+    pub slot: String,
+    /// Previously equipped item detail, if any
+    pub previous_item: Option<ItemEquipmentDetail>,
+    /// Newly equipped item detail
+    pub new_item: ItemEquipmentDetail,
+    /// Starforce difference (new starforce - old starforce)
+    pub starforce_diff: i64,
+    /// Detailed stat and combat power differences
+    pub stat_diff: StatDiff,
+    /// Set effect modifications (if set effect data was provided)
+    pub set_effect_diff: Option<SetEffectDiff>,
+}
+
+impl EquipmentDiff {
+    /// Whether the simulated swap is an upgrade (combat power increases).
+    pub fn is_upgrade(&self) -> bool {
+        self.stat_diff.combat_power_diff > 0
+    }
+
+    /// Estimated combat power difference.
+    pub fn combat_power_diff(&self) -> i64 {
+        self.stat_diff.combat_power_diff
+    }
+
+    /// Main stat difference.
+    pub fn main_stat_diff(&self) -> i64 {
+        self.stat_diff.main_stat()
+    }
+
+    /// Attack power difference.
+    pub fn attack_power_diff(&self) -> i64 {
+        self.stat_diff.attack_power
+    }
+
+    /// Magic power difference.
+    pub fn magic_power_diff(&self) -> i64 {
+        self.stat_diff.magic_power
+    }
+
+    /// Boss damage difference percentage.
+    pub fn boss_damage_diff(&self) -> f64 {
+        self.stat_diff.boss_damage
+    }
+
+    /// Ignore monster armor (방어율 무시) difference percentage.
+    pub fn ignore_monster_armor_diff(&self) -> f64 {
+        self.stat_diff.ignore_monster_armor
+    }
+}
+
+/// Stat differences resulting from an equipment swap.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct StatDiff {
+    /// STR difference (힘)
+    pub str: i64,
+    /// DEX difference (민첩)
+    pub dex: i64,
+    /// INT difference (지력)
+    pub int: i64,
+    /// LUK difference (행운)
+    pub luk: i64,
+    /// Max HP difference (최대 HP)
+    pub max_hp: i64,
+    /// Max MP difference (최대 MP)
+    pub max_mp: i64,
+    /// Attack Power difference (공격력)
+    pub attack_power: i64,
+    /// Magic Power difference (마력)
+    pub magic_power: i64,
+    /// Armor difference (방어력)
+    pub armor: i64,
+    /// Boss damage difference percentage (보스 몬스터 데미지 %)
+    pub boss_damage: f64,
+    /// Ignore monster armor difference percentage (방어율 무시 %)
+    pub ignore_monster_armor: f64,
+    /// Damage difference percentage (데미지 %)
+    pub damage: f64,
+    /// All stat difference percentage (올스탯 %)
+    pub all_stat: f64,
+    /// Critical rate difference percentage (크리티컬 확률 %)
+    pub critical_rate: f64,
+    /// Critical damage difference percentage (크리티컬 데미지 %)
+    pub critical_damage: f64,
+    /// Starforce difference (스타포스)
+    pub starforce: i64,
+    /// Estimated combat power difference (예상 전투력 증감치)
+    pub combat_power_diff: i64,
+    /// Estimated total combat power after swap (교체 후 예상 최종 전투력)
+    pub estimated_combat_power: i64,
+}
+
+impl StatDiff {
+    /// Returns the main stat difference (max of STR, DEX, INT, LUK).
+    pub fn main_stat(&self) -> i64 {
+        self.str.max(self.dex).max(self.int).max(self.luk)
+    }
+
+    /// Returns the main stat difference for a specific character class.
+    pub fn main_stat_for_class(&self, character_class: Option<&str>) -> i64 {
+        match character_class {
+            Some("데몬어벤져") => self.max_hp,
+            Some("제논") => self.str.max(self.dex).max(self.luk),
+            Some(job) if job.contains("마법사") || job.contains("메이지") || job.contains("비숍") || job.contains("플레임위자드") || job.contains("에반") || job.contains("배틀메이지") || job.contains("루미너스") || job.contains("일리움") || job.contains("라라") || job.contains("키네시스") => self.int,
+            Some(job) if job.contains("궁수") || job.contains("보우마스터") || job.contains("신궁") || job.contains("패스파인더") || job.contains("윈드브레이커") || job.contains("와일드헌터") || job.contains("메르세데스") || job.contains("카인") => self.dex,
+            Some(job) if job.contains("도적") || job.contains("나이트로드") || job.contains("섀도어") || job.contains("듀얼블레이더") || job.contains("나이트워커") || job.contains("팬텀") || job.contains("카데나") || job.contains("호영") || job.contains("칼리") => self.luk,
+            Some(job) if job.contains("전사") || job.contains("히어로") || job.contains("팔라딘") || job.contains("다크나이트") || job.contains("소울마스터") || job.contains("미하일") || job.contains("블래스터") || job.contains("데몬슬레이어") || job.contains("아란") || job.contains("카이저") || job.contains("아델") || job.contains("제로") => self.str,
+            Some(job) if job.contains("캡틴") || job.contains("메카닉") => self.dex,
+            Some(job) if job.contains("해적") || job.contains("바이퍼") || job.contains("캐논슈터") || job.contains("스트라이커") || job.contains("은월") || job.contains("아크") => self.str,
+            _ => self.main_stat(),
+        }
+    }
+}
+
+/// Set effect changes resulting from an equipment swap.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct SetEffectDiff {
+    /// Changes in piece counts per set
+    pub set_count_changes: Vec<SetCountChange>,
+    /// Set effect options gained by reaching higher thresholds
+    pub gained_options: Vec<String>,
+    /// Set effect options lost by dropping below thresholds
+    pub lost_options: Vec<String>,
+}
+
+/// Piece count change for an item set.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SetCountChange {
+    /// Set effect name
+    pub set_name: String,
+    /// Piece count before swap
+    pub previous_count: i64,
+    /// Piece count after swap
+    pub new_count: i64,
+}
+
+#[derive(Debug, Default, Clone)]
+struct ItemStatBag {
+    str: i64,
+    dex: i64,
+    int: i64,
+    luk: i64,
+    max_hp: i64,
+    max_mp: i64,
+    attack_power: i64,
+    magic_power: i64,
+    armor: i64,
+    boss_damage: f64,
+    ignore_monster_armor: f64,
+    damage: f64,
+    all_stat: f64,
+    critical_damage: f64,
+    critical_rate: f64,
+    starforce: i64,
+}
+
+fn parse_stat_i64(s: Option<&str>) -> i64 {
+    s.and_then(|v| {
+        let v = v.trim().trim_start_matches('+');
+        v.parse::<i64>().ok()
+    })
+    .unwrap_or(0)
+}
+
+fn parse_stat_f64(s: Option<&str>) -> f64 {
+    s.and_then(|v| {
+        let v = v.trim().trim_start_matches('+').trim_end_matches('%');
+        v.parse::<f64>().ok()
+    })
+    .unwrap_or(0.0)
+}
+
+fn fill_item_stat_bag(item: &ItemEquipmentDetail, bag: &mut ItemStatBag) {
+    bag.starforce = item.starforce.as_deref().and_then(|s| s.parse::<i64>().ok()).unwrap_or(0);
+
+    if let Some(ref tot) = item.item_total_option {
+        bag.str = parse_stat_i64(tot.str.as_deref());
+        bag.dex = parse_stat_i64(tot.dex.as_deref());
+        bag.int = parse_stat_i64(tot.int.as_deref());
+        bag.luk = parse_stat_i64(tot.luk.as_deref());
+        bag.max_hp = parse_stat_i64(tot.max_hp.as_deref());
+        bag.max_mp = parse_stat_i64(tot.max_mp.as_deref());
+        bag.attack_power = parse_stat_i64(tot.attack_power.as_deref());
+        bag.magic_power = parse_stat_i64(tot.magic_power.as_deref());
+        bag.armor = parse_stat_i64(tot.armor.as_deref());
+        bag.boss_damage = parse_stat_f64(tot.boss_damage.as_deref());
+        bag.ignore_monster_armor = parse_stat_f64(tot.ignore_monster_armor.as_deref());
+        bag.damage = parse_stat_f64(tot.damage.as_deref());
+        bag.all_stat = parse_stat_f64(tot.all_stat.as_deref());
+    } else {
+        let options = [
+            item.item_base_option.as_ref().map(|o| (o.str.as_deref(), o.dex.as_deref(), o.int.as_deref(), o.luk.as_deref(), o.max_hp.as_deref(), o.max_mp.as_deref(), o.attack_power.as_deref(), o.magic_power.as_deref(), o.armor.as_deref(), o.boss_damage.as_deref(), o.ignore_monster_armor.as_deref(), None, o.all_stat.as_deref())),
+            item.item_add_option.as_ref().map(|o| (o.str.as_deref(), o.dex.as_deref(), o.int.as_deref(), o.luk.as_deref(), o.max_hp.as_deref(), o.max_mp.as_deref(), o.attack_power.as_deref(), o.magic_power.as_deref(), o.armor.as_deref(), o.boss_damage.as_deref(), None, o.damage.as_deref(), o.all_stat.as_deref())),
+            item.item_etc_option.as_ref().map(|o| (o.str.as_deref(), o.dex.as_deref(), o.int.as_deref(), o.luk.as_deref(), o.max_hp.as_deref(), o.max_mp.as_deref(), o.attack_power.as_deref(), o.magic_power.as_deref(), o.armor.as_deref(), None, None, None, None)),
+            item.item_starforce_option.as_ref().map(|o| (o.str.as_deref(), o.dex.as_deref(), o.int.as_deref(), o.luk.as_deref(), o.max_hp.as_deref(), o.max_mp.as_deref(), o.attack_power.as_deref(), o.magic_power.as_deref(), o.armor.as_deref(), None, None, None, None)),
+            item.item_exceptional_option.as_ref().map(|o| (o.str.as_deref(), o.dex.as_deref(), o.int.as_deref(), o.luk.as_deref(), o.max_hp.as_deref(), o.max_mp.as_deref(), o.attack_power.as_deref(), o.magic_power.as_deref(), None, None, None, None, None)),
+        ];
+        for opt in options.into_iter().flatten() {
+            bag.str += parse_stat_i64(opt.0);
+            bag.dex += parse_stat_i64(opt.1);
+            bag.int += parse_stat_i64(opt.2);
+            bag.luk += parse_stat_i64(opt.3);
+            bag.max_hp += parse_stat_i64(opt.4);
+            bag.max_mp += parse_stat_i64(opt.5);
+            bag.attack_power += parse_stat_i64(opt.6);
+            bag.magic_power += parse_stat_i64(opt.7);
+            bag.armor += parse_stat_i64(opt.8);
+            bag.boss_damage += parse_stat_f64(opt.9);
+            bag.ignore_monster_armor += parse_stat_f64(opt.10);
+            bag.damage += parse_stat_f64(opt.11);
+            bag.all_stat += parse_stat_f64(opt.12);
+        }
+    }
+
+    for pot in item.all_potentials_parsed() {
+        match pot.stat_type {
+            StatType::Str => {
+                if !pot.is_percentage {
+                    bag.str += pot.value as i64;
+                }
+            }
+            StatType::Dex => {
+                if !pot.is_percentage {
+                    bag.dex += pot.value as i64;
+                }
+            }
+            StatType::Int => {
+                if !pot.is_percentage {
+                    bag.int += pot.value as i64;
+                }
+            }
+            StatType::Luk => {
+                if !pot.is_percentage {
+                    bag.luk += pot.value as i64;
+                }
+            }
+            StatType::AttackPower => {
+                if !pot.is_percentage {
+                    bag.attack_power += pot.value as i64;
+                }
+            }
+            StatType::MagicPower => {
+                if !pot.is_percentage {
+                    bag.magic_power += pot.value as i64;
+                }
+            }
+            StatType::BossDamage => {
+                bag.boss_damage += pot.value;
+            }
+            StatType::IgnoreMonsterArmor => {
+                bag.ignore_monster_armor += pot.value;
+            }
+            StatType::Damage => {
+                bag.damage += pot.value;
+            }
+            StatType::CriticalDamage => {
+                bag.critical_damage += pot.value;
+            }
+            StatType::CriticalRate => {
+                bag.critical_rate += pot.value;
+            }
+            StatType::AllStat => {
+                bag.all_stat += pot.value;
+            }
+            _ => {}
+        }
+    }
+}
+
+fn item_matches_set(item: &ItemEquipmentDetail, set_info: &SetEffectInfo) -> bool {
+    let item_name = match item.item_name.as_deref() {
+        Some(name) => name,
+        None => return false,
+    };
+    let set_name = match set_info.set_name.as_deref() {
+        Some(name) => name,
+        None => return false,
+    };
+
+    if item_name.contains(set_name) || set_name.contains(item_name) {
+        return true;
+    }
+
+    let base_set = set_name
+        .split('(')
+        .next()
+        .unwrap_or(set_name)
+        .replace(" 세트", "")
+        .replace("세트", "")
+        .trim()
+        .to_string();
+
+    if !base_set.is_empty() && item_name.contains(&base_set) {
+        return true;
+    }
+
+    (base_set.contains("루타비스")
+        && (item_name.contains("하이네스")
+            || item_name.contains("이글아이")
+            || item_name.contains("트릭스터")
+            || item_name.contains("파프니르")
+            || item_name.contains("루타비스")))
+        || (base_set.contains("앱솔랩스") && item_name.contains("앱솔랩스"))
+        || (base_set.contains("아케인") && item_name.contains("아케인"))
+        || (base_set.contains("에테르넬") && item_name.contains("에테르넬"))
+        || (base_set.contains("칠흑")
+            && (item_name.contains("칠흑")
+                || item_name.contains("루즈 컨트롤")
+                || item_name.contains("마력이 깃든")
+                || item_name.contains("마깃안")
+                || item_name.contains("커맨더 포스")
+                || item_name.contains("몽환의 벨트")
+                || item_name.contains("창세의 뱃지")
+                || item_name.contains("거대한 공포")
+                || item_name.contains("고통의 근원")
+                || item_name.contains("미트라의 분노")
+                || item_name.contains("블랙 하트")))
+        || (base_set.contains("여명")
+            && (item_name.contains("여명")
+                || item_name.contains("트와일라이트")
+                || item_name.contains("에스텔라")
+                || item_name.contains("데이브레이크")))
+        || (base_set.contains("보스 장신구")
+            && (item_name.contains("응축된")
+                || item_name.contains("아쿠아틱")
+                || item_name.contains("블랙빈")
+                || item_name.contains("골든 클로버")
+                || item_name.contains("핑크빛")
+                || item_name.contains("데아 시두스")
+                || item_name.contains("매커네이터")
+                || item_name.contains("도미네이터")
+                || item_name.contains("가디언 엔젤")))
+}
+
+fn parse_set_option_chunk(chunk: &str, bag: &mut ItemStatBag, multiplier: f64) {
+    let trimmed = chunk.trim();
+    if trimmed.is_empty() {
+        return;
+    }
+
+    let mut num_start = None;
+    for (i, c) in trimmed.char_indices() {
+        if c.is_ascii_digit()
+            || ((c == '+' || c == '-')
+                && trimmed[i..]
+                    .chars()
+                    .nth(1)
+                    .is_some_and(|next| next.is_ascii_digit()))
+        {
+            num_start = Some(i);
+            break;
+        }
+    }
+
+    let val = if let Some(idx) = num_start {
+        let part = &trimmed[idx..];
+        let end_idx = part
+            .find(|c: char| !c.is_ascii_digit() && c != '.' && c != '+' && c != '-')
+            .unwrap_or(part.len());
+        part[..end_idx].parse::<f64>().unwrap_or(0.0)
+    } else {
+        0.0
+    } * multiplier;
+
+    let text = if let Some(idx) = num_start {
+        &trimmed[..idx]
+    } else {
+        trimmed
+    };
+
+    if (text.contains("보스") && text.contains("데미지")) || text.contains("보스 몬스터 공격 시 데미지") {
+        bag.boss_damage += val;
+    } else if text.contains("방어율") && text.contains("무시") {
+        bag.ignore_monster_armor += val;
+    } else if text.contains("크리티컬") && text.contains("데미지") {
+        bag.critical_damage += val;
+    } else if text.contains("크리티컬") && text.contains("확률") {
+        bag.critical_rate += val;
+    } else if text.contains("올스탯") {
+        bag.all_stat += val;
+    } else if text.contains("공격력") && text.contains("마력") {
+        bag.attack_power += val as i64;
+        bag.magic_power += val as i64;
+    } else if text.contains("공격력") {
+        bag.attack_power += val as i64;
+    } else if text.contains("마력") {
+        bag.magic_power += val as i64;
+    } else if text.contains("HP") && text.contains("MP") {
+        bag.max_hp += val as i64;
+        bag.max_mp += val as i64;
+    } else if text.contains("HP") {
+        bag.max_hp += val as i64;
+    } else if text.contains("MP") {
+        bag.max_mp += val as i64;
+    } else if text.contains("STR") || text.contains("힘") {
+        bag.str += val as i64;
+    } else if text.contains("DEX") || text.contains("민첩") {
+        bag.dex += val as i64;
+    } else if text.contains("INT") || text.contains("지력") {
+        bag.int += val as i64;
+    } else if text.contains("LUK") || text.contains("행운") {
+        bag.luk += val as i64;
+    } else if text.contains("데미지") {
+        bag.damage += val;
+    }
+}
+
+fn parse_set_option_string(s: &str, bag: &mut ItemStatBag, multiplier: f64) {
+    for chunk in s.split(',') {
+        parse_set_option_chunk(chunk, bag, multiplier);
+    }
+}
+
 
 // ─── Character Progression Helpers (HEXA, V-Matrix, Ability, Hyper Stat) ─────
 

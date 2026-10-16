@@ -2631,3 +2631,323 @@ async fn test_avatar_client_pipeline_and_custom_frames() {
     // Verify that AvatarClient sub-client is accessible
     let _ = avatar;
 }
+
+#[test]
+fn test_gear_swap_simulation_weapon() {
+    use maplestory_openapi::models::character::{
+        CharacterBasic, CharacterCombatAnalytics, CharacterItemEquipment, CharacterStat,
+        FinalStatEntry, ItemEquipmentDetail,
+    };
+    use maplestory_openapi::models::common::ItemTotalOption;
+    use maplestory_openapi::{EquipmentDiff, StatDiff};
+
+    let basic = CharacterBasic {
+        character_name: Some("히어로대표".to_string()),
+        character_class: Some("히어로".to_string()),
+        character_level: Some(275),
+        ..Default::default()
+    };
+    let stat = CharacterStat {
+        final_stat: Some(vec![
+            FinalStatEntry {
+                stat_name: Some("전투력".to_string()),
+                stat_value: Some("50000000".to_string()),
+            },
+            FinalStatEntry {
+                stat_name: Some("보스 몬스터 데미지".to_string()),
+                stat_value: Some("320.0".to_string()),
+            },
+            FinalStatEntry {
+                stat_name: Some("방어율 무시".to_string()),
+                stat_value: Some("95.0".to_string()),
+            },
+            FinalStatEntry {
+                stat_name: Some("데미지".to_string()),
+                stat_value: Some("45.0".to_string()),
+            },
+            FinalStatEntry {
+                stat_name: Some("크리티컬 데미지".to_string()),
+                stat_value: Some("80.0".to_string()),
+            },
+        ]),
+        ..Default::default()
+    };
+
+    // Current equipped weapon: 17-star Absolab two-handed sword
+    let current_weapon = ItemEquipmentDetail {
+        item_equipment_part: Some("무기".to_string()),
+        item_equipment_slot: Some("무기".to_string()),
+        item_name: Some("앱솔랩스 브로드소드".to_string()),
+        starforce: Some("17".to_string()),
+        item_total_option: Some(ItemTotalOption {
+            str: Some("120".to_string()),
+            dex: Some("80".to_string()),
+            attack_power: Some("320".to_string()),
+            boss_damage: Some("30".to_string()),
+            ignore_monster_armor: Some("10".to_string()),
+            ..Default::default()
+        }),
+        potential_option_1: Some("공격력 : +9%".to_string()),
+        potential_option_2: Some("보스 몬스터 공격 시 데미지 : +30%".to_string()),
+        ..Default::default()
+    };
+
+    let equip = CharacterItemEquipment {
+        preset_no: Some(1),
+        item_equipment_preset_1: Some(vec![current_weapon]),
+        ..Default::default()
+    };
+
+    let analytics = CharacterCombatAnalytics::from_stats(
+        &basic,
+        &stat,
+        Some(&equip),
+        None,
+        1320,
+        300,
+        None,
+    );
+
+    // Target upgrade weapon: 22-star Arcane Umbra two-handed sword
+    let new_weapon = ItemEquipmentDetail {
+        item_equipment_part: Some("무기".to_string()),
+        item_equipment_slot: Some("무기".to_string()),
+        item_name: Some("아케인셰이드 투핸드소드".to_string()),
+        starforce: Some("22".to_string()),
+        item_total_option: Some(ItemTotalOption {
+            str: Some("270".to_string()),
+            dex: Some("150".to_string()),
+            attack_power: Some("500".to_string()),
+            boss_damage: Some("40".to_string()),
+            ignore_monster_armor: Some("20".to_string()),
+            ..Default::default()
+        }),
+        potential_option_1: Some("보스 몬스터 공격 시 데미지 : +40%".to_string()),
+        potential_option_2: Some("공격력 : +12%".to_string()),
+        ..Default::default()
+    };
+
+    let diff: EquipmentDiff = analytics.simulate_equipment_swap(&equip, &new_weapon, None);
+
+    assert_eq!(diff.slot, "무기");
+    assert!(diff.previous_item.is_some());
+    assert_eq!(diff.previous_item.as_ref().unwrap().item_name.as_deref(), Some("앱솔랩스 브로드소드"));
+    assert_eq!(diff.new_item.item_name.as_deref(), Some("아케인셰이드 투핸드소드"));
+
+    // Starforce diff: 22 - 17 = 5
+    assert_eq!(diff.starforce_diff, 5);
+    let stat_diff: &StatDiff = &diff.stat_diff;
+    assert_eq!(stat_diff.starforce, 5);
+
+    // Attack power diff: 500 - 320 = 180
+    assert_eq!(diff.stat_diff.attack_power, 180);
+    assert_eq!(diff.attack_power_diff(), 180);
+
+    // Main stat (STR for Hero): 270 - 120 = 150
+    assert_eq!(diff.stat_diff.str, 150);
+    assert_eq!(diff.stat_diff.main_stat(), 150);
+    assert_eq!(diff.stat_diff.main_stat_for_class(Some("히어로")), 150);
+    assert_eq!(diff.main_stat_diff(), 150);
+
+    // Boss damage diff: (40 - 30) total option + (40 - 30) potential = 20.0%
+    assert_eq!(diff.stat_diff.boss_damage, 20.0);
+    assert_eq!(diff.boss_damage_diff(), 20.0);
+
+    // IED diff: 20 - 10 = 10.0%
+    assert_eq!(diff.stat_diff.ignore_monster_armor, 10.0);
+    assert_eq!(diff.ignore_monster_armor_diff(), 10.0);
+
+    // Combat power diff is strictly positive
+    assert!(diff.stat_diff.combat_power_diff > 0);
+    assert!(diff.combat_power_diff() > 0);
+    assert_eq!(
+        diff.stat_diff.estimated_combat_power,
+        analytics.combat_power + diff.stat_diff.combat_power_diff
+    );
+    assert!(diff.is_upgrade());
+}
+
+#[test]
+fn test_gear_swap_simulation_set_effect_recalculation() {
+    use maplestory_openapi::models::character::{
+        CharacterBasic, CharacterCombatAnalytics, CharacterItemEquipment, CharacterSetEffect,
+        CharacterStat, FinalStatEntry, ItemEquipmentDetail, SetEffectInfo, SetEffectOption,
+    };
+    use maplestory_openapi::models::common::ItemTotalOption;
+    use maplestory_openapi::EquipmentDiff;
+
+    let basic = CharacterBasic {
+        character_name: Some("썬콜법사".to_string()),
+        character_class: Some("아크메이지(썬,콜)".to_string()),
+        character_level: Some(270),
+        ..Default::default()
+    };
+    let stat = CharacterStat {
+        final_stat: Some(vec![
+            FinalStatEntry {
+                stat_name: Some("전투력".to_string()),
+                stat_value: Some("40000000".to_string()),
+            },
+            FinalStatEntry {
+                stat_name: Some("보스 몬스터 데미지".to_string()),
+                stat_value: Some("300.0".to_string()),
+            },
+            FinalStatEntry {
+                stat_name: Some("방어율 무시".to_string()),
+                stat_value: Some("94.0".to_string()),
+            },
+        ]),
+        ..Default::default()
+    };
+
+    let old_hat = ItemEquipmentDetail {
+        item_equipment_part: Some("모자".to_string()),
+        item_equipment_slot: Some("모자".to_string()),
+        item_name: Some("하이네스 던위치햇".to_string()), // Root Abyss hat
+        starforce: Some("18".to_string()),
+        item_total_option: Some(ItemTotalOption {
+            int: Some("120".to_string()),
+            magic_power: Some("60".to_string()),
+            ..Default::default()
+        }),
+        ..Default::default()
+    };
+
+    let equip = CharacterItemEquipment {
+        preset_no: Some(1),
+        item_equipment_preset_1: Some(vec![old_hat]),
+        ..Default::default()
+    };
+
+    let set_effects = CharacterSetEffect {
+        date: None,
+        set_effect: Some(vec![
+            SetEffectInfo {
+                set_name: Some("루타비스 세트 (마법사)".to_string()),
+                total_set_count: Some(4),
+                set_effect_info: Some(vec![
+                    SetEffectOption {
+                        set_count: Some(2),
+                        set_option: Some("올스탯: +20, 최대 HP/최대 MP: +1000".to_string()),
+                    },
+                    SetEffectOption {
+                        set_count: Some(3),
+                        set_option: Some("공격력: +50, 마력: +50".to_string()),
+                    },
+                    SetEffectOption {
+                        set_count: Some(4),
+                        set_option: Some("보스 몬스터 공격 시 데미지: +30%".to_string()),
+                    },
+                ]),
+                set_option_full: None,
+            },
+            SetEffectInfo {
+                set_name: Some("아케인셰이드 세트 (마법사)".to_string()),
+                total_set_count: Some(4),
+                set_effect_info: Some(vec![
+                    SetEffectOption {
+                        set_count: Some(2),
+                        set_option: Some("올스탯: +30, 마력: +10".to_string()),
+                    },
+                    SetEffectOption {
+                        set_count: Some(3),
+                        set_option: Some("마력: +30".to_string()),
+                    },
+                    SetEffectOption {
+                        set_count: Some(4),
+                        set_option: Some("방어율 무시: +10%".to_string()),
+                    },
+                    SetEffectOption {
+                        set_count: Some(5),
+                        set_option: Some("보스 몬스터 공격 시 데미지: +30%, 마력: +30".to_string()),
+                    },
+                ]),
+                set_option_full: None,
+            },
+        ]),
+    };
+
+    let analytics = CharacterCombatAnalytics::from_stats(
+        &basic,
+        &stat,
+        Some(&equip),
+        None,
+        1320,
+        300,
+        None,
+    );
+
+    // Swapping Root Abyss hat with Arcane Umbra hat
+    let new_hat = ItemEquipmentDetail {
+        item_equipment_part: Some("모자".to_string()),
+        item_equipment_slot: Some("모자".to_string()),
+        item_name: Some("아케인셰이드 메이지햇".to_string()), // Arcane Umbra hat
+        starforce: Some("22".to_string()),
+        item_total_option: Some(ItemTotalOption {
+            int: Some("200".to_string()),
+            magic_power: Some("95".to_string()),
+            ..Default::default()
+        }),
+        ..Default::default()
+    };
+
+    let diff: EquipmentDiff = analytics.simulate_equipment_swap(&equip, &new_hat, Some(&set_effects));
+
+    // Verify set count changes
+    assert!(diff.set_effect_diff.is_some());
+    let sed = diff.set_effect_diff.as_ref().unwrap();
+    let root_abyss_change = sed.set_count_changes.iter().find(|c| c.set_name.contains("루타비스")).unwrap();
+    assert_eq!(root_abyss_change.previous_count, 4);
+    assert_eq!(root_abyss_change.new_count, 3); // Dropped 4 -> 3
+
+    let arcane_change = sed.set_count_changes.iter().find(|c| c.set_name.contains("아케인")).unwrap();
+    assert_eq!(arcane_change.previous_count, 4);
+    assert_eq!(arcane_change.new_count, 5); // Increased 4 -> 5
+
+    // Lost 4-set Root Abyss option ("보스 몬스터 공격 시 데미지: +30%")
+    assert!(sed.lost_options.iter().any(|o| o.contains("보스 몬스터 공격 시 데미지")));
+    // Gained 5-set Arcane Umbra option ("보스 몬스터 공격 시 데미지: +30%, 마력: +30")
+    assert!(sed.gained_options.iter().any(|o| o.contains("5-set")));
+
+    // Net set effect boss damage: -30% + 30% = 0.0%
+    assert_eq!(diff.stat_diff.boss_damage, 0.0);
+    // Net magic power: item diff (95 - 60 = 35) + set diff (+30) = 65
+    assert_eq!(diff.stat_diff.magic_power, 65);
+    // Net INT: item diff (200 - 120 = 80) + set diff (0) = 80
+    assert_eq!(diff.stat_diff.int, 80);
+}
+
+#[test]
+fn test_gear_swap_simulation_empty_slot() {
+    use maplestory_openapi::models::character::{
+        CharacterBasic, CharacterCombatAnalytics, CharacterItemEquipment, CharacterStat,
+        ItemEquipmentDetail,
+    };
+    use maplestory_openapi::models::common::ItemTotalOption;
+
+    let basic = CharacterBasic::default();
+    let stat = CharacterStat::default();
+    let equip = CharacterItemEquipment::default(); // completely empty equipment
+    let analytics = CharacterCombatAnalytics::from_stats(&basic, &stat, Some(&equip), None, 0, 0, None);
+
+    let ring = ItemEquipmentDetail {
+        item_equipment_part: Some("반지".to_string()),
+        item_equipment_slot: Some("반지4".to_string()),
+        item_name: Some("마이티 링".to_string()),
+        starforce: Some("10".to_string()),
+        item_total_option: Some(ItemTotalOption {
+            str: Some("25".to_string()),
+            attack_power: Some("15".to_string()),
+            ..Default::default()
+        }),
+        ..Default::default()
+    };
+
+    let diff = analytics.simulate_equipment_swap(&equip, &ring, None);
+    assert_eq!(diff.slot, "반지4");
+    assert!(diff.previous_item.is_none());
+    assert_eq!(diff.starforce_diff, 10);
+    assert_eq!(diff.stat_diff.str, 25);
+    assert_eq!(diff.stat_diff.attack_power, 15);
+}
+

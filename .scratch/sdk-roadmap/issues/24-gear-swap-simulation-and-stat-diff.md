@@ -5,9 +5,9 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] `EquipmentDiff` 및 `StatDiff` 도메인 모델 정의 (슬롯별 아이템 비교, 스탯 증감치, 공격력/마력 증감치, 보스데미지/방무 증감치)
-- [ ] 장비 교체 시 세트 효과(`ItemSetEffect`) 재계산 및 세트 옵션 반영 로직 구현
-- [ ] 잠재옵션 및 스타포스 수치 변경에 따른 최종 스탯 및 전투력 변동 역산 헬퍼 구현 (`CharacterCombatAnalytics::simulate_equipment_swap`)
-- [ ] 네트워크 의존성 없는 순수 단위 테스트(가상 아이템 교체, 세트 효과 깨짐/추가, 전투력 증감 검증) 작성 및 통과
+- [x] `EquipmentDiff` 및 `StatDiff` 도메인 모델 정의 (슬롯별 아이템 비교, 스탯 증감치, 공격력/마력 증감치, 보스데미지/방무 증감치)
+- [x] 장비 교체 시 세트 효과(`ItemSetEffect`) 재계산 및 세트 옵션 반영 로직 구현
+- [x] 잠재옵션 및 스타포스 수치 변경에 따른 최종 스탯 및 전투력 변동 역산 헬퍼 구현 (`CharacterCombatAnalytics::simulate_equipment_swap`)
+- [x] 네트워크 의존성 없는 순수 단위 테스트(가상 아이템 교체, 세트 효과 깨짐/추가, 전투력 증감 검증) 작성 및 통과

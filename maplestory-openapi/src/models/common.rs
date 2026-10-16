@@ -65,7 +65,7 @@ impl std::fmt::Display for SkillGrade {
 // These are reused by multiple equipment-type endpoints (item, dragon, mechanic).
 
 /// Final total option of an equipment item (합산 최종 옵션).
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct ItemTotalOption {
     pub str: Option<String>,
     pub dex: Option<String>,
@@ -88,7 +88,7 @@ pub struct ItemTotalOption {
 }
 
 /// Base (base roll) option of an equipment item (기본 옵션).
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct ItemBaseOption {
     pub str: Option<String>,
     pub dex: Option<String>,
@@ -110,7 +110,7 @@ pub struct ItemBaseOption {
 }
 
 /// Exceptional (익셉셔널) option of an equipment item.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct ItemExceptionalOption {
     pub str: Option<String>,
     pub dex: Option<String>,
@@ -124,7 +124,7 @@ pub struct ItemExceptionalOption {
 }
 
 /// Add (추가) option of an equipment item.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct ItemAddOption {
     pub str: Option<String>,
     pub dex: Option<String>,
@@ -144,7 +144,7 @@ pub struct ItemAddOption {
 }
 
 /// Etc (기타) option of an equipment item.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct ItemEtcOption {
     pub str: Option<String>,
     pub dex: Option<String>,
@@ -160,7 +160,7 @@ pub struct ItemEtcOption {
 }
 
 /// Starforce option of an equipment item.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct ItemStarforceOption {
     pub str: Option<String>,
     pub dex: Option<String>,
