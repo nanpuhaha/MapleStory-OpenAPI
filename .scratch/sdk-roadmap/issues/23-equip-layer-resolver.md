@@ -1,15 +1,16 @@
-# Ticket 23: Equip Layering Engine (`EquipLayerResolver`)
+# 23: Equip Layering Engine (`EquipLayerResolver`)
 
-## Background & Motivation
-`CharacterCoordination` currently handles slot matching and visible equipment layering in an ad-hoc loop inside `from_equipment_and_cash`. It mixes slot mapping, transparent item heuristics, and anvil overrides.
+**What to build:** Encapsulate equipment layering, cash priority rules, overall (`한벌옷`) slot precedence, transparent item detection, and anvil overrides into a dedicated domain engine `EquipLayerResolver`.
 
-## Requirements
-1. Encapsulate layering logic in `EquipLayerResolver`:
-   - Pure domain resolver in `src/models/character.rs` (or a dedicated submodule if appropriate).
-   - Rules:
-     - Cash item priority over Normal item in the same slot.
-     - Transparent cash item (`투명`) allows underlying normal equipment appearance to shine through if not hidden, or properly sets visibility flags.
-     - Anvil item (`item_shape_name`) overrides normal base item appearance.
-     - Cash weapon / weapon type resolution.
-2. `CharacterCoordination::from_equipment_and_cash` delegates to `EquipLayerResolver::resolve`.
-3. Unit tests covering transparent items, anvil items, and full cash override layering.
+**Blocked by:** None
+
+**Status:** done
+
+- [x] Implemented `EquipLayerResolver::resolve(beauty, cash_equip, normal_equip) -> CharacterCoordination` in `src/models/character.rs`.
+- [x] Internalized layering rules:
+  - Cash items take priority over normal equipment in the same slot.
+  - Overall (`한벌옷`) covers both top and bottom slots, skipping bottom in normal equipment.
+  - Transparent item detection (`is_transparent`) for `투명*` cash items.
+  - Anvil items (`item_shape_name` / `item_shape_icon`) override base item appearance.
+- [x] Delegated `CharacterCoordination::from_parts` and `from_equipment_and_cash` to `EquipLayerResolver::resolve`.
+- [x] Added automated unit tests in `test_equip_layer_resolver_direct_and_custom_rules` verifying transparent items, anvil items, and full cash override layering.

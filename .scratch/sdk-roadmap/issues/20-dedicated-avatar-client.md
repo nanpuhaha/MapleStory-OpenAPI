@@ -1,15 +1,13 @@
-# Ticket 20: Dedicated Avatar Client (`AvatarClient`)
+# 20: Dedicated Avatar Client (`AvatarClient`)
 
-## Background & Motivation
-Avatar GIF rendering (`render_avatar_gif`, `render_custom_avatar_gif`) currently lives inside `CharacterClient`, mixing character profile API operations with multi-frame image fetching and binary animated GIF encoding.
+**What to build:** Introduce a dedicated `AvatarClient` sub-client accessed via `client.avatar()`, separating multi-frame avatar HTTP fetching and animated GIF encoding from `CharacterClient` while maintaining backward compatibility.
 
-## Requirements
-1. Create `AvatarClient<'a>` in `src/client/avatar.rs`.
-2. Expose `client.avatar()` on `MapleStoryClient`.
-3. Provide high-level methods on `AvatarClient`:
-   - `render_gif(character_look: &CharacterLookQuery, preset: AnimationPreset) -> Result<Vec<u8>>`
-   - `render_custom_gif(character_look: &CharacterLookQuery, frames: &[FrameConfig]) -> Result<Vec<u8>>`
-   - `fetch_frame(character_look: &CharacterLookQuery, frame: &FrameConfig) -> Result<Vec<u8>>`
-4. Preserve backward compatibility on `CharacterClient`:
-   - Provide forwarding helper on `CharacterClient` with deprecation note or seamless delegation to `AvatarClient`.
-5. Unit and integration tests for avatar pipeline.
+**Blocked by:** None
+
+**Status:** done
+
+- [x] Created `AvatarClient<'a>` in `src/client/avatar.rs` with `render_gif`, `render_custom_gif`, `fetch_frame`, and `fetch_frame_bytes`.
+- [x] Registered `client.avatar()` on `MapleStoryClient`.
+- [x] Added `FrameConfig` type alias in `src/avatar.rs` and builder methods on `AvatarLookQuery`.
+- [x] Preserved backward-compatible forwarding on `CharacterClient::render_avatar_gif` and `render_character_gif_by_name`.
+- [x] Added automated pipeline tests in `test_avatar_client_pipeline_and_custom_frames`.
