@@ -3092,4 +3092,186 @@ fn test_cube_target_option_cost_estimate() {
     assert_eq!(estimate.percentile_90_attempts, 230);
 }
 
+#[tokio::test]
+async fn test_disk_identity_cache_basic_operations() {
+    use maplestory_openapi::client::{DiskIdentityCache, IdentityCache};
+    use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
+    let nanos = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+    let temp_dir = std::env::temp_dir().join(format!("maple_cache_test_{}_{}", std::process::id(), nanos));
+
+    let cache = DiskIdentityCache::new(&temp_dir, Duration::from_secs(3600));
+
+    // Initially empty
+    assert_eq!(cache.get_ocid("아델").await, None);
+    assert_eq!(cache.get_oguild_id("테스트길드", "스카니아").await, None);
+
+    // Set OCID
+    cache.set_ocid("아델", "ocid-adel-1234").await;
+    assert_eq!(cache.get_ocid("아델").await, Some("ocid-adel-1234".to_string()));
+
+    // Set OGuildID
+    cache.set_oguild_id("테스트길드", "스카니아", "oguild-guild-5678").await;
+    assert_eq!(
+        cache.get_oguild_id("테스트길드", "스카니아").await,
+        Some("oguild-guild-5678".to_string())
+    );
+
+    // Overwrite OCID
+    cache.set_ocid("아델", "ocid-adel-updated").await;
+    assert_eq!(cache.get_ocid("아델").await, Some("ocid-adel-updated".to_string()));
+
+    let _ = std::fs::remove_dir_all(&temp_dir);
+}
+
+#[tokio::test]
+async fn test_disk_identity_cache_persistence_across_instances() {
+    use maplestory_openapi::client::{DiskIdentityCache, IdentityCache};
+    use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
+    let nanos = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+    let temp_dir = std::env::temp_dir().join(format!("maple_cache_persist_{}_{}", std::process::id(), nanos));
+
+    // Instance 1 writes
+    {
+        let cache1 = DiskIdentityCache::new(&temp_dir, Duration::from_secs(3600));
+        cache1.set_ocid("온앤온", "ocid-onandon-9999").await;
+        cache1.set_oguild_id("스타", "루나", "oguild-star-1111").await;
+    }
+
+    // Instance 2 (simulating process restart) reads from same directory
+    {
+        let cache2 = DiskIdentityCache::new(&temp_dir, Duration::from_secs(3600));
+        assert_eq!(
+            cache2.get_ocid("온앤온").await,
+            Some("ocid-onandon-9999".to_string())
+        );
+        assert_eq!(
+            cache2.get_oguild_id("스타", "루나").await,
+            Some("oguild-star-1111".to_string())
+        );
+        assert_eq!(cache2.get_ocid("미등록캐릭터").await, None);
+        assert_eq!(cache2.get_oguild_id("없는길드", "루나").await, None);
+    }
+
+    let _ = std::fs::remove_dir_all(&temp_dir);
+}
+
+#[tokio::test]
+async fn test_disk_identity_cache_expiration_past_ttl() {
+    use maplestory_openapi::client::{DiskIdentityCache, IdentityCache};
+    use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
+    let nanos = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+    let temp_dir = std::env::temp_dir().join(format!("maple_cache_expire_{}_{}", std::process::id(), nanos));
+
+    let cache = DiskIdentityCache::new(&temp_dir, Duration::from_millis(300));
+
+    cache.set_ocid("단명캐릭터", "ocid-short-lived").await;
+    cache.set_oguild_id("단명길드", "크로아", "oguild-short-lived").await;
+
+    // Immediately available
+    assert_eq!(
+        cache.get_ocid("단명캐릭터").await,
+        Some("ocid-short-lived".to_string())
+    );
+    assert_eq!(
+        cache.get_oguild_id("단명길드", "크로아").await,
+        Some("oguild-short-lived".to_string())
+    );
+
+    // Wait for TTL to expire
+    tokio::time::sleep(Duration::from_millis(450)).await;
+
+    // Should return None after expiration
+    assert_eq!(cache.get_ocid("단명캐릭터").await, None);
+    assert_eq!(cache.get_oguild_id("단명길드", "크로아").await, None);
+
+    let _ = std::fs::remove_dir_all(&temp_dir);
+}
+
+#[tokio::test]
+async fn test_disk_identity_cache_with_maplestory_client_persistence() {
+    use maplestory_openapi::client::DiskIdentityCache;
+    use maplestory_openapi::MapleStoryClient;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Arc;
+    use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
+    let nanos = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+    let temp_dir = std::env::temp_dir().join(format!("maple_cache_client_{}_{}", std::process::id(), nanos));
+
+    let req_counter = Arc::new(AtomicUsize::new(0));
+    let req_counter_clone = req_counter.clone();
+
+    let (base_url, server_task) = spawn_mock_server(move |req_text| {
+        req_counter_clone.fetch_add(1, Ordering::SeqCst);
+        let body = if req_text.contains("/maplestory/v1/id") {
+            r#"{"ocid":"test-client-disk-ocid"}"#.to_string()
+        } else if req_text.contains("/maplestory/v1/guild/id") {
+            r#"{"oguild_id":"test-client-disk-oguild"}"#.to_string()
+        } else {
+            r#"{}"#.to_string()
+        };
+        (200, body, None)
+    })
+    .await;
+
+    // Client 1 fetches character ocid via HTTP and persists it to disk
+    {
+        let cache = Arc::new(DiskIdentityCache::new(&temp_dir, Duration::from_secs(3600)));
+        let client = MapleStoryClient::builder()
+            .api_key("test-key")
+            .base_url(&base_url)
+            .identity_cache(cache)
+            .build()
+            .unwrap();
+
+        let ocid = client.get_ocid("hero").await.unwrap();
+        assert_eq!(ocid, "test-client-disk-ocid");
+        assert_eq!(req_counter.load(Ordering::SeqCst), 1);
+    }
+
+    // Client 2 (new instance, new cache reading same directory) fetches character ocid from disk
+    {
+        let cache = Arc::new(DiskIdentityCache::new(&temp_dir, Duration::from_secs(3600)));
+        let client = MapleStoryClient::builder()
+            .api_key("test-key")
+            .base_url(&base_url)
+            .identity_cache(cache)
+            .build()
+            .unwrap();
+
+        // Hit from disk without HTTP request!
+        let ocid = client.get_ocid("hero").await.unwrap();
+        assert_eq!(ocid, "test-client-disk-ocid");
+        assert_eq!(req_counter.load(Ordering::SeqCst), 1);
+
+        // Fetch guild id (hits HTTP)
+        let oguild = client.get_oguild_id("testguild", "scania").await.unwrap();
+        assert_eq!(oguild, "test-client-disk-oguild");
+        assert_eq!(req_counter.load(Ordering::SeqCst), 2);
+    }
+
+    // Client 3 (another new instance) fetches guild id from disk
+    {
+        let cache = Arc::new(DiskIdentityCache::new(&temp_dir, Duration::from_secs(3600)));
+        let client = MapleStoryClient::builder()
+            .api_key("test-key")
+            .base_url(&base_url)
+            .identity_cache(cache)
+            .build()
+            .unwrap();
+
+        let oguild = client.get_oguild_id("testguild", "scania").await.unwrap();
+        assert_eq!(oguild, "test-client-disk-oguild");
+        assert_eq!(req_counter.load(Ordering::SeqCst), 2);
+    }
+
+    server_task.abort();
+    let _ = std::fs::remove_dir_all(&temp_dir);
+}
+
+
+
 

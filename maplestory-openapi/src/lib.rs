@@ -53,6 +53,8 @@ pub use avatar::{
     AnimationFrame, AnimationPreset, AvatarAction, AvatarCode, AvatarEmotion, AvatarLookQuery,
     WeaponMotion,
 };
+#[cfg(not(target_arch = "wasm32"))]
+pub use client::DiskIdentityCache;
 pub use client::{
     BattlePracticeClient, BoxFuture, CharacterClient, GuildClient, HistoryClient, IdentityCache,
     MapleStoryClient, MapleStoryClientBuilder, NoopIdentityCache, NoticeClient, RankingClient,

@@ -5,9 +5,9 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] 파일 기반 영속 캐시 구조체(`DiskIdentityCache`) 구현 및 `IdentityCache` 트레이트 구현
-- [ ] 캐시 엔트리 만료(TTL) 및 직렬화/역직렬화(JSON 또는 바이너리 포맷) 안전성 보장
-- [ ] 동시 프로세스/스레드 접근 시 파일 락 또는 안전한 아토믹 쓰기 보장
-- [ ] 프로세스 재시작 시뮬레이션 및 캐시 히트/미스 동작 단위 테스트 작성 및 검증
+- [x] 파일 기반 영속 캐시 구조체(`DiskIdentityCache`) 구현 및 `IdentityCache` 트레이트 구현
+- [x] 캐시 엔트리 만료(TTL) 및 직렬화/역직렬화(JSON 또는 바이너리 포맷) 안전성 보장
+- [x] 동시 프로세스/스레드 접근 시 파일 락 또는 안전한 아토믹 쓰기 보장
+- [x] 프로세스 재시작 시뮬레이션 및 캐시 히트/미스 동작 단위 테스트 작성 및 검증

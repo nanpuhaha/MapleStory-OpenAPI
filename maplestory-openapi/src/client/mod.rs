@@ -4,6 +4,8 @@
 pub mod cache;
 #[cfg(feature = "cache")]
 pub use cache::MokaIdentityCache;
+#[cfg(not(target_arch = "wasm32"))]
+pub use cache::DiskIdentityCache;
 pub use cache::{BoxFuture, IdentityCache, NoopIdentityCache};
 
 mod avatar;
