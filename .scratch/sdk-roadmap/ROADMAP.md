@@ -1,7 +1,7 @@
 # MapleStory OpenAPI Rust SDK — Complete Roadmap & Ticket Status
 
-> **Overall Status**: 🚀 **23 / 30 Tickets Completed (77% - M1~M5 Complete, M6 Ready for Agent)**  
-> **Repository Baseline**: `main`  
+> **Overall Status**: 🚀 **30 / 30 Tickets Completed (100% - All Milestones M1~M6 Complete)**  
+> **Repository Baseline**: `feature/m6-simulators-and-ecosystem`  
 > **Quality Gate**: `cargo test` (0 failures across all crates), `cargo clippy` (0 warnings with `-D warnings`)
 
 ---
@@ -15,7 +15,7 @@
 | **M3: Deep Domain Modeling & Spec Analytics** | 잠재옵션 파서, 세트효과/아티팩트, 유니온 레이더/챔피언, 성장 헬퍼, 종합 애그리게이터, 전투력/보스방무/무릉 분석, 직업별 포스 스케일링, 장비 레이어링 엔진 | #04, #05, #10, #13, #14, #18, #21, #23 | ✅ Completed |
 | **M4: Multi-Language Bindings & C-ABI** | Python, Node.js 확장, C-ABI 진단 에러 & 고레버리지 타입형 전투 요약체/코디 | #09, #12, #22 | ✅ Completed |
 | **M5: Quality, CI/CD & Release Readiness** | E2E 라이브 API 테스트, 문서화 동기화, 수동 CI 워크플로우, 패키징/릴리스 스크립트 | #11, #15, #16, #17 | ✅ Completed |
-| **M6: Advanced Simulators & Ecosystem** | 장비 교체 시뮬레이터, 스타포스/큐브 기댓값 계산기, 헥사 매트릭스 잔여량, 영속 디스크 캐시, 대량 크롤러, WebP/스프라이트시트, CLI 도구 | #24, #25, #26, #27, #28, #29, #30 | 🚀 In Progress (Ready for Agent) |
+| **M6: Advanced Simulators & Ecosystem** | 장비 교체 시뮬레이터, 스타포스/큐브 기댓값 계산기, 헥사 매트릭스 잔여량, 영속 디스크 캐시, 대량 크롤러, WebP/스프라이트시트, CLI 도구 | #24, #25, #26, #27, #28, #29, #30 | ✅ Completed |
 
 ---
 
@@ -46,13 +46,13 @@
 | **21** | [Decoupled Combat Analytics & Job Force Scaling](issues/21-combat-analytics-job-force-scaling.md) | `from_stats(...)` 독립 생성자, 제논(+48)/데몬어벤져(+2100/+4200) 직업별 심볼 스케일링 수식 | `test_combat_analytics_decoupled_and_job_specific_force_scaling` | ✅ Done |
 | **22** | [C-ABI High-Leverage Typed Summaries](issues/22-c-abi-high-leverage-summaries.md) | C 구조체 `MapleStoryCombatSummary`, OCID/닉네임 기반 C-ABI 함수 제공, 무파싱 고속 연동 | `test_c_abi_notice_union_ranking_guild_and_account_summary` | ✅ Done |
 | **23** | [Equip Layering Engine](issues/23-equip-layer-resolver.md) | `EquipLayerResolver::resolve`, 캐시장비 우선, 한벌옷 하의 가림, 투명 장비 감지, 모루 외형 대체 | `test_equip_layer_resolver_direct_and_custom_rules` | ✅ Done |
-| **24** | [Gear Swap Simulation & Stat Diff](issues/24-gear-swap-simulation-and-stat-diff.md) | 장비 교체 시 세트 효과/스탯/전투력 변동치 역산 시뮬레이터 (`EquipmentDiff`, `StatDiff`) | 순수 단위 테스트 (세트 효과 변동, 스탯 역산) | ⏳ Ready |
-| **25** | [Starforce & Cube Expected Cost Calculator](issues/25-starforce-cube-expected-cost-calculator.md) | 스타포스(마르코프 체인) 및 큐브 목표 달성 소요 비용/확률/기댓값 계산 엔진 | 마르코프 체인 비용 수렴 및 컷오프 확률 테스트 | ✅ Done |
-| **26** | [HEXA Matrix Progression Calculator](issues/26-hexa-matrix-progression-calculator.md) | 6차 전직 헥사 매트릭스 코어/스탯별 30레벨 만렙 달성 잔여 솔 에르다/조각 수량 계산 | 코어 타입별 재료 합산 단위 테스트 | ⏳ Ready |
-| **27** | [Persistent Disk Cache Adapter](issues/27-persistent-disk-cache-adapter.md) | 파일 시스템 기반 영속 식별자 캐시 (`DiskIdentityCache`) 구현체 (TTL, 동시성 보장) | 파일 캐시 히트/미스 및 프로세스 재시작 시뮬레이션 | ⏳ Ready |
-| **28** | [Batch Character & Guild Crawler](issues/28-batch-character-and-guild-crawler.md) | 길드원/계정 캐릭터 대량 병렬 수집기 (`client.guild().fetch_roster_profiles()`) | ConcurrencyLimiter 연동 및 부분 실패 내구성 테스트 | ⏳ Ready |
-| **29** | [WebP & Spritesheet Avatar Engine](issues/29-avatar-webp-and-spritesheet-engine.md) | 아바타 WebP 애니메이션 인코더 및 2D 스프라이트시트 PNG + JSON 메타데이터 패커 | WebP 및 스프라이트시트 이미지 생성 테스트 | ⏳ Ready |
-| **30** | [Maple CLI Terminal Utility](issues/30-maple-cli-lightweight-terminal-tool.md) | 터미널 대시보드, 아바타 다운로드, 캐릭터 비교, 스타포스 계산 독립 CLI 크레이트 (`maple-cli`) | CLI 인수 파싱 및 통합 테스트 | ⏳ Ready |
+| **24** | [Gear Swap Simulation & Stat Diff](issues/24-gear-swap-simulation-and-stat-diff.md) | 장비 교체 시 세트 효과/스탯/전투력 변동치 역산 시뮬레이터 (`EquipmentDiff`, `StatDiff`) | `test_gear_swap_simulation_weapon`, `test_gear_swap_simulation_set_effect_recalculation` | ✅ Done |
+| **25** | [Starforce & Cube Expected Cost Calculator](issues/25-starforce-cube-expected-cost-calculator.md) | 스타포스(마르코프 체인) 및 큐브 목표 달성 소요 비용/확률/기댓값 계산 엔진 | `test_starforce_markov_chain_from_12_to_17`, `test_cube_grade_up_nexon_official_probabilities_and_ceiling` | ✅ Done |
+| **26** | [HEXA Matrix Progression Calculator](issues/26-hexa-matrix-progression-calculator.md) | 6차 전직 헥사 매트릭스 코어/스탯별 30레벨 만렙 달성 잔여 솔 에르다/조각 수량 계산 | `test_character_progression_domain_helpers` | ✅ Done |
+| **27** | [Persistent Disk Cache Adapter](issues/27-persistent-disk-cache-adapter.md) | 파일 시스템 기반 영속 식별자 캐시 (`DiskIdentityCache`) 구현체 (TTL, 동시성 보장) | `test_disk_identity_cache_basic_operations`, `test_disk_identity_cache_persistence_across_instances` | ✅ Done |
+| **28** | [Batch Character & Guild Crawler](issues/28-batch-character-and-guild-crawler.md) | 길드원/계정 캐릭터 대량 병렬 수집기 (`client.guild().fetch_roster_profiles()`) | `test_character_fetch_batch_and_partial_failures`, `test_batch_result_helpers` | ✅ Done |
+| **29** | [WebP & Spritesheet Avatar Engine](issues/29-avatar-webp-and-spritesheet-engine.md) | 아바타 WebP 애니메이션 인코더 및 2D 스프라이트시트 PNG + JSON 메타데이터 패커 | `test_avatar_spritesheet_packer`, `test_avatar_animated_webp_encoder` | ✅ Done |
+| **30** | [Maple CLI Terminal Utility](issues/30-maple-cli-lightweight-terminal-tool.md) | 터미널 대시보드, 아바타 다운로드, 캐릭터 비교, 스타포스 계산 독립 CLI 크레이트 (`maple-cli`) | `test_cli_parsing_char_command`, `test_calc_starforce_execution` 등 7종 | ✅ Done |
 
 ---
 
