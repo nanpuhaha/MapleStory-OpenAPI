@@ -76,8 +76,9 @@ pub use models::character::{
     CharacterDashboard, CharacterDojang, CharacterHexaMatrix, CharacterHexaMatrixStat,
     CharacterHyperStat, CharacterItemEquipment, CharacterOcid, CharacterPopularity,
     CharacterProfile, CharacterStat, CharacterVMatrix, DashboardOptions, DashboardSection,
-    DashboardSectionError, EquipmentDiff, HexaCoreEquipment, HexaStatCore, HyperStatEntry,
-    ItemEquipmentDetail, ParsedPotentialOption, SetCountChange, SetEffectDiff,
+    DashboardSectionError, EquipmentDiff, HexaCoreEquipment, HexaCoreProgression, HexaMaterials,
+    HexaProgressionSummary, HexaStatCore, HexaStatCoreProgression, HexaStatProgressionSummary,
+    HyperStatEntry, ItemEquipmentDetail, ParsedPotentialOption, SetCountChange, SetEffectDiff,
     StarforceStatBreakdown, StatDiff, StatType, VCoreEquipment, VisibleEquipItem,
 };
 pub use models::common::{DateParam, MapleDate, SkillGrade};

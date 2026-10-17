@@ -2177,6 +2177,53 @@ fn test_character_progression_domain_helpers() {
     assert_eq!(hexa_stat.main_stat_level(2), Some(9));
     assert_eq!(hexa_stat.main_stat_level(3), None);
 
+    // 2.1 HEXA Matrix Remaining Materials Calculation
+    let prog = hexa.remaining_materials(30);
+    assert_eq!(prog.target_level, 30);
+    assert_eq!(prog.cores.len(), 2);
+
+    let origin_prog = prog.cores.iter().find(|c| c.name == "오리진 스킬").unwrap();
+    assert_eq!(origin_prog.current_level, 20);
+    assert_eq!(origin_prog.target_level, 30);
+    assert_eq!(origin_prog.remaining.sol_erda, 63);
+    assert_eq!(origin_prog.remaining.sol_erda_fragments, 2390);
+
+    let enhance_prog = prog.cores.iter().find(|c| c.name == "미개방 코어").unwrap();
+    assert_eq!(enhance_prog.current_level, 0);
+    assert_eq!(enhance_prog.target_level, 30);
+    assert_eq!(enhance_prog.remaining.sol_erda, 106);
+    assert_eq!(enhance_prog.remaining.sol_erda_fragments, 3210);
+
+    assert_eq!(prog.total_remaining.sol_erda, 63 + 106);
+    assert_eq!(prog.total_remaining.sol_erda_fragments, 2390 + 3210);
+
+    // 2.2 HEXA Stat Remaining Materials Calculation
+    let stat_prog = hexa_stat.remaining_materials(20);
+    assert_eq!(stat_prog.total_fragments_remaining, 0);
+
+    let partial_stat = CharacterHexaMatrixStat {
+        date: None,
+        character_class: Some("아델".to_string()),
+        character_hexa_stat_core: Some(vec![HexaStatCore {
+            slot_id: Some("0".to_string()),
+            main_stat_name: Some("크리티컬 데미지 증가".to_string()),
+            sub_stat_name_1: None,
+            sub_stat_name_2: None,
+            main_stat_level: Some(5),
+            sub_stat_level_1: Some(3),
+            sub_stat_level_2: Some(2),
+            stat_grade: Some(10),
+        }]),
+        character_hexa_stat_core_2: None,
+        character_hexa_stat_core_3: None,
+        preset_hexa_stat_core: None,
+        preset_hexa_stat_core_2: None,
+        preset_hexa_stat_core_3: None,
+    };
+    let partial_stat_prog = partial_stat.remaining_materials(20);
+    assert_eq!(partial_stat_prog.stat_cores_remaining.len(), 1);
+    assert_eq!(partial_stat_prog.total_fragments_remaining, 520);
+
     // 3. V-Matrix
     let vmatrix = CharacterVMatrix {
         date: None,

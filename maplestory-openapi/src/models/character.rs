@@ -3315,6 +3315,44 @@ impl CharacterHexaMatrix {
             .filter(|c| c.hexa_core_type.as_deref() == Some(core_type))
             .collect()
     }
+
+    /// Calculate remaining Sol Erda and Fragments required to upgrade all active cores to `target_level` (1..=30).
+    pub fn remaining_materials(&self, target_level: i64) -> HexaProgressionSummary {
+        let target = target_level.clamp(1, 30);
+        let mut total = HexaMaterials::default();
+        let mut cores = Vec::new();
+
+        if let Some(equip_cores) = &self.character_hexa_core_equipment {
+            for core in equip_cores {
+                let name = core.hexa_core_name.clone().unwrap_or_default();
+                let core_type = core.hexa_core_type.clone().unwrap_or_default();
+                let current = core.hexa_core_level.unwrap_or(0).clamp(0, 30);
+                if current >= target {
+                    continue;
+                }
+                let mut remaining = HexaMaterials::default();
+                for lvl in (current as usize)..(target as usize) {
+                    let (erda, frag) = hexa_step_cost(&core_type, lvl);
+                    remaining.sol_erda += erda;
+                    remaining.sol_erda_fragments += frag;
+                }
+                total += remaining;
+                cores.push(HexaCoreProgression {
+                    name,
+                    core_type,
+                    current_level: current,
+                    target_level: target,
+                    remaining,
+                });
+            }
+        }
+
+        HexaProgressionSummary {
+            target_level: target,
+            total_remaining: total,
+            cores,
+        }
+    }
 }
 
 impl CharacterHexaMatrixStat {
@@ -3351,6 +3389,204 @@ impl CharacterHexaMatrixStat {
     pub fn additional_stat_levels(&self, slot_index: usize) -> Option<(i64, i64)> {
         let core = self.slot_core(slot_index)?;
         Some((core.sub_stat_level_1?, core.sub_stat_level_2?))
+    }
+
+    /// Calculate remaining Sol Erda Fragments required to upgrade all active HEXA Stat cores to `target_grade` (1..=20).
+    pub fn remaining_materials(&self, target_grade: i64) -> HexaStatProgressionSummary {
+        let target = target_grade.clamp(1, 20);
+        let mut total_frags = 0i64;
+        let mut stat_cores_remaining = Vec::new();
+
+        for slot_idx in 1..=3 {
+            if let Some(core) = self.slot_core(slot_idx) {
+                let current_grade = core.stat_grade.unwrap_or(0).clamp(0, 20);
+                if current_grade < target {
+                    let mut frags = 0i64;
+                    for g in (current_grade as usize)..(target as usize) {
+                        frags += hexa_stat_step_fragments(g);
+                    }
+                    total_frags += frags;
+                    stat_cores_remaining.push(HexaStatCoreProgression {
+                        slot_index: slot_idx,
+                        main_stat_name: core.main_stat_name.clone(),
+                        current_grade,
+                        target_grade: target,
+                        fragments_remaining: frags,
+                    });
+                }
+            }
+        }
+
+        HexaStatProgressionSummary {
+            target_grade: target,
+            total_fragments_remaining: total_frags,
+            stat_cores_remaining,
+        }
+    }
+}
+
+/// Material requirements for HEXA progression (솔 에르다 및 솔 에르다 조각).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub struct HexaMaterials {
+    /// Sol Erda count (솔 에르다)
+    pub sol_erda: i64,
+    /// Sol Erda Fragment count (솔 에르다 조각)
+    pub sol_erda_fragments: i64,
+}
+
+impl HexaMaterials {
+    /// Create a new material pair.
+    pub const fn new(sol_erda: i64, sol_erda_fragments: i64) -> Self {
+        Self {
+            sol_erda,
+            sol_erda_fragments,
+        }
+    }
+}
+
+impl std::ops::Add for HexaMaterials {
+    type Output = Self;
+    fn add(self, rhs: Self) -> Self::Output {
+        Self {
+            sol_erda: self.sol_erda + rhs.sol_erda,
+            sol_erda_fragments: self.sol_erda_fragments + rhs.sol_erda_fragments,
+        }
+    }
+}
+
+impl std::ops::AddAssign for HexaMaterials {
+    fn add_assign(&mut self, rhs: Self) {
+        self.sol_erda += rhs.sol_erda;
+        self.sol_erda_fragments += rhs.sol_erda_fragments;
+    }
+}
+
+/// Detailed material progression breakdown for an individual HEXA core.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct HexaCoreProgression {
+    /// Core name
+    pub name: String,
+    /// Core type (e.g. "스킬 코어", "마스터리 코어")
+    pub core_type: String,
+    /// Current core level
+    pub current_level: i64,
+    /// Target level
+    pub target_level: i64,
+    /// Remaining materials required
+    pub remaining: HexaMaterials,
+}
+
+/// Comprehensive progression summary for all equipped HEXA cores in a matrix.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub struct HexaProgressionSummary {
+    /// Target level evaluated
+    pub target_level: i64,
+    /// Total remaining Sol Erda and Fragments
+    pub total_remaining: HexaMaterials,
+    /// Breakdown per core needing upgrade
+    pub cores: Vec<HexaCoreProgression>,
+}
+
+/// Material progression summary for HEXA Stat cores.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub struct HexaStatProgressionSummary {
+    /// Target stat grade
+    pub target_grade: i64,
+    /// Total Sol Erda Fragments required
+    pub total_fragments_remaining: i64,
+    /// Breakdown per active stat core
+    pub stat_cores_remaining: Vec<HexaStatCoreProgression>,
+}
+
+/// Detailed material progression for an individual HEXA Stat slot core.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct HexaStatCoreProgression {
+    /// Slot index (1..=3)
+    pub slot_index: usize,
+    /// Main stat name
+    pub main_stat_name: Option<String>,
+    /// Current stat grade (sum of main and sub stat levels)
+    pub current_grade: i64,
+    /// Target stat grade
+    pub target_grade: i64,
+    /// Fragments remaining
+    pub fragments_remaining: i64,
+}
+
+// ─── HEXA Matrix Level Tables ────────────────────────────────────────────────
+
+fn hexa_step_cost(core_type: &str, from_level: usize) -> (i64, i64) {
+    if from_level >= 30 {
+        return (0, 0);
+    }
+
+    match core_type {
+        "스킬 코어" | "오리진" => {
+            const ERDA: [i64; 30] = [
+                5, 1, 1, 1, 2, 2, 2, 3, 3, 10,
+                3, 3, 4, 4, 4, 4, 4, 4, 5, 15,
+                4, 4, 4, 4, 5, 5, 5, 6, 6, 20,
+            ];
+            const FRAG: [i64; 30] = [
+                100, 30, 35, 40, 45, 50, 55, 60, 65, 200,
+                80, 90, 100, 110, 120, 130, 140, 150, 160, 300,
+                170, 180, 190, 200, 210, 220, 230, 240, 250, 500,
+            ];
+            (ERDA[from_level], FRAG[from_level])
+        }
+        "마스터리 코어" => {
+            const ERDA: [i64; 30] = [
+                3, 1, 1, 1, 1, 1, 1, 2, 2, 5,
+                1, 2, 2, 2, 2, 2, 2, 2, 2, 8,
+                3, 3, 3, 3, 3, 3, 4, 4, 4, 10,
+            ];
+            const FRAG: [i64; 30] = [
+                50, 15, 18, 20, 23, 25, 28, 30, 33, 100,
+                35, 40, 45, 50, 55, 60, 65, 70, 75, 150,
+                85, 90, 95, 100, 105, 110, 115, 120, 125, 250,
+            ];
+            (ERDA[from_level], FRAG[from_level])
+        }
+        "강화 코어" => {
+            const ERDA: [i64; 30] = [
+                4, 1, 1, 1, 2, 2, 2, 2, 2, 7,
+                2, 2, 3, 3, 3, 3, 3, 3, 3, 11,
+                3, 3, 3, 3, 4, 4, 4, 4, 4, 14,
+            ];
+            const FRAG: [i64; 30] = [
+                75, 23, 27, 30, 34, 38, 42, 45, 49, 150,
+                53, 60, 68, 75, 83, 90, 98, 105, 113, 225,
+                120, 128, 135, 143, 150, 158, 165, 173, 180, 375,
+            ];
+            (ERDA[from_level], FRAG[from_level])
+        }
+        "공용 코어" => {
+            const ERDA: [i64; 30] = [
+                7, 2, 2, 2, 3, 3, 3, 4, 4, 14,
+                4, 4, 5, 5, 5, 5, 5, 5, 6, 21,
+                5, 5, 5, 5, 6, 6, 6, 7, 7, 28,
+            ];
+            const FRAG: [i64; 30] = [
+                125, 38, 44, 50, 56, 63, 69, 75, 81, 250,
+                88, 100, 113, 125, 138, 150, 163, 175, 188, 375,
+                200, 213, 225, 238, 250, 263, 275, 288, 300, 625,
+            ];
+            (ERDA[from_level], FRAG[from_level])
+        }
+        _ => (0, 0),
+    }
+}
+
+fn hexa_stat_step_fragments(from_grade: usize) -> i64 {
+    match from_grade {
+        0..=3 => 10,
+        4..=6 => 20,
+        7..=9 => 30,
+        10..=12 => 40,
+        13..=15 => 50,
+        16..=18 => 60,
+        19 => 70,
+        _ => 0,
     }
 }
 
