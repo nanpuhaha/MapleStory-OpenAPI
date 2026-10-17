@@ -672,7 +672,7 @@ pub struct CustomOrigin {
 // ─── Symbol Equipment ─────────────────────────────────────────────────────────
 
 /// Response from `GET /maplestory/v1/character/symbol-equipment`.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct CharacterSymbolEquipment {
     /// Query reference date (KST)
     pub date: Option<String>,
@@ -681,7 +681,7 @@ pub struct CharacterSymbolEquipment {
 }
 
 /// A single symbol equipment entry.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct SymbolEquipmentDetail {
     pub symbol_name: Option<String>,
     pub symbol_icon: Option<String>,
@@ -1586,6 +1586,8 @@ pub struct CharacterCoordination {
     pub skin: Option<SkinInfo>,
     /// Active cash preset number
     pub cash_preset_no: Option<i64>,
+    /// Symbol equipment (심볼 장비) if available
+    pub symbol_equipment: Option<CharacterSymbolEquipment>,
     /// Final visible equipment items across all slots
     pub visible_items: Vec<VisibleEquipItem>,
 }
@@ -1598,11 +1600,12 @@ pub type CharacterAppearance = CharacterCoordination;
 pub struct EquipLayerResolver;
 
 impl EquipLayerResolver {
-    /// Resolves visible equipment items and beauty state into a [`CharacterCoordination`].
+    /// Resolves visible equipment items, beauty state, and symbol equipment into a [`CharacterCoordination`].
     pub fn resolve(
         beauty: &CharacterBeautyEquipment,
         cash_equip: &CharacterCashItemEquipment,
         normal_equip: &CharacterItemEquipment,
+        symbol_equip: Option<&CharacterSymbolEquipment>,
     ) -> CharacterCoordination {
         // Standard visual slots in typical display order
         let standard_slots = [
@@ -1798,6 +1801,7 @@ impl EquipLayerResolver {
             face: beauty.character_face.clone(),
             skin: beauty.character_skin.clone(),
             cash_preset_no: cash_equip.preset_no,
+            symbol_equipment: symbol_equip.cloned(),
             visible_items,
         }
     }
@@ -1810,7 +1814,7 @@ impl CharacterCoordination {
         cash_equip: &CharacterCashItemEquipment,
         normal_equip: &CharacterItemEquipment,
     ) -> Self {
-        EquipLayerResolver::resolve(beauty, cash_equip, normal_equip)
+        EquipLayerResolver::resolve(beauty, cash_equip, normal_equip, None)
     }
 
     /// Synthesizes coordination from equipment and cash layers (alias for [`EquipLayerResolver::resolve`]).
@@ -1819,7 +1823,17 @@ impl CharacterCoordination {
         cash_equip: &CharacterCashItemEquipment,
         normal_equip: &CharacterItemEquipment,
     ) -> Self {
-        EquipLayerResolver::resolve(beauty, cash_equip, normal_equip)
+        EquipLayerResolver::resolve(beauty, cash_equip, normal_equip, None)
+    }
+
+    /// Synthesizes coordination from beauty, cash, normal equipment, and symbol equipment models.
+    pub fn from_parts_with_symbols(
+        beauty: &CharacterBeautyEquipment,
+        cash_equip: &CharacterCashItemEquipment,
+        normal_equip: &CharacterItemEquipment,
+        symbol_equip: Option<&CharacterSymbolEquipment>,
+    ) -> Self {
+        EquipLayerResolver::resolve(beauty, cash_equip, normal_equip, symbol_equip)
     }
 
     /// Synthesizes coordination including basic character profile information.
@@ -1829,7 +1843,18 @@ impl CharacterCoordination {
         cash_equip: &CharacterCashItemEquipment,
         normal_equip: &CharacterItemEquipment,
     ) -> Self {
-        let mut coord = Self::from_parts(beauty, cash_equip, normal_equip);
+        Self::from_full_parts_with_symbols(basic, beauty, cash_equip, normal_equip, None)
+    }
+
+    /// Synthesizes coordination including basic character profile and symbol equipment information.
+    pub fn from_full_parts_with_symbols(
+        basic: &CharacterBasic,
+        beauty: &CharacterBeautyEquipment,
+        cash_equip: &CharacterCashItemEquipment,
+        normal_equip: &CharacterItemEquipment,
+        symbol_equip: Option<&CharacterSymbolEquipment>,
+    ) -> Self {
+        let mut coord = Self::from_parts_with_symbols(beauty, cash_equip, normal_equip, symbol_equip);
         coord.character_name = basic.character_name.clone();
         coord.world_name = basic.world_name.clone();
         coord.character_class = basic.character_class.clone();
@@ -2297,14 +2322,15 @@ impl CharacterDashboard {
             None => CharacterBeautyEquipment::default(),
         };
 
-        let coordination = CharacterCoordination::from_full_parts(
+        let symbols = unwrap_sec!(raw.symbols, Symbols);
+
+        let coordination = CharacterCoordination::from_full_parts_with_symbols(
             &basic,
             &beauty_equipment,
             &cash_item_equipment,
             &item_equipment,
+            symbols.as_ref(),
         );
-
-        let symbols = unwrap_sec!(raw.symbols, Symbols);
         let ability = unwrap_sec!(raw.ability, Ability);
         let hyper_stat = unwrap_sec!(raw.hyper_stat, HyperStat);
         let hexa_matrix = unwrap_sec!(raw.hexa_matrix, HexaMatrix);
@@ -2481,23 +2507,15 @@ impl CharacterDashboard {
 
     /// Extracts combat power, boss multipliers, and spec breakdowns into a [`CharacterCombatAnalytics`].
     pub fn combat_analytics(&self) -> CharacterCombatAnalytics {
-        CharacterCombatAnalytics {
-            character_name: self.character_name().to_string(),
-            world_name: self.basic.world_name.clone(),
-            character_class: self.basic.character_class.clone(),
-            character_level: self.character_level(),
-            combat_power: self.combat_power(),
-            boss_damage: self.stat.boss_damage().unwrap_or(0.0),
-            ignore_monster_armor: self.stat.ignore_monster_armor().unwrap_or(0.0),
-            damage: self.stat.damage().unwrap_or(0.0),
-            critical_rate: self.stat.critical_rate().unwrap_or(0.0),
-            critical_damage: self.stat.critical_damage().unwrap_or(0.0),
-            total_starforce: self.total_starforce(),
-            arcane_force: self.arcane_force(),
-            authentic_force: self.authentic_force(),
-            dojang_best_floor: self.dojang_best_floor(),
-            starforce_stat_breakdown: Some(self.starforce_stat_breakdown()),
-        }
+        CharacterCombatAnalytics::from_stats(
+            &self.basic,
+            &self.stat,
+            Some(&self.item_equipment),
+            self.dojang.as_ref(),
+            self.arcane_force(),
+            self.authentic_force(),
+            self.hyper_stat.as_ref(),
+        )
     }
 }
 

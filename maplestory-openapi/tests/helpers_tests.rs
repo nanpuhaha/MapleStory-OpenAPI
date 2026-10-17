@@ -738,7 +738,8 @@ fn test_equip_layer_resolver_direct_and_custom_rules() {
         ..Default::default()
     };
 
-    let resolved = EquipLayerResolver::resolve(&beauty, &cash_equip, &normal_equip);
+    let resolved = EquipLayerResolver::resolve(&beauty, &cash_equip, &normal_equip, None);
+    assert!(resolved.symbol_equipment.is_none());
     assert_eq!(resolved.visible_items.len(), 1);
     let overall = &resolved.visible_items[0];
     assert_eq!(overall.slot, "한벌옷");
@@ -947,6 +948,7 @@ fn test_dashboard_partial_failure_diagnostics() {
             face: None,
             skin: None,
             cash_preset_no: None,
+            symbol_equipment: None,
             visible_items: vec![],
         },
         symbols: None,
@@ -2490,6 +2492,7 @@ fn test_character_combat_analytics() {
             face: None,
             skin: None,
             cash_preset_no: None,
+            symbol_equipment: None,
             visible_items: vec![],
         },
         symbols: None,
@@ -3874,10 +3877,71 @@ fn test_animation_preset_from_str_and_parsing() {
     );
 }
 
+#[test]
+fn test_starforce_analytical_percentile_model() {
+    use maplestory_openapi::models::calculator::{StarforceCalculator, StarforceOptions};
 
+    let opts = StarforceOptions::default()
+        .with_starcatch(true)
+        .with_simulation_samples(0); // analytical model
 
+    let estimate = StarforceCalculator::calculate(160, 12, 17, &opts).expect("analytical starforce");
+    assert!(estimate.percentile_10_cost > 0);
+    assert!(estimate.percentile_10_cost <= estimate.percentile_50_cost);
+    assert!(estimate.percentile_50_cost <= estimate.percentile_90_cost);
+    assert!(estimate.std_deviation_cost > 0.0);
+}
 
+#[test]
+fn test_equip_layer_resolver_with_symbol_equipment() {
+    use maplestory_openapi::models::character::{
+        CharacterBeautyEquipment, CharacterCashItemEquipment, CharacterItemEquipment,
+        CharacterSymbolEquipment, EquipLayerResolver, SymbolEquipmentDetail,
+    };
 
+    let beauty = CharacterBeautyEquipment::default();
+    let cash_equip = CharacterCashItemEquipment::default();
+    let normal_equip = CharacterItemEquipment::default();
+    let symbol_equip = CharacterSymbolEquipment {
+        symbol: Some(vec![SymbolEquipmentDetail {
+            symbol_name: Some("아케인심볼 : 소멸의 여로".to_string()),
+            symbol_force: Some("300".to_string()),
+            ..Default::default()
+        }]),
+        ..Default::default()
+    };
 
+    let resolved = EquipLayerResolver::resolve(
+        &beauty,
+        &cash_equip,
+        &normal_equip,
+        Some(&symbol_equip),
+    );
+    assert!(resolved.symbol_equipment.is_some());
+    let syms = resolved.symbol_equipment.unwrap();
+    assert_eq!(syms.symbol.as_ref().unwrap().len(), 1);
+    assert_eq!(
+        syms.symbol.unwrap()[0].symbol_name.as_deref(),
+        Some("아케인심볼 : 소멸의 여로")
+    );
+}
 
+#[test]
+fn test_avatar_enums_from_str_and_parse_or_default() {
+    use maplestory_openapi::avatar::{AvatarAction, AvatarEmotion, WeaponMotion};
+    use std::str::FromStr;
+
+    assert_eq!(AvatarAction::from_str("walk1").unwrap(), AvatarAction::Walk1);
+    assert_eq!(AvatarAction::from_str("jump").unwrap(), AvatarAction::Jump);
+    assert_eq!(
+        AvatarAction::parse_or_default("invalid_action", AvatarAction::Stand1),
+        AvatarAction::Custom("invalid_action".to_string())
+    );
+
+    assert_eq!(AvatarEmotion::from_str("smile").unwrap(), AvatarEmotion::Smile);
+    assert_eq!(AvatarEmotion::from_str("wink").unwrap(), AvatarEmotion::Wink);
+
+    assert_eq!(WeaponMotion::from_str("twohand").unwrap(), WeaponMotion::TwoHand);
+    assert_eq!(WeaponMotion::from_str("gun").unwrap(), WeaponMotion::Gun);
+}
 

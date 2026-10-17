@@ -183,28 +183,7 @@ impl MapleStoryClient {
         ocid: &str,
         date: impl Into<DateParam>,
     ) -> Result<CharacterCoordination> {
-        let date_param = date.into();
-        let date_ref = date_param.as_deref();
-        let ((basic_res, beauty_res), (cash_res, equip_res)) = futures_util::future::join(
-            futures_util::future::join(
-                self.get_character_basic(ocid, date_ref),
-                self.get_character_beauty_equipment(ocid, date_ref),
-            ),
-            futures_util::future::join(
-                self.get_character_cashitem_equipment(ocid, date_ref),
-                self.get_character_item_equipment(ocid, date_ref),
-            ),
-        )
-        .await;
-
-        let basic = basic_res?;
-        let beauty = beauty_res?;
-        let cash = cash_res?;
-        let equip = equip_res?;
-
-        Ok(CharacterCoordination::from_full_parts(
-            &basic, &beauty, &cash, &equip,
-        ))
+        self.character().get_coordination(ocid, date).await
     }
 
     /// Retrieve final visible coordination (코디 정보) directly by character name.
@@ -212,8 +191,7 @@ impl MapleStoryClient {
         &self,
         character_name: &str,
     ) -> Result<CharacterCoordination> {
-        let ocid = self.get_ocid(character_name).await?;
-        self.get_character_coordination(&ocid, None).await
+        self.character().get_coordination_by_name(character_name).await
     }
 
     /// Retrieve complete visual look and coordination directly by character name.
@@ -635,6 +613,7 @@ impl MapleStoryClient {
     /// * `width` - optional width in pixels (e.g. `Some(96)`)
     /// * `height` - optional height in pixels (e.g. `Some(96)`)
     #[cfg(feature = "animation")]
+    #[deprecated(since = "0.1.0", note = "Please use client.avatar().render_gif(...) instead")]
     pub async fn render_avatar_gif(
         &self,
         avatar_code: &crate::avatar::AvatarCode,
@@ -655,6 +634,7 @@ impl MapleStoryClient {
     /// * `width` - optional width in pixels (e.g. `Some(96)`)
     /// * `height` - optional height in pixels (e.g. `Some(96)`)
     #[cfg(feature = "animation")]
+    #[deprecated(since = "0.1.0", note = "Please use client.avatar().render_gif_by_name(...) instead")]
     pub async fn render_character_gif_by_name(
         &self,
         character_name: &str,
@@ -1294,7 +1274,28 @@ impl<'a> CharacterClient<'a> {
         ocid: &str,
         date: impl Into<DateParam>,
     ) -> Result<CharacterCoordination> {
-        self.client.get_character_coordination(ocid, date).await
+        let date_param = date.into();
+        let date_ref = date_param.as_deref();
+        let ((basic_res, beauty_res), (cash_res, equip_res)) = futures_util::future::join(
+            futures_util::future::join(
+                self.get_basic(ocid, date_ref),
+                self.get_beauty_equipment(ocid, date_ref),
+            ),
+            futures_util::future::join(
+                self.get_cashitem_equipment(ocid, date_ref),
+                self.get_item_equipment(ocid, date_ref),
+            ),
+        )
+        .await;
+
+        let basic = basic_res?;
+        let beauty = beauty_res?;
+        let cash = cash_res?;
+        let equip = equip_res?;
+
+        Ok(CharacterCoordination::from_full_parts(
+            &basic, &beauty, &cash, &equip,
+        ))
     }
 
     /// Retrieve synthesized coordination model directly by character name.
@@ -1302,9 +1303,8 @@ impl<'a> CharacterClient<'a> {
         &self,
         character_name: &str,
     ) -> Result<CharacterCoordination> {
-        self.client
-            .get_character_coordination_by_name(character_name)
-            .await
+        let ocid = self.get_ocid(character_name).await?;
+        self.get_coordination(&ocid, None).await
     }
 
     /// Retrieve basic information of a character directly by character name.
@@ -1370,8 +1370,8 @@ impl<'a> CharacterClient<'a> {
 
     /// Retrieve combat analytics of a character by OCID.
     ///
-    /// Selectively fetches only the required dashboard sections (`Basic`, `Stat`, `ItemEquipment`,
-    /// `Symbols`, and `Dojang`) instead of the entire 20+ endpoint set.
+    /// Selectively fetches only the required dashboard sections (`Basic`, `Stat`, `HyperStat`,
+    /// `ItemEquipment`, `Symbols`, and `Dojang`) instead of the entire 20+ endpoint set.
     pub async fn get_combat_analytics(
         &self,
         ocid: &str,
@@ -1380,6 +1380,7 @@ impl<'a> CharacterClient<'a> {
         let options = DashboardOptions::builder()
             .include(DashboardSection::Basic)
             .include(DashboardSection::Stat)
+            .include(DashboardSection::HyperStat)
             .include(DashboardSection::ItemEquipment)
             .include(DashboardSection::Symbols)
             .include(DashboardSection::Dojang)

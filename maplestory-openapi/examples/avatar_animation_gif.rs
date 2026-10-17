@@ -45,7 +45,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         let start = std::time::Instant::now();
         let gif_bytes = client
-            .render_character_gif_by_name(&character_name, &preset, Some(128), Some(128))
+            .avatar()
+            .render_gif_by_name(&character_name, &preset, Some(128), Some(128))
             .await?;
         let elapsed = start.elapsed();
 

@@ -150,12 +150,8 @@ pub async fn run(
     println!("{DIM}--------------------------------------------------------------------------{RESET}");
     let key_slots = ["무기", "모자", "상의", "하의", "장갑", "신발", "망토"];
     for &slot in &key_slots {
-        let item1 = dash1.item_equipment.item_equipment.as_deref().unwrap_or(&[])
-            .iter()
-            .find(|i| i.item_equipment_slot.as_deref() == Some(slot) || i.item_equipment_part.as_deref() == Some(slot));
-        let item2 = dash2.item_equipment.item_equipment.as_deref().unwrap_or(&[])
-            .iter()
-            .find(|i| i.item_equipment_slot.as_deref() == Some(slot) || i.item_equipment_part.as_deref() == Some(slot));
+        let item1 = dash1.item_equipment.find_slot(slot);
+        let item2 = dash2.item_equipment.find_slot(slot);
 
         let desc1 = item1.map(|i| {
             let n = i.item_name.as_deref().unwrap_or("Unknown");

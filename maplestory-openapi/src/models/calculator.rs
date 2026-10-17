@@ -444,8 +444,8 @@ impl StarforceCalculator {
         }
 
         let attempts = solve_linear_system(a.clone(), vec![1.0; n])?;
-        let meso_costs = solve_linear_system(a.clone(), cost_vec)?;
-        let destructions = solve_linear_system(a, dest_vec)?;
+        let meso_costs = solve_linear_system(a.clone(), cost_vec.clone())?;
+        let destructions = solve_linear_system(a.clone(), dest_vec)?;
         let p_no_dest = solve_linear_system(a0, r_target)?;
 
         let start_idx = star_to_idx(start_star);
@@ -455,59 +455,90 @@ impl StarforceCalculator {
         let expected_meso_cost = expected_pure_meso + expected_destructions * (options.spare_cost as f64);
         let no_destruction_probability = p_no_dest[start_idx].clamp(0.0, 1.0);
 
-        // Monte Carlo simulation for percentiles & standard deviation
-        let samples = if options.simulation_samples > 0 {
-            options.simulation_samples
-        } else {
-            10_000
-        };
-
-        let mut rng = SimpleRng::new(42);
-        let mut costs = Vec::with_capacity(samples);
-
-        for _ in 0..samples {
-            let mut star = start_star;
-            let mut run_cost = 0u64;
-            while star < target_star {
-                let cost = Self::cost_per_attempt(item_level, star, options);
-                run_cost += cost;
-                let probs = Self::transition_probabilities(star, options);
-                let r = rng.next_f64();
-                if r < probs.success {
-                    if options.event_1_plus_1 && star <= 10 {
-                        star = (star + 2).min(target_star);
-                    } else {
-                        star += 1;
-                    }
-                } else if r < probs.success + probs.destroy {
-                    run_cost += options.spare_cost;
-                    star = options.restore_star.min(target_star - 1).max(s_min);
-                } else if r < probs.success + probs.destroy + probs.failure_drop {
-                    if star > s_min {
-                        star -= 1;
-                    }
-                } else {
-                    // maintain
+        // Percentiles & standard deviation estimation: analytical Markov model if simulation_samples == 0,
+        // or empirical Monte Carlo simulation if simulation_samples > 0.
+        let (percentile_10_cost, percentile_50_cost, percentile_90_cost, std_deviation_cost) =
+            if options.simulation_samples == 0 {
+                // Analytical Markov chain second moment and variance calculation:
+                // (I - Q) y = c .^ 2 + 2 c .* (Q mu) = c .* (2 mu - c)
+                let mut b2 = Vec::with_capacity(n);
+                for i in 0..n {
+                    let c = cost_vec[i];
+                    let mu = meso_costs[i];
+                    b2.push(c * (2.0 * mu - c));
                 }
-            }
-            costs.push(run_cost);
-        }
+                let y = solve_linear_system(a, b2)?;
+                let var = (y[start_idx] - expected_pure_meso * expected_pure_meso).max(0.0);
+                let std_dev = var.sqrt();
 
-        costs.sort_unstable();
-        let percentile_10_cost = costs[(samples * 10 / 100).min(samples - 1)];
-        let percentile_50_cost = costs[(samples * 50 / 100).min(samples - 1)];
-        let percentile_90_cost = costs[(samples * 90 / 100).min(samples - 1)];
+                let (p10, p50, p90) = if expected_meso_cost > 0.0 && var > 0.0 {
+                    let sigma_ln2 = (1.0 + var / (expected_meso_cost * expected_meso_cost)).ln();
+                    let sigma_ln = sigma_ln2.sqrt();
+                    let mu_ln = expected_meso_cost.ln() - 0.5 * sigma_ln2;
+                    let p10 = (mu_ln - 1.28155 * sigma_ln).exp().round() as u64;
+                    let p50 = mu_ln.exp().round() as u64;
+                    let p90 = (mu_ln + 1.28155 * sigma_ln).exp().round() as u64;
+                    (p10, p50, p90)
+                } else {
+                    let cost_u64 = expected_meso_cost.round() as u64;
+                    (cost_u64, cost_u64, cost_u64)
+                };
+                (p10, p50, p90, std_dev)
+            } else {
+                let samples = options.simulation_samples;
+                let mut rng = SimpleRng::new(42);
+                let mut costs = Vec::with_capacity(samples);
 
-        let mean = costs.iter().map(|&c| c as f64).sum::<f64>() / (samples as f64);
-        let variance = costs
-            .iter()
-            .map(|&c| {
-                let diff = (c as f64) - mean;
-                diff * diff
-            })
-            .sum::<f64>()
-            / (samples as f64);
-        let std_deviation_cost = variance.sqrt();
+                for _ in 0..samples {
+                    let mut star = start_star;
+                    let mut run_cost = 0u64;
+                    while star < target_star {
+                        let cost = Self::cost_per_attempt(item_level, star, options);
+                        run_cost += cost;
+                        let probs = Self::transition_probabilities(star, options);
+                        let r = rng.next_f64();
+                        if r < probs.success {
+                            if options.event_1_plus_1 && star <= 10 {
+                                star = (star + 2).min(target_star);
+                            } else {
+                                star += 1;
+                            }
+                        } else if r < probs.success + probs.destroy {
+                            run_cost += options.spare_cost;
+                            star = options.restore_star.min(target_star - 1).max(s_min);
+                        } else if r < probs.success + probs.destroy + probs.failure_drop {
+                            if star > s_min {
+                                star -= 1;
+                            }
+                        } else {
+                            // maintain
+                        }
+                    }
+                    costs.push(run_cost);
+                }
+
+                costs.sort_unstable();
+                let percentile_10_cost = costs[(samples * 10 / 100).min(samples - 1)];
+                let percentile_50_cost = costs[(samples * 50 / 100).min(samples - 1)];
+                let percentile_90_cost = costs[(samples * 90 / 100).min(samples - 1)];
+
+                let mean = costs.iter().map(|&c| c as f64).sum::<f64>() / (samples as f64);
+                let variance = costs
+                    .iter()
+                    .map(|&c| {
+                        let diff = (c as f64) - mean;
+                        diff * diff
+                    })
+                    .sum::<f64>()
+                    / (samples as f64);
+                let std_deviation_cost = variance.sqrt();
+                (
+                    percentile_10_cost,
+                    percentile_50_cost,
+                    percentile_90_cost,
+                    std_deviation_cost,
+                )
+            };
 
         Ok(StarforceCostEstimate {
             item_level,

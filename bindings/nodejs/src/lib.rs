@@ -83,7 +83,8 @@ impl JsMapleStoryClient {
 
         let gif_bytes = self
             .inner
-            .render_character_gif_by_name(
+            .avatar()
+            .render_gif_by_name(
                 &character_name,
                 &anim_preset,
                 Some(width.unwrap_or(128)),

@@ -581,7 +581,8 @@ pub unsafe extern "C" fn maplestory_render_character_gif(
     let res = h_ref.runtime.block_on(async {
         h_ref
             .client
-            .render_character_gif_by_name(name, &anim_preset, Some(w), Some(h))
+            .avatar()
+            .render_gif_by_name(name, &anim_preset, Some(w), Some(h))
             .await
     });
 
@@ -634,17 +635,17 @@ pub unsafe extern "C" fn maplestory_avatar_to_look_url(
     let mut query = AvatarLookQuery::new();
     if !action.is_null() {
         if let Ok(act) = CStr::from_ptr(action).to_str() {
-            query.action = Some(AvatarAction::Custom(act.to_string()));
+            query.action = Some(AvatarAction::parse_or_default(act, AvatarAction::Stand1));
         }
     }
     if !emotion.is_null() {
         if let Ok(emo) = CStr::from_ptr(emotion).to_str() {
-            query.emotion = Some(AvatarEmotion::Custom(emo.to_string()));
+            query.emotion = Some(AvatarEmotion::parse_or_default(emo, AvatarEmotion::Default));
         }
     }
     if !wmotion.is_null() {
         if let Ok(wm) = CStr::from_ptr(wmotion).to_str() {
-            query.wmotion = Some(WeaponMotion::Custom(wm.to_string()));
+            query.wmotion = Some(WeaponMotion::parse_or_default(wm, WeaponMotion::Default));
         }
     }
     if width > 0 && height > 0 {

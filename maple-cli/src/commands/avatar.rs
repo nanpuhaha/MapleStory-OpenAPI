@@ -20,43 +20,9 @@ pub async fn run(
             })?;
             let avatar_code = AvatarCode::from_url_or_code(&img_url)?;
 
-            let action = match args.action.as_str() {
-                "stand1" => AvatarAction::Stand1,
-                "stand2" => AvatarAction::Stand2,
-                "walk1" => AvatarAction::Walk1,
-                "walk2" => AvatarAction::Walk2,
-                "prone" => AvatarAction::Prone,
-                "fly" => AvatarAction::Fly,
-                "jump" => AvatarAction::Jump,
-                "sit" => AvatarAction::Sit,
-                "alert" => AvatarAction::Alert,
-                other => AvatarAction::Custom(other.to_string()),
-            };
-
-            let emotion = match args.emotion.as_str() {
-                "wink" => AvatarEmotion::Wink,
-                "smile" => AvatarEmotion::Smile,
-                "cry" => AvatarEmotion::Cry,
-                "angry" => AvatarEmotion::Angry,
-                "bewildered" => AvatarEmotion::Bewildered,
-                "blink" => AvatarEmotion::Blink,
-                "furious" => AvatarEmotion::Furious,
-                "sleepy" => AvatarEmotion::Sleepy,
-                "love" => AvatarEmotion::Love,
-                "despair" => AvatarEmotion::Despair,
-                "pain" => AvatarEmotion::Pain,
-                "default" => AvatarEmotion::Default,
-                other => AvatarEmotion::Custom(other.to_string()),
-            };
-
-            let wmotion = match args.wmotion.as_str() {
-                "onehand" => WeaponMotion::OneHand,
-                "twohand" => WeaponMotion::TwoHand,
-                "gun" => WeaponMotion::Gun,
-                "hideweapon" => WeaponMotion::HideWeapon,
-                "default" => WeaponMotion::Default,
-                other => WeaponMotion::Custom(other.to_string()),
-            };
+            let action = AvatarAction::parse_or_default(&args.action, AvatarAction::Stand1);
+            let emotion = AvatarEmotion::parse_or_default(&args.emotion, AvatarEmotion::Default);
+            let wmotion = WeaponMotion::parse_or_default(&args.wmotion, WeaponMotion::Default);
 
             let query = AvatarLookQuery::default()
                 .action(action)

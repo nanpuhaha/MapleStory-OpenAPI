@@ -514,6 +514,54 @@ impl AvatarAction {
             Self::Custom(c) => c.as_str(),
         }
     }
+
+    /// Parses an action from a string, falling back to `default` if unrecognized.
+    pub fn parse_or_default(s: &str, default: Self) -> Self {
+        s.parse().unwrap_or(default)
+    }
+}
+
+impl std::str::FromStr for AvatarAction {
+    type Err = std::convert::Infallible;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        let act = match s.trim().to_lowercase().as_str() {
+            "stand1" => Self::Stand1,
+            "stand2" => Self::Stand2,
+            "walk1" => Self::Walk1,
+            "walk2" => Self::Walk2,
+            "prone" => Self::Prone,
+            "fly" => Self::Fly,
+            "jump" => Self::Jump,
+            "sit" => Self::Sit,
+            "ladder" => Self::Ladder,
+            "rope" => Self::Rope,
+            "heal" => Self::Heal,
+            "alert" => Self::Alert,
+            "pronestab" => Self::ProneStab,
+            "swingo1" => Self::SwingO1,
+            "swingo2" => Self::SwingO2,
+            "swingo3" => Self::SwingO3,
+            "swingof" => Self::SwingOF,
+            "swingt1" => Self::SwingT1,
+            "swingt2" => Self::SwingT2,
+            "swingt3" => Self::SwingT3,
+            "swingtf" => Self::SwingTF,
+            "stabo1" => Self::StabO1,
+            "stabo2" => Self::StabO2,
+            "stabof" => Self::StabOF,
+            "stabt1" => Self::StabT1,
+            "stabt2" => Self::StabT2,
+            "stabtf" => Self::StabTF,
+            "shoot1" => Self::Shoot1,
+            "shoot2" => Self::Shoot2,
+            "shootf" => Self::ShootF,
+            "dead" => Self::Dead,
+            "ghostwalk" => Self::GhostWalk,
+            other => Self::Custom(other.to_string()),
+        };
+        Ok(act)
+    }
 }
 
 /// Character Facial Expression / Emotion for avatar rendering.
@@ -552,6 +600,34 @@ impl AvatarEmotion {
             Self::Pain => "E19",
             Self::Custom(c) => c.as_str(),
         }
+    }
+
+    /// Parses an emotion from a string, falling back to `default` if unrecognized.
+    pub fn parse_or_default(s: &str, default: Self) -> Self {
+        s.parse().unwrap_or(default)
+    }
+}
+
+impl std::str::FromStr for AvatarEmotion {
+    type Err = std::convert::Infallible;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        let emo = match s.trim().to_lowercase().as_str() {
+            "default" => Self::Default,
+            "wink" => Self::Wink,
+            "smile" => Self::Smile,
+            "cry" => Self::Cry,
+            "angry" => Self::Angry,
+            "bewildered" => Self::Bewildered,
+            "blink" => Self::Blink,
+            "furious" => Self::Furious,
+            "sleepy" => Self::Sleepy,
+            "love" => Self::Love,
+            "despair" => Self::Despair,
+            "pain" => Self::Pain,
+            other => Self::Custom(other.to_string()),
+        };
+        Ok(emo)
     }
 }
 
@@ -708,6 +784,27 @@ impl WeaponMotion {
             Self::HideWeapon => "W04",
             Self::Custom(c) => c.as_str(),
         }
+    }
+
+    /// Parses a weapon motion from a string, falling back to `default` if unrecognized.
+    pub fn parse_or_default(s: &str, default: Self) -> Self {
+        s.parse().unwrap_or(default)
+    }
+}
+
+impl std::str::FromStr for WeaponMotion {
+    type Err = std::convert::Infallible;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        let wm = match s.trim().to_lowercase().as_str() {
+            "default" => Self::Default,
+            "onehand" => Self::OneHand,
+            "twohand" => Self::TwoHand,
+            "gun" => Self::Gun,
+            "hideweapon" => Self::HideWeapon,
+            other => Self::Custom(other.to_string()),
+        };
+        Ok(wm)
     }
 }
 

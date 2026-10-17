@@ -118,7 +118,8 @@ impl PyMapleStoryClient {
 
         pyo3_async_runtimes::tokio::future_into_py(py, async move {
             let gif_bytes = client
-                .render_character_gif_by_name(&character_name, &anim_preset, Some(w), Some(h))
+                .avatar()
+                .render_gif_by_name(&character_name, &anim_preset, Some(w), Some(h))
                 .await
                 .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))?;
 
