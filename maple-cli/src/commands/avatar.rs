@@ -10,17 +10,7 @@ pub async fn run(
     client: &MapleStoryClient,
     args: &AvatarArgs,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
-    let preset = match args.action.to_lowercase().as_str() {
-        "walk" | "walk1" | "walk2" => AnimationPreset::Walk,
-        "jump" => AnimationPreset::Jump,
-        "sit" => AnimationPreset::Sit,
-        "prone" => AnimationPreset::Prone,
-        "fly" => AnimationPreset::Fly,
-        "climb" => AnimationPreset::Climb,
-        "blink" => AnimationPreset::Blink,
-        "wink" => AnimationPreset::Wink,
-        _ => AnimationPreset::Stand,
-    };
+    let preset = AnimationPreset::parse_or_default(&args.action, AnimationPreset::Stand);
 
     let (bytes, extension) = match args.format {
         AvatarFormat::Png => {

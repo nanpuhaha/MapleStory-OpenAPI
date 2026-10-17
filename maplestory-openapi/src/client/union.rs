@@ -38,8 +38,17 @@ impl<'a> UnionClient<'a> {
 
     /// Retrieve Union basic information directly by character name.
     pub async fn get_by_name(&self, character_name: &str) -> Result<UserUnion> {
+        self.get_by_name_and_date(character_name, None).await
+    }
+
+    /// Retrieve Union basic information directly by character name and query date.
+    pub async fn get_by_name_and_date(
+        &self,
+        character_name: &str,
+        date: impl Into<DateParam>,
+    ) -> Result<UserUnion> {
         let ocid = self.client.get_ocid(character_name).await?;
-        self.get_union(&ocid, None).await
+        self.get_union(&ocid, date).await
     }
 
     /// Retrieve Union Raider board and stat information.

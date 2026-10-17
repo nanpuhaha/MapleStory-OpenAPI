@@ -589,20 +589,23 @@ impl MapleStoryClient {
         };
 
         let min_date = chrono::NaiveDate::from_ymd_opt(2023, 12, 21).unwrap();
+        let latest_available = crate::models::common::MapleDate::latest_available()
+            .to_naive_date()
+            .unwrap();
+
         if parsed < min_date {
             return Err(MapleStoryError::DateOutOfRange {
                 date: date.to_string(),
                 min_date: crate::models::common::MapleDate::MIN_DATE.to_string(),
+                max_date: latest_available.to_string(),
             });
         }
 
-        let latest_available = crate::models::common::MapleDate::latest_available()
-            .to_naive_date()
-            .unwrap();
         if parsed > latest_available {
             return Err(MapleStoryError::DateOutOfRange {
                 date: date.to_string(),
                 min_date: crate::models::common::MapleDate::MIN_DATE.to_string(),
+                max_date: latest_available.to_string(),
             });
         }
 

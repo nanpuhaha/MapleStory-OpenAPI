@@ -68,8 +68,12 @@ pub enum MapleStoryError {
     ServiceUnavailable { code: String, message: String },
 
     /// Requested date is out of the allowed range
-    #[error("Date {date} is out of range; minimum allowed date is {min_date}")]
-    DateOutOfRange { date: String, min_date: String },
+    #[error("Date {date} is out of range; allowed range is {min_date} ~ {max_date}")]
+    DateOutOfRange {
+        date: String,
+        min_date: String,
+        max_date: String,
+    },
 
     /// URL construction error
     #[error("URL error: {0}")]

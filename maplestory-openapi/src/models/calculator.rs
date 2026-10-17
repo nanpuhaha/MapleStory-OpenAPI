@@ -627,8 +627,9 @@ pub struct CubeGradeUpEstimate {
     pub is_cash: bool,
     /// Cumulative ceiling cubes (maximum guaranteed attempts across all steps).
     pub ceiling_cubes: Option<u32>,
-    /// Cumulative maximum ceiling cost.
     pub ceiling_cost: Option<u64>,
+    /// 10th percentile cubes (lucky attempts).
+    pub percentile_10_cubes: u32,
     /// 50th percentile cubes (median attempts).
     pub percentile_50_cubes: u32,
     /// 90th percentile cubes (unlucky attempts).
@@ -646,12 +647,16 @@ pub struct TargetOptionCostEstimate {
     pub expected_attempts: f64,
     /// Expected total cost.
     pub expected_cost: f64,
+    /// 10th percentile attempts (lucky rolls).
+    pub percentile_10_attempts: u32,
     /// 50th percentile (median) attempts.
     pub percentile_50_attempts: u32,
     /// 90th percentile attempts.
     pub percentile_90_attempts: u32,
     /// 99th percentile attempts.
     pub percentile_99_attempts: u32,
+    /// Cost at 10th percentile attempts.
+    pub cost_at_percentile_10: u64,
     /// Cost at 50th percentile attempts.
     pub cost_at_percentile_50: u64,
     /// Cost at 90th percentile attempts.
@@ -803,7 +808,7 @@ impl CubeCalculator {
         let total_ceiling_cost = total_ceiling_cubes.map(|c| (c as u64) * cost_per_cube);
 
         // Calculate percentiles across steps by convolving PMFs
-        let (percentile_50_cubes, percentile_90_cubes) =
+        let (percentile_10_cubes, percentile_50_cubes, percentile_90_cubes) =
             calculate_cube_percentiles(&step_details);
 
         Ok(CubeGradeUpEstimate {
@@ -815,6 +820,7 @@ impl CubeCalculator {
             is_cash,
             ceiling_cubes: total_ceiling_cubes,
             ceiling_cost: total_ceiling_cost,
+            percentile_10_cubes,
             percentile_50_cubes,
             percentile_90_cubes,
             step_details,
@@ -836,6 +842,11 @@ impl CubeCalculator {
         let expected_cost = expected_attempts * (cost_per_attempt as f64);
 
         let q_fail = 1.0 - target_probability;
+        let percentile_10_attempts = if q_fail > 0.0 {
+            (0.9f64.ln() / q_fail.ln()).ceil().max(1.0) as u32
+        } else {
+            1
+        };
         let percentile_50_attempts = if q_fail > 0.0 {
             (0.5f64.ln() / q_fail.ln()).ceil().max(1.0) as u32
         } else {
@@ -852,6 +863,7 @@ impl CubeCalculator {
             1
         };
 
+        let cost_at_percentile_10 = (percentile_10_attempts as u64) * cost_per_attempt;
         let cost_at_percentile_50 = (percentile_50_attempts as u64) * cost_per_attempt;
         let cost_at_percentile_90 = (percentile_90_attempts as u64) * cost_per_attempt;
 
@@ -859,19 +871,21 @@ impl CubeCalculator {
             target_probability,
             expected_attempts,
             expected_cost,
+            percentile_10_attempts,
             percentile_50_attempts,
             percentile_90_attempts,
             percentile_99_attempts,
+            cost_at_percentile_10,
             cost_at_percentile_50,
             cost_at_percentile_90,
         })
     }
 }
 
-/// Computes the exact 50th and 90th percentiles for multi-step cube transitions via PMF convolution.
-fn calculate_cube_percentiles(steps: &[CubeGradeStepEstimate]) -> (u32, u32) {
+/// Computes the exact 10th, 50th, and 90th percentiles for multi-step cube transitions via PMF convolution.
+fn calculate_cube_percentiles(steps: &[CubeGradeStepEstimate]) -> (u32, u32, u32) {
     if steps.is_empty() {
-        return (0, 0);
+        return (0, 0, 0);
     }
 
     // Step PMF constructor: P(X = k) for k in 1..=max_k
@@ -914,15 +928,21 @@ fn calculate_cube_percentiles(steps: &[CubeGradeStepEstimate]) -> (u32, u32) {
         current_pmf = convolved;
     }
 
-    // Find 50th and 90th percentile from CDF
+    // Find 10th, 50th, and 90th percentile from CDF
     let mut cdf = 0.0;
+    let mut p10 = 1;
     let mut p50 = 1;
     let mut p90 = 1;
+    let mut found_10 = false;
     let mut found_50 = false;
     let mut found_90 = false;
 
     for (k, &prob) in current_pmf.iter().enumerate() {
         cdf += prob;
+        if !found_10 && cdf >= 0.1 {
+            p10 = k as u32;
+            found_10 = true;
+        }
         if !found_50 && cdf >= 0.5 {
             p50 = k as u32;
             found_50 = true;
@@ -934,6 +954,9 @@ fn calculate_cube_percentiles(steps: &[CubeGradeStepEstimate]) -> (u32, u32) {
         }
     }
 
+    if !found_10 {
+        p10 = 1;
+    }
     if !found_50 {
         p50 = current_pmf.len().saturating_sub(1) as u32;
     }
@@ -941,7 +964,7 @@ fn calculate_cube_percentiles(steps: &[CubeGradeStepEstimate]) -> (u32, u32) {
         p90 = current_pmf.len().saturating_sub(1) as u32;
     }
 
-    (p50, p90)
+    (p10, p50, p90)
 }
 
 /// Gaussian elimination with partial pivoting to solve A x = b.

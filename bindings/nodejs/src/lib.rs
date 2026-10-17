@@ -79,17 +79,7 @@ impl JsMapleStoryClient {
         height: Option<u32>,
     ) -> Result<Buffer> {
         let preset_str = preset.unwrap_or_else(|| "walk".to_string());
-        let anim_preset = match preset_str.to_lowercase().as_str() {
-            "walk" => AnimationPreset::Walk,
-            "wink" => AnimationPreset::Wink,
-            "stand" => AnimationPreset::Stand,
-            "jump" => AnimationPreset::Jump,
-            "sit" => AnimationPreset::Sit,
-            "prone" => AnimationPreset::Prone,
-            "fly" => AnimationPreset::Fly,
-            "blink" => AnimationPreset::Blink,
-            _ => AnimationPreset::Walk,
-        };
+        let anim_preset = AnimationPreset::parse_or_default(&preset_str, AnimationPreset::Walk);
 
         let gif_bytes = self
             .inner

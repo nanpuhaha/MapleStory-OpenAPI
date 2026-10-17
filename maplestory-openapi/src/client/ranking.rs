@@ -170,6 +170,7 @@ impl MapleStoryClient {
     /// Retrieve Union ranking.
     ///
     /// Corresponds to `GET /maplestory/v1/ranking/union`.
+    #[deprecated(since = "0.1.0", note = "Please use client.ranking().get_union(...) instead")]
     pub async fn get_union_ranking(&self, query: UnionRankingQuery<'_>) -> Result<UnionRanking> {
         self.ranking().get_union(query).await
     }
@@ -177,6 +178,7 @@ impl MapleStoryClient {
     /// Retrieve guild ranking.
     ///
     /// Corresponds to `GET /maplestory/v1/ranking/guild`.
+    #[deprecated(since = "0.1.0", note = "Please use client.ranking().get_guild(...) instead")]
     pub async fn get_guild_ranking(&self, query: GuildRankingQuery<'_>) -> Result<GuildRanking> {
         self.ranking().get_guild(query).await
     }
@@ -184,6 +186,7 @@ impl MapleStoryClient {
     /// Retrieve dojang ranking.
     ///
     /// Corresponds to `GET /maplestory/v1/ranking/dojang`.
+    #[deprecated(since = "0.1.0", note = "Please use client.ranking().get_dojang(...) instead")]
     pub async fn get_dojang_ranking(&self, query: DojangRankingQuery<'_>) -> Result<DojangRanking> {
         self.ranking().get_dojang(query).await
     }
@@ -191,6 +194,7 @@ impl MapleStoryClient {
     /// Retrieve the seed ranking.
     ///
     /// Corresponds to `GET /maplestory/v1/ranking/theseed`.
+    #[deprecated(since = "0.1.0", note = "Please use client.ranking().get_the_seed(...) instead")]
     pub async fn get_theseed_ranking(
         &self,
         query: TheSeedRankingQuery<'_>,
@@ -201,6 +205,7 @@ impl MapleStoryClient {
     /// Retrieve achievement ranking.
     ///
     /// Corresponds to `GET /maplestory/v1/ranking/achievement`.
+    #[deprecated(since = "0.1.0", note = "Please use client.ranking().get_achievement(...) instead")]
     pub async fn get_achievement_ranking(
         &self,
         query: AchievementRankingQuery<'_>,

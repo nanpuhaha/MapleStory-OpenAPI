@@ -111,17 +111,7 @@ impl PyMapleStoryClient {
     ) -> PyResult<Bound<'py, PyAny>> {
         let client = self.inner.clone();
         let preset_str = preset.unwrap_or_else(|| "walk".to_string());
-        let anim_preset = match preset_str.to_lowercase().as_str() {
-            "walk" => AnimationPreset::Walk,
-            "wink" => AnimationPreset::Wink,
-            "stand" => AnimationPreset::Stand,
-            "jump" => AnimationPreset::Jump,
-            "sit" => AnimationPreset::Sit,
-            "prone" => AnimationPreset::Prone,
-            "fly" => AnimationPreset::Fly,
-            "blink" => AnimationPreset::Blink,
-            _ => AnimationPreset::Walk,
-        };
+        let anim_preset = AnimationPreset::parse_or_default(&preset_str, AnimationPreset::Walk);
 
         let w = width.unwrap_or(128);
         let h = height.unwrap_or(128);

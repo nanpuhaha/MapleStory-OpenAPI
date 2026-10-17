@@ -580,6 +580,35 @@ pub enum AnimationPreset {
     Custom(Vec<AnimationFrame>),
 }
 
+impl std::str::FromStr for AnimationPreset {
+    type Err = crate::error::MapleStoryError;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s.trim().to_lowercase().as_str() {
+            "stand" | "stand1" | "stand2" => Ok(AnimationPreset::Stand),
+            "walk" | "walk1" | "walk2" => Ok(AnimationPreset::Walk),
+            "jump" => Ok(AnimationPreset::Jump),
+            "sit" => Ok(AnimationPreset::Sit),
+            "prone" => Ok(AnimationPreset::Prone),
+            "fly" => Ok(AnimationPreset::Fly),
+            "climb" | "ladder" | "rope" => Ok(AnimationPreset::Climb),
+            "blink" => Ok(AnimationPreset::Blink),
+            "wink" => Ok(AnimationPreset::Wink),
+            other => Err(crate::error::MapleStoryError::InvalidParameter(format!(
+                "Unknown animation preset '{}'; supported presets are stand, walk, jump, sit, prone, fly, climb, blink, wink",
+                other
+            ))),
+        }
+    }
+}
+
+impl AnimationPreset {
+    /// Parses an animation preset from a string, falling back to `default` if unrecognized.
+    pub fn parse_or_default(s: &str, default: Self) -> Self {
+        s.parse().unwrap_or(default)
+    }
+}
+
 /// A single frame in an avatar animation sequence.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AnimationFrame {

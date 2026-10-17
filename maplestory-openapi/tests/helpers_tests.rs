@@ -3120,7 +3120,9 @@ fn test_cube_grade_up_nexon_official_probabilities_and_ceiling() {
     assert_eq!(black_rare_to_leg.step_details.len(), 3); // Rare->Epic, Epic->Unique, Unique->Legendary
     assert_eq!(black_rare_to_leg.ceiling_cubes, Some(10 + 42 + 107)); // sum of ceilings
     assert!(black_rare_to_leg.expected_cubes < (10 + 42 + 107) as f64);
+    assert!(black_rare_to_leg.percentile_10_cubes <= black_rare_to_leg.percentile_50_cubes);
     assert!(black_rare_to_leg.percentile_50_cubes <= black_rare_to_leg.percentile_90_cubes);
+    assert!(black_rare_to_leg.percentile_10_cubes > 0);
 
     // Additional Cube: Unique -> Legendary (0.7%, ceiling 214)
     let add_unique_to_leg = CubeCalculator::calculate(CubeType::Additional, PotentialGrade::Unique, PotentialGrade::Legendary, None).unwrap();
@@ -3137,6 +3139,9 @@ fn test_cube_target_option_cost_estimate() {
     assert_eq!(estimate.target_probability, 0.01);
     assert_eq!(estimate.expected_attempts, 100.0);
     assert_eq!(estimate.expected_cost, 220_000.0);
+    // 10th percentile: ln(0.9)/ln(0.99) = 11 attempts
+    assert_eq!(estimate.percentile_10_attempts, 11);
+    assert_eq!(estimate.cost_at_percentile_10, 11 * 2200);
     // 50th percentile: ln(0.5)/ln(0.99) = 69 attempts
     assert_eq!(estimate.percentile_50_attempts, 69);
     // 90th percentile: ln(0.1)/ln(0.99) = 230 attempts
@@ -3843,6 +3848,32 @@ fn test_hexa_matrix_progression_calculator_all_core_types() {
     assert_eq!(multi_summary.max_fragments_remaining, 400);
     assert_eq!(multi_summary.stat_cores_remaining.len(), 1);
 }
+
+#[test]
+fn test_date_out_of_range_message_formatting() {
+    use maplestory_openapi::client::MapleStoryClient;
+
+    let err = MapleStoryClient::validate_date("2099-01-01").unwrap_err();
+    let msg = err.to_string();
+    assert!(msg.contains("out of range"));
+    assert!(msg.contains("allowed range is 2023-12-21 ~"));
+}
+
+#[test]
+fn test_animation_preset_from_str_and_parsing() {
+    use maplestory_openapi::avatar::AnimationPreset;
+    use std::str::FromStr;
+
+    assert_eq!(AnimationPreset::from_str("walk").unwrap(), AnimationPreset::Walk);
+    assert_eq!(AnimationPreset::from_str("STAND").unwrap(), AnimationPreset::Stand);
+    assert_eq!(AnimationPreset::from_str("jump").unwrap(), AnimationPreset::Jump);
+    assert_eq!(AnimationPreset::from_str("Blink").unwrap(), AnimationPreset::Blink);
+    assert_eq!(
+        AnimationPreset::parse_or_default("invalid", AnimationPreset::Stand),
+        AnimationPreset::Stand
+    );
+}
+
 
 
 

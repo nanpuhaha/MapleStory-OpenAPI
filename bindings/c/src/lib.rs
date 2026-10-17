@@ -267,6 +267,18 @@ pub unsafe extern "C" fn maplestory_character_get_combat_summary(
 }
 
 /// Fetch character combat analytics summary directly by character name into a typed C struct.
+/// Fetch character combat analytics summary directly by character name into a typed C struct.
+/// Returns 0 on success.
+#[no_mangle]
+pub unsafe extern "C" fn maplestory_character_get_combat_summary_by_name(
+    handle: *mut ClientHandle,
+    character_name: *const c_char,
+    out_summary: *mut MapleStoryCombatSummary,
+) -> i32 {
+    maplestory_get_character_combat_summary(handle, character_name, out_summary)
+}
+
+/// Legacy alias for `maplestory_character_get_combat_summary_by_name`.
 /// Returns 0 on success.
 #[no_mangle]
 pub unsafe extern "C" fn maplestory_get_character_combat_summary(
@@ -560,17 +572,7 @@ pub unsafe extern "C" fn maplestory_render_character_gif(
         CStr::from_ptr(preset).to_str().unwrap_or("walk")
     };
 
-    let anim_preset = match preset_str.to_lowercase().as_str() {
-        "walk" => AnimationPreset::Walk,
-        "wink" => AnimationPreset::Wink,
-        "stand" => AnimationPreset::Stand,
-        "jump" => AnimationPreset::Jump,
-        "sit" => AnimationPreset::Sit,
-        "prone" => AnimationPreset::Prone,
-        "fly" => AnimationPreset::Fly,
-        "blink" => AnimationPreset::Blink,
-        _ => AnimationPreset::Walk,
-    };
+    let anim_preset = AnimationPreset::parse_or_default(preset_str, AnimationPreset::Walk);
 
     let w = if width == 0 { 128 } else { width };
     let h = if height == 0 { 128 } else { height };

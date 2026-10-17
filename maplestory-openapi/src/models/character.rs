@@ -2214,22 +2214,25 @@ impl CharacterDashboard {
         raw: RawDashboardSections,
         options: &DashboardOptions,
     ) -> Result<Self, crate::error::MapleStoryError> {
-        let _ = options; // Options metadata retained for interface depth and callers
         let basic = raw.basic?;
         let mut errors = std::collections::HashMap::new();
 
         macro_rules! unwrap_sec {
             ($field:expr, $section:ident) => {
-                match $field {
-                    Some(Ok(v)) => Some(v),
-                    Some(Err(e)) => {
-                        errors.insert(
-                            DashboardSection::$section,
-                            DashboardSectionError::from_error(DashboardSection::$section, &e),
-                        );
-                        None
+                if options.is_enabled(DashboardSection::$section) {
+                    match $field {
+                        Some(Ok(v)) => Some(v),
+                        Some(Err(e)) => {
+                            errors.insert(
+                                DashboardSection::$section,
+                                DashboardSectionError::from_error(DashboardSection::$section, &e),
+                            );
+                            None
+                        }
+                        None => None,
                     }
-                    None => None,
+                } else {
+                    None
                 }
             };
         }
@@ -2551,7 +2554,28 @@ impl CharacterCombatAnalytics {
         authentic_force: i64,
         hyper_stat: Option<&CharacterHyperStat>,
     ) -> Self {
-        let _ = hyper_stat; // Hyper stat parameter retained for deep spec calculation
+        let mut final_arcane_force = arcane_force;
+        if final_arcane_force == 0 {
+            if let Some(hs) = hyper_stat {
+                let preset = match hs.use_preset_no.as_deref() {
+                    Some("2") => hs.hyper_stat_preset_2.as_deref(),
+                    Some("3") => hs.hyper_stat_preset_3.as_deref(),
+                    _ => hs.hyper_stat_preset_1.as_deref(),
+                };
+                if let Some(entries) = preset {
+                    for entry in entries {
+                        if entry.stat_type.as_deref() == Some("아케인포스") {
+                            if let Some(inc) = entry.stat_increase.as_deref() {
+                                if let Ok(val) = inc.trim().parse::<i64>() {
+                                    final_arcane_force += val;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         let starforce_stat_breakdown = item_equipment.map(|eq| eq.starforce_stat_breakdown());
         let total_starforce = item_equipment
             .map(|eq| eq.total_starforce())
@@ -2569,7 +2593,7 @@ impl CharacterCombatAnalytics {
             critical_rate: stat.critical_rate().unwrap_or(0.0),
             critical_damage: stat.critical_damage().unwrap_or(0.0),
             total_starforce,
-            arcane_force,
+            arcane_force: final_arcane_force,
             authentic_force,
             dojang_best_floor: dojang.and_then(|d| d.dojang_best_floor),
             starforce_stat_breakdown,

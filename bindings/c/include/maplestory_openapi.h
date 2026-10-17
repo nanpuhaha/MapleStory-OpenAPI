@@ -73,6 +73,15 @@ int32_t maplestory_character_get_combat_summary(
  * Fetch character combat analytics summary directly by character name into a typed C struct.
  * Returns 0 on success.
  */
+int32_t maplestory_character_get_combat_summary_by_name(
+    ClientHandle* handle,
+    const char* character_name,
+    MapleStoryCombatSummary* out_summary
+);
+
+/**
+ * Legacy alias for maplestory_character_get_combat_summary_by_name.
+ */
 int32_t maplestory_get_character_combat_summary(
     ClientHandle* handle,
     const char* character_name,

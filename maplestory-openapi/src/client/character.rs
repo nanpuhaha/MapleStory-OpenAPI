@@ -1401,6 +1401,7 @@ impl<'a> CharacterClient<'a> {
 
     /// Render character avatar GIF. Delegates to [`AvatarClient::render_gif`].
     #[cfg(feature = "animation")]
+    #[deprecated(since = "0.1.0", note = "Please use client.avatar().render_gif(...) instead")]
     pub async fn render_avatar_gif(
         &self,
         avatar_code: &crate::avatar::AvatarCode,
@@ -1413,6 +1414,7 @@ impl<'a> CharacterClient<'a> {
 
     /// Render character avatar GIF directly by name. Delegates to [`AvatarClient::render_gif_by_name`].
     #[cfg(feature = "animation")]
+    #[deprecated(since = "0.1.0", note = "Please use client.avatar().render_gif_by_name(...) instead")]
     pub async fn render_character_gif_by_name(
         &self,
         character_name: &str,
@@ -1513,6 +1515,7 @@ impl<'a> CharacterClient<'a> {
 
 impl MapleStoryClient {
     /// Concurrently fetch comprehensive character profiles for multiple character names.
+    #[deprecated(since = "0.1.0", note = "Please use client.character().fetch_batch(...) instead")]
     pub async fn fetch_character_batch<I, S>(&self, names: I) -> BatchResult<CharacterProfile>
     where
         I: IntoIterator<Item = S>,

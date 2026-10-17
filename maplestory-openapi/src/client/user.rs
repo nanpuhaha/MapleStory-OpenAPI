@@ -65,8 +65,12 @@ impl<'a> UserClient<'a> {
         character_name: Option<&str>,
         date: impl Into<crate::models::common::DateParam>,
     ) -> Result<crate::models::user::AccountSummary> {
-        let (character_list_res, achievement_res) =
-            futures_util::future::join(self.get_character_list(), self.get_achievement(date)).await;
+        let date_param = date.into();
+        let (character_list_res, achievement_res) = futures_util::future::join(
+            self.get_character_list(),
+            self.get_achievement(date_param.clone()),
+        )
+        .await;
 
         let character_list = character_list_res?;
         let achievement = achievement_res.ok();
@@ -84,7 +88,11 @@ impl<'a> UserClient<'a> {
         });
 
         let union = if let Some(name) = target_name.as_deref() {
-            self.client.union().get_by_name(name).await.ok()
+            self.client
+                .union()
+                .get_by_name_and_date(name, date_param)
+                .await
+                .ok()
         } else {
             None
         };
