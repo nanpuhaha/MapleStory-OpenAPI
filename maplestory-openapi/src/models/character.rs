@@ -3353,6 +3353,11 @@ impl CharacterHexaMatrix {
             cores,
         }
     }
+
+    /// Calculate remaining Sol Erda and Fragments required to reach maximum level (30).
+    pub fn remaining_materials_to_max(&self) -> HexaProgressionSummary {
+        self.remaining_materials(30)
+    }
 }
 
 impl CharacterHexaMatrixStat {
@@ -3394,23 +3399,46 @@ impl CharacterHexaMatrixStat {
     /// Calculate remaining Sol Erda Fragments required to upgrade all active HEXA Stat cores to `target_grade` (1..=20).
     pub fn remaining_materials(&self, target_grade: i64) -> HexaStatProgressionSummary {
         let target = target_grade.clamp(1, 20);
+        let mut total_attempts = 0i64;
         let mut total_frags = 0i64;
+        let mut total_min = 0i64;
+        let mut total_max = 0i64;
+        let mut total_expected = 0.0f64;
         let mut stat_cores_remaining = Vec::new();
 
         for slot_idx in 1..=3 {
             if let Some(core) = self.slot_core(slot_idx) {
-                let current_grade = core.stat_grade.unwrap_or(0).clamp(0, 20);
+                let main_lvl = core.main_stat_level.unwrap_or(0);
+                let sub1_lvl = core.sub_stat_level_1.unwrap_or(0);
+                let sub2_lvl = core.sub_stat_level_2.unwrap_or(0);
+                let current_grade = core
+                    .stat_grade
+                    .unwrap_or_else(|| main_lvl + sub1_lvl + sub2_lvl)
+                    .clamp(0, 20);
+
                 if current_grade < target {
-                    let mut frags = 0i64;
-                    for g in (current_grade as usize)..(target as usize) {
-                        frags += hexa_stat_step_fragments(g);
-                    }
+                    let attempts = target - current_grade;
+                    let (min_f, max_f, exp_f) = calculate_hexa_stat_cost_range(main_lvl, attempts);
+                    let frags = exp_f.round() as i64;
+
+                    total_attempts += attempts;
+                    total_min += min_f;
+                    total_max += max_f;
+                    total_expected += exp_f;
                     total_frags += frags;
+
                     stat_cores_remaining.push(HexaStatCoreProgression {
                         slot_index: slot_idx,
                         main_stat_name: core.main_stat_name.clone(),
                         current_grade,
                         target_grade: target,
+                        remaining_attempts: attempts,
+                        current_main_stat_level: main_lvl,
+                        current_sub_stat_level_1: sub1_lvl,
+                        current_sub_stat_level_2: sub2_lvl,
+                        min_fragments_remaining: min_f,
+                        max_fragments_remaining: max_f,
+                        expected_fragments_remaining: exp_f,
                         fragments_remaining: frags,
                     });
                 }
@@ -3419,9 +3447,18 @@ impl CharacterHexaMatrixStat {
 
         HexaStatProgressionSummary {
             target_grade: target,
+            total_remaining_attempts: total_attempts,
             total_fragments_remaining: total_frags,
+            min_fragments_remaining: total_min,
+            max_fragments_remaining: total_max,
+            expected_fragments_remaining: total_expected,
             stat_cores_remaining,
         }
+    }
+
+    /// Calculate remaining Sol Erda Fragments required to reach maximum grade (20).
+    pub fn remaining_materials_to_max(&self) -> HexaStatProgressionSummary {
+        self.remaining_materials(20)
     }
 }
 
@@ -3487,33 +3524,187 @@ pub struct HexaProgressionSummary {
     pub cores: Vec<HexaCoreProgression>,
 }
 
+impl HexaProgressionSummary {
+    /// Total Sol Erda required across all cores.
+    pub fn total_sol_erda(&self) -> i64 {
+        self.total_remaining.sol_erda
+    }
+
+    /// Total Sol Erda Fragments required across all cores.
+    pub fn total_sol_erda_fragments(&self) -> i64 {
+        self.total_remaining.sol_erda_fragments
+    }
+
+    /// Material cost breakdown filtered by core type (e.g. `"스킬 코어"`, `"마스터리 코어"`).
+    pub fn cost_by_type(&self, core_type: &str) -> HexaMaterials {
+        let mut total = HexaMaterials::default();
+        for c in &self.cores {
+            if c.core_type == core_type {
+                total += c.remaining;
+            }
+        }
+        total
+    }
+
+    /// Returns `true` if all equipped cores have reached or exceeded the target level.
+    pub fn is_maxed(&self) -> bool {
+        self.cores.is_empty()
+    }
+}
+
 /// Material progression summary for HEXA Stat cores.
-#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct HexaStatProgressionSummary {
     /// Target stat grade
     pub target_grade: i64,
-    /// Total Sol Erda Fragments required
+    /// Total enhancement attempts remaining across all active stat cores
+    pub total_remaining_attempts: i64,
+    /// Total Sol Erda Fragments required (expected rounded to nearest integer)
     pub total_fragments_remaining: i64,
+    /// Total minimum Sol Erda Fragments required
+    pub min_fragments_remaining: i64,
+    /// Total maximum Sol Erda Fragments required
+    pub max_fragments_remaining: i64,
+    /// Total expected Sol Erda Fragments required
+    pub expected_fragments_remaining: f64,
     /// Breakdown per active stat core
     pub stat_cores_remaining: Vec<HexaStatCoreProgression>,
 }
 
+impl HexaStatProgressionSummary {
+    /// Total Sol Erda fragments required.
+    pub fn total_fragments(&self) -> i64 {
+        self.total_fragments_remaining
+    }
+
+    /// Total minimum Sol Erda fragments required.
+    pub fn min_fragments(&self) -> i64 {
+        self.min_fragments_remaining
+    }
+
+    /// Total maximum Sol Erda fragments required.
+    pub fn max_fragments(&self) -> i64 {
+        self.max_fragments_remaining
+    }
+
+    /// Total expected Sol Erda fragments required.
+    pub fn expected_fragments(&self) -> f64 {
+        self.expected_fragments_remaining
+    }
+
+    /// Returns `true` if all active stat cores have reached or exceeded the target grade.
+    pub fn is_maxed(&self) -> bool {
+        self.stat_cores_remaining.is_empty()
+    }
+}
+
 /// Detailed material progression for an individual HEXA Stat slot core.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct HexaStatCoreProgression {
     /// Slot index (1..=3)
     pub slot_index: usize,
     /// Main stat name
     pub main_stat_name: Option<String>,
-    /// Current stat grade (sum of main and sub stat levels)
+    /// Current stat grade (sum of main and sub stat levels, 0..=20)
     pub current_grade: i64,
-    /// Target stat grade
+    /// Target stat grade (clamped 1..=20)
     pub target_grade: i64,
-    /// Fragments remaining
+    /// Enhancement attempts remaining
+    pub remaining_attempts: i64,
+    /// Current main stat level
+    pub current_main_stat_level: i64,
+    /// Current sub stat 1 level
+    pub current_sub_stat_level_1: i64,
+    /// Current sub stat 2 level
+    pub current_sub_stat_level_2: i64,
+    /// Minimum fragments required (all remaining attempts hit sub stats)
+    pub min_fragments_remaining: i64,
+    /// Maximum fragments required (remaining attempts hit main stat first)
+    pub max_fragments_remaining: i64,
+    /// Expected fragments required
+    pub expected_fragments_remaining: f64,
+    /// Fragments remaining (expected rounded to nearest integer)
     pub fragments_remaining: i64,
 }
 
 // ─── HEXA Matrix Level Tables ────────────────────────────────────────────────
+
+/// Sol Erda Fragment attempt cost for HEXA Stat based on current main stat level.
+pub fn hexa_stat_attempt_cost(main_stat_level: i64) -> i64 {
+    match main_stat_level {
+        0..=2 => 10,
+        3..=6 => 20,
+        7..=8 => 30,
+        _ => 50,
+    }
+}
+
+/// Success probability of enhancing main stat given current main stat level.
+pub fn hexa_stat_success_rate(main_stat_level: i64) -> f64 {
+    match main_stat_level {
+        0..=2 => 0.35,
+        3..=6 => 0.20,
+        7 => 0.15,
+        8 => 0.10,
+        9 => 0.05,
+        _ => 0.0,
+    }
+}
+
+/// Calculate min, max, and expected fragment cost for `attempts` remaining enhancements
+/// starting from `current_main_stat_level`.
+pub fn calculate_hexa_stat_cost_range(
+    current_main_stat_level: i64,
+    attempts: i64,
+) -> (i64, i64, f64) {
+    if attempts <= 0 {
+        return (0, 0, 0.0);
+    }
+
+    let m_clamped = current_main_stat_level.clamp(0, 10);
+
+    // 1. Minimum fragments: all attempts fail to upgrade main stat, remaining at current level
+    let min_cost = attempts * hexa_stat_attempt_cost(m_clamped);
+
+    // 2. Maximum fragments: all attempts upgrade main stat up to lv 10
+    let mut max_cost = 0i64;
+    let mut cur_m = m_clamped;
+    for _ in 0..attempts {
+        max_cost += hexa_stat_attempt_cost(cur_m);
+        if cur_m < 10 {
+            cur_m += 1;
+        }
+    }
+
+    // 3. Expected fragments using DP distribution of main stat level
+    let mut prob = [0.0f64; 11];
+    prob[m_clamped as usize] = 1.0;
+    let mut expected_cost = 0.0f64;
+
+    for _ in 0..attempts {
+        // Add expected cost for this attempt
+        for (m, &p) in prob.iter().enumerate() {
+            if p > 0.0 {
+                expected_cost += p * (hexa_stat_attempt_cost(m as i64) as f64);
+            }
+        }
+
+        // Transition to next attempt
+        let mut next_prob = [0.0f64; 11];
+        for (m, &p) in prob.iter().enumerate() {
+            if p > 0.0 {
+                let p_succ = hexa_stat_success_rate(m as i64);
+                let p_stay = 1.0 - p_succ;
+                let next_m = (m + 1).min(10);
+                next_prob[next_m] += p * p_succ;
+                next_prob[m] += p * p_stay;
+            }
+        }
+        prob = next_prob;
+    }
+
+    (min_cost, max_cost, expected_cost)
+}
 
 fn hexa_step_cost(core_type: &str, from_level: usize) -> (i64, i64) {
     if from_level >= 30 {
@@ -3525,11 +3716,11 @@ fn hexa_step_cost(core_type: &str, from_level: usize) -> (i64, i64) {
             const ERDA: [i64; 30] = [
                 5, 1, 1, 1, 2, 2, 2, 3, 3, 10,
                 3, 3, 4, 4, 4, 4, 4, 4, 5, 15,
-                4, 4, 4, 4, 5, 5, 5, 6, 6, 20,
+                5, 5, 5, 5, 5, 6, 6, 6, 7, 20,
             ];
             const FRAG: [i64; 30] = [
                 100, 30, 35, 40, 45, 50, 55, 60, 65, 200,
-                80, 90, 100, 110, 120, 130, 140, 150, 160, 300,
+                80, 90, 100, 110, 120, 130, 140, 150, 160, 350,
                 170, 180, 190, 200, 210, 220, 230, 240, 250, 500,
             ];
             (ERDA[from_level], FRAG[from_level])
@@ -3537,56 +3728,43 @@ fn hexa_step_cost(core_type: &str, from_level: usize) -> (i64, i64) {
         "마스터리 코어" => {
             const ERDA: [i64; 30] = [
                 3, 1, 1, 1, 1, 1, 1, 2, 2, 5,
-                1, 2, 2, 2, 2, 2, 2, 2, 2, 8,
-                3, 3, 3, 3, 3, 3, 4, 4, 4, 10,
+                2, 2, 2, 2, 2, 2, 2, 2, 3, 8,
+                3, 3, 3, 3, 3, 3, 3, 3, 4, 10,
             ];
             const FRAG: [i64; 30] = [
                 50, 15, 18, 20, 23, 25, 28, 30, 33, 100,
-                35, 40, 45, 50, 55, 60, 65, 70, 75, 150,
+                40, 45, 50, 55, 60, 65, 70, 75, 80, 175,
                 85, 90, 95, 100, 105, 110, 115, 120, 125, 250,
             ];
             (ERDA[from_level], FRAG[from_level])
         }
         "강화 코어" => {
             const ERDA: [i64; 30] = [
-                4, 1, 1, 1, 2, 2, 2, 2, 2, 7,
-                2, 2, 3, 3, 3, 3, 3, 3, 3, 11,
-                3, 3, 3, 3, 4, 4, 4, 4, 4, 14,
+                4, 1, 1, 1, 2, 2, 2, 3, 3, 8,
+                3, 3, 3, 3, 3, 3, 3, 3, 4, 12,
+                4, 4, 4, 4, 4, 5, 5, 5, 6, 15,
             ];
             const FRAG: [i64; 30] = [
                 75, 23, 27, 30, 34, 38, 42, 45, 49, 150,
-                53, 60, 68, 75, 83, 90, 98, 105, 113, 225,
-                120, 128, 135, 143, 150, 158, 165, 173, 180, 375,
+                60, 68, 75, 83, 90, 98, 105, 113, 120, 263,
+                128, 135, 143, 150, 158, 165, 173, 180, 188, 375,
             ];
             (ERDA[from_level], FRAG[from_level])
         }
         "공용 코어" => {
             const ERDA: [i64; 30] = [
-                7, 2, 2, 2, 3, 3, 3, 4, 4, 14,
-                4, 4, 5, 5, 5, 5, 5, 5, 6, 21,
-                5, 5, 5, 5, 6, 6, 6, 7, 7, 28,
+                7, 2, 2, 2, 3, 3, 3, 5, 5, 14,
+                5, 5, 6, 6, 6, 6, 6, 6, 7, 17,
+                7, 7, 7, 7, 7, 9, 9, 9, 10, 20,
             ];
             const FRAG: [i64; 30] = [
-                125, 38, 44, 50, 56, 63, 69, 75, 81, 250,
-                88, 100, 113, 125, 138, 150, 163, 175, 188, 375,
-                200, 213, 225, 238, 250, 263, 275, 288, 300, 625,
+                125, 38, 44, 50, 57, 63, 69, 75, 82, 300,
+                110, 124, 138, 152, 165, 179, 193, 207, 220, 525,
+                234, 248, 262, 275, 289, 303, 317, 330, 344, 750,
             ];
             (ERDA[from_level], FRAG[from_level])
         }
         _ => (0, 0),
-    }
-}
-
-fn hexa_stat_step_fragments(from_grade: usize) -> i64 {
-    match from_grade {
-        0..=3 => 10,
-        4..=6 => 20,
-        7..=9 => 30,
-        10..=12 => 40,
-        13..=15 => 50,
-        16..=18 => 60,
-        19 => 70,
-        _ => 0,
     }
 }
 

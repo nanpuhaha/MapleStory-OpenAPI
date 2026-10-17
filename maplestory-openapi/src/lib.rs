@@ -80,6 +80,7 @@ pub use models::character::{
     HexaProgressionSummary, HexaStatCore, HexaStatCoreProgression, HexaStatProgressionSummary,
     HyperStatEntry, ItemEquipmentDetail, ParsedPotentialOption, SetCountChange, SetEffectDiff,
     StarforceStatBreakdown, StatDiff, StatType, VCoreEquipment, VisibleEquipItem,
+    calculate_hexa_stat_cost_range, hexa_stat_attempt_cost, hexa_stat_success_rate,
 };
 pub use models::common::{DateParam, MapleDate, SkillGrade};
 pub use models::guild::{GuildBasic, GuildId, GuildProfile, GuildSkill};

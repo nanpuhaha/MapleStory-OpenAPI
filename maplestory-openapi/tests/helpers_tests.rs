@@ -2185,17 +2185,17 @@ fn test_character_progression_domain_helpers() {
     let origin_prog = prog.cores.iter().find(|c| c.name == "오리진 스킬").unwrap();
     assert_eq!(origin_prog.current_level, 20);
     assert_eq!(origin_prog.target_level, 30);
-    assert_eq!(origin_prog.remaining.sol_erda, 63);
+    assert_eq!(origin_prog.remaining.sol_erda, 70);
     assert_eq!(origin_prog.remaining.sol_erda_fragments, 2390);
 
     let enhance_prog = prog.cores.iter().find(|c| c.name == "미개방 코어").unwrap();
     assert_eq!(enhance_prog.current_level, 0);
     assert_eq!(enhance_prog.target_level, 30);
-    assert_eq!(enhance_prog.remaining.sol_erda, 106);
-    assert_eq!(enhance_prog.remaining.sol_erda_fragments, 3210);
+    assert_eq!(enhance_prog.remaining.sol_erda, 123);
+    assert_eq!(enhance_prog.remaining.sol_erda_fragments, 3383);
 
-    assert_eq!(prog.total_remaining.sol_erda, 63 + 106);
-    assert_eq!(prog.total_remaining.sol_erda_fragments, 2390 + 3210);
+    assert_eq!(prog.total_remaining.sol_erda, 70 + 123);
+    assert_eq!(prog.total_remaining.sol_erda_fragments, 2390 + 3383);
 
     // 2.2 HEXA Stat Remaining Materials Calculation
     let stat_prog = hexa_stat.remaining_materials(20);
@@ -2222,7 +2222,9 @@ fn test_character_progression_domain_helpers() {
     };
     let partial_stat_prog = partial_stat.remaining_materials(20);
     assert_eq!(partial_stat_prog.stat_cores_remaining.len(), 1);
-    assert_eq!(partial_stat_prog.total_fragments_remaining, 520);
+    assert_eq!(partial_stat_prog.stat_cores_remaining[0].remaining_attempts, 10);
+    assert_eq!(partial_stat_prog.stat_cores_remaining[0].min_fragments_remaining, 200);
+    assert_eq!(partial_stat_prog.stat_cores_remaining[0].max_fragments_remaining, 400);
 
     // 3. V-Matrix
     let vmatrix = CharacterVMatrix {
@@ -3579,6 +3581,269 @@ fn test_avatar_animated_webp_encoder() {
     let empty_frames: Vec<AnimationFrame> = vec![];
     assert!(encode_animated_webp(&empty_frames).is_err());
 }
+
+#[test]
+fn test_hexa_matrix_progression_calculator_all_core_types() {
+    use maplestory_openapi::models::character::{
+        CharacterHexaMatrix, CharacterHexaMatrixStat, HexaCoreEquipment, HexaStatCore,
+    };
+
+    // 1. Matrix with 4 cores at level 0 (full 0 -> 30 progression)
+    let matrix_all_zero = CharacterHexaMatrix {
+        date: None,
+        character_hexa_core_equipment: Some(vec![
+            HexaCoreEquipment {
+                hexa_core_name: Some("오리진 스킬".to_string()),
+                hexa_core_level: Some(0),
+                hexa_core_event_level: None,
+                hexa_core_type: Some("스킬 코어".to_string()),
+                linked_skill: None,
+            },
+            HexaCoreEquipment {
+                hexa_core_name: Some("마스터리 코어 I".to_string()),
+                hexa_core_level: Some(0),
+                hexa_core_event_level: None,
+                hexa_core_type: Some("마스터리 코어".to_string()),
+                linked_skill: None,
+            },
+            HexaCoreEquipment {
+                hexa_core_name: Some("강화 코어 I".to_string()),
+                hexa_core_level: Some(0),
+                hexa_core_event_level: None,
+                hexa_core_type: Some("강화 코어".to_string()),
+                linked_skill: None,
+            },
+            HexaCoreEquipment {
+                hexa_core_name: Some("솔 야누스".to_string()),
+                hexa_core_level: Some(0),
+                hexa_core_event_level: None,
+                hexa_core_type: Some("공용 코어".to_string()),
+                linked_skill: None,
+            },
+        ]),
+    };
+
+    let summary = matrix_all_zero.remaining_materials(30);
+    assert_eq!(summary.target_level, 30);
+    assert_eq!(summary.cores.len(), 4);
+
+    // Skill core (0 -> 30): 150 Sol Erda, 4500 Fragments
+    let skill_cost = summary.cost_by_type("스킬 코어");
+    assert_eq!(skill_cost.sol_erda, 150);
+    assert_eq!(skill_cost.sol_erda_fragments, 4500);
+
+    // Mastery core (0 -> 30): 83 Sol Erda, 2252 Fragments
+    let mastery_cost = summary.cost_by_type("마스터리 코어");
+    assert_eq!(mastery_cost.sol_erda, 83);
+    assert_eq!(mastery_cost.sol_erda_fragments, 2252);
+
+    // Enhancement core (0 -> 30): 123 Sol Erda, 3383 Fragments
+    let enhance_cost = summary.cost_by_type("강화 코어");
+    assert_eq!(enhance_cost.sol_erda, 123);
+    assert_eq!(enhance_cost.sol_erda_fragments, 3383);
+
+    // Common core (0 -> 30): 208 Sol Erda, 6268 Fragments
+    let common_cost = summary.cost_by_type("공용 코어");
+    assert_eq!(common_cost.sol_erda, 208);
+    assert_eq!(common_cost.sol_erda_fragments, 6268);
+
+    // Total: 150 + 83 + 123 + 208 = 564 Sol Erda, 4500 + 2252 + 3383 + 6268 = 16403 Fragments
+    assert_eq!(summary.total_sol_erda(), 564);
+    assert_eq!(summary.total_sol_erda_fragments(), 16403);
+    assert_eq!(summary.total_remaining.sol_erda, 564);
+    assert_eq!(summary.total_remaining.sol_erda_fragments, 16403);
+    assert!(!summary.is_maxed());
+
+    // 2. Matrix with 4 cores at level 1 (1 -> 30 progression, skipping 0 -> 1 unlock)
+    let matrix_all_one = CharacterHexaMatrix {
+        date: None,
+        character_hexa_core_equipment: Some(vec![
+            HexaCoreEquipment {
+                hexa_core_name: Some("오리진 스킬".to_string()),
+                hexa_core_level: Some(1),
+                hexa_core_event_level: None,
+                hexa_core_type: Some("스킬 코어".to_string()),
+                linked_skill: None,
+            },
+            HexaCoreEquipment {
+                hexa_core_name: Some("마스터리 코어 I".to_string()),
+                hexa_core_level: Some(1),
+                hexa_core_event_level: None,
+                hexa_core_type: Some("마스터리 코어".to_string()),
+                linked_skill: None,
+            },
+            HexaCoreEquipment {
+                hexa_core_name: Some("강화 코어 I".to_string()),
+                hexa_core_level: Some(1),
+                hexa_core_event_level: None,
+                hexa_core_type: Some("강화 코어".to_string()),
+                linked_skill: None,
+            },
+            HexaCoreEquipment {
+                hexa_core_name: Some("공용 스킬".to_string()),
+                hexa_core_level: Some(1),
+                hexa_core_event_level: None,
+                hexa_core_type: Some("공용 코어".to_string()),
+                linked_skill: None,
+            },
+        ]),
+    };
+
+    let summary_one = matrix_all_one.remaining_materials_to_max();
+    assert_eq!(summary_one.cost_by_type("스킬 코어").sol_erda, 145);
+    assert_eq!(summary_one.cost_by_type("스킬 코어").sol_erda_fragments, 4400);
+    assert_eq!(summary_one.cost_by_type("마스터리 코어").sol_erda, 80);
+    assert_eq!(summary_one.cost_by_type("마스터리 코어").sol_erda_fragments, 2202);
+    assert_eq!(summary_one.cost_by_type("강화 코어").sol_erda, 119);
+    assert_eq!(summary_one.cost_by_type("강화 코어").sol_erda_fragments, 3308);
+    assert_eq!(summary_one.cost_by_type("공용 코어").sol_erda, 201);
+    assert_eq!(summary_one.cost_by_type("공용 코어").sol_erda_fragments, 6143);
+    assert_eq!(summary_one.total_sol_erda(), 545);
+    assert_eq!(summary_one.total_sol_erda_fragments(), 16053);
+
+    // 3. Level 9 -> 10 milestones
+    let matrix_nine = CharacterHexaMatrix {
+        date: None,
+        character_hexa_core_equipment: Some(vec![
+            HexaCoreEquipment {
+                hexa_core_name: Some("오리진".to_string()),
+                hexa_core_level: Some(9),
+                hexa_core_event_level: None,
+                hexa_core_type: Some("스킬 코어".to_string()),
+                linked_skill: None,
+            },
+            HexaCoreEquipment {
+                hexa_core_name: Some("마스터리".to_string()),
+                hexa_core_level: Some(9),
+                hexa_core_event_level: None,
+                hexa_core_type: Some("마스터리 코어".to_string()),
+                linked_skill: None,
+            },
+            HexaCoreEquipment {
+                hexa_core_name: Some("강화".to_string()),
+                hexa_core_level: Some(9),
+                hexa_core_event_level: None,
+                hexa_core_type: Some("강화 코어".to_string()),
+                linked_skill: None,
+            },
+            HexaCoreEquipment {
+                hexa_core_name: Some("공용".to_string()),
+                hexa_core_level: Some(9),
+                hexa_core_event_level: None,
+                hexa_core_type: Some("공용 코어".to_string()),
+                linked_skill: None,
+            },
+        ]),
+    };
+    let summary_nine_to_ten = matrix_nine.remaining_materials(10);
+    assert_eq!(summary_nine_to_ten.cost_by_type("스킬 코어").sol_erda, 10);
+    assert_eq!(summary_nine_to_ten.cost_by_type("스킬 코어").sol_erda_fragments, 200);
+    assert_eq!(summary_nine_to_ten.cost_by_type("마스터리 코어").sol_erda, 5);
+    assert_eq!(summary_nine_to_ten.cost_by_type("마스터리 코어").sol_erda_fragments, 100);
+    assert_eq!(summary_nine_to_ten.cost_by_type("강화 코어").sol_erda, 8);
+    assert_eq!(summary_nine_to_ten.cost_by_type("강화 코어").sol_erda_fragments, 150);
+    assert_eq!(summary_nine_to_ten.cost_by_type("공용 코어").sol_erda, 14);
+    assert_eq!(summary_nine_to_ten.cost_by_type("공용 코어").sol_erda_fragments, 300);
+
+    // 4. Fully maxed cores
+    let matrix_maxed = CharacterHexaMatrix {
+        date: None,
+        character_hexa_core_equipment: Some(vec![
+            HexaCoreEquipment {
+                hexa_core_name: Some("오리진".to_string()),
+                hexa_core_level: Some(30),
+                hexa_core_event_level: None,
+                hexa_core_type: Some("스킬 코어".to_string()),
+                linked_skill: None,
+            },
+        ]),
+    };
+    let summary_maxed = matrix_maxed.remaining_materials(30);
+    assert_eq!(summary_maxed.total_sol_erda(), 0);
+    assert_eq!(summary_maxed.total_sol_erda_fragments(), 0);
+    assert!(summary_maxed.is_maxed());
+
+    // 5. Empty matrix
+    let matrix_empty = CharacterHexaMatrix {
+        date: None,
+        character_hexa_core_equipment: None,
+    };
+    let summary_empty = matrix_empty.remaining_materials(30);
+    assert_eq!(summary_empty.total_sol_erda(), 0);
+    assert_eq!(summary_empty.total_sol_erda_fragments(), 0);
+    assert!(summary_empty.is_maxed());
+
+    // 6. HEXA Stat Progression Calculator
+    let fresh_stat = CharacterHexaMatrixStat {
+        date: None,
+        character_class: Some("히어로".to_string()),
+        character_hexa_stat_core: Some(vec![HexaStatCore {
+            slot_id: Some("0".to_string()),
+            main_stat_name: Some("크리티컬 데미지 증가".to_string()),
+            sub_stat_name_1: Some("공격력 증가".to_string()),
+            sub_stat_name_2: Some("주력스탯 증가".to_string()),
+            main_stat_level: Some(0),
+            sub_stat_level_1: Some(0),
+            sub_stat_level_2: Some(0),
+            stat_grade: Some(0),
+        }]),
+        character_hexa_stat_core_2: None,
+        character_hexa_stat_core_3: None,
+        preset_hexa_stat_core: None,
+        preset_hexa_stat_core_2: None,
+        preset_hexa_stat_core_3: None,
+    };
+
+    let stat_summary = fresh_stat.remaining_materials_to_max();
+    assert_eq!(stat_summary.target_grade, 20);
+    assert_eq!(stat_summary.total_remaining_attempts, 20);
+    assert_eq!(stat_summary.min_fragments_remaining, 200);
+    assert_eq!(stat_summary.max_fragments_remaining, 720);
+    assert!(stat_summary.expected_fragments_remaining >= 320.0 && stat_summary.expected_fragments_remaining <= 330.0);
+    assert_eq!(stat_summary.stat_cores_remaining.len(), 1);
+    let core0 = &stat_summary.stat_cores_remaining[0];
+    assert_eq!(core0.remaining_attempts, 20);
+    assert_eq!(core0.min_fragments_remaining, 200);
+    assert_eq!(core0.max_fragments_remaining, 720);
+
+    // Multi-core stat calculation
+    let multi_stat = CharacterHexaMatrixStat {
+        date: None,
+        character_class: Some("히어로".to_string()),
+        character_hexa_stat_core: Some(vec![HexaStatCore {
+            slot_id: Some("0".to_string()),
+            main_stat_name: Some("크뎀".to_string()),
+            sub_stat_name_1: None,
+            sub_stat_name_2: None,
+            main_stat_level: Some(8),
+            sub_stat_level_1: Some(7),
+            sub_stat_level_2: Some(5),
+            stat_grade: Some(20),
+        }]),
+        character_hexa_stat_core_2: Some(vec![HexaStatCore {
+            slot_id: Some("1".to_string()),
+            main_stat_name: Some("보공".to_string()),
+            sub_stat_name_1: None,
+            sub_stat_name_2: None,
+            main_stat_level: Some(5),
+            sub_stat_level_1: Some(3),
+            sub_stat_level_2: Some(2),
+            stat_grade: Some(10),
+        }]),
+        character_hexa_stat_core_3: None,
+        preset_hexa_stat_core: None,
+        preset_hexa_stat_core_2: None,
+        preset_hexa_stat_core_3: None,
+    };
+
+    let multi_summary = multi_stat.remaining_materials(20);
+    // Core 1 is grade 20 (0 remaining), Core 2 is grade 10 (10 remaining)
+    assert_eq!(multi_summary.total_remaining_attempts, 10);
+    assert_eq!(multi_summary.min_fragments_remaining, 200);
+    assert_eq!(multi_summary.max_fragments_remaining, 400);
+    assert_eq!(multi_summary.stat_cores_remaining.len(), 1);
+}
+
 
 
 
