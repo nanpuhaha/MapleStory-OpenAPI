@@ -1,4 +1,7 @@
 use crate::cli::CompareArgs;
+use crate::ui::{
+    format_diff_colored, format_number, BOLD, BOLD_CYAN, BOLD_WHITE, DIM, RESET,
+};
 use maplestory_openapi::client::MapleStoryClient;
 use serde::Serialize;
 use std::error::Error;
@@ -81,14 +84,14 @@ pub async fn run(
         return Ok(());
     }
 
-    println!("\n==========================================================================");
-    println!(" [Spec Comparison] {} vs {}", name1, name2);
-    println!("--------------------------------------------------------------------------");
+    println!("\n{BOLD_CYAN}=========================================================================={RESET}");
+    println!(" {BOLD_WHITE}[Spec Comparison]{RESET} {BOLD}{name1}{RESET} vs {BOLD}{name2}{RESET}");
+    println!("{DIM}--------------------------------------------------------------------------{RESET}");
     println!(
         " {:<20} | {:<22} | {:<22}",
         "Attribute", name1, name2
     );
-    println!("--------------------------------------------------------------------------");
+    println!("{DIM}--------------------------------------------------------------------------{RESET}");
     println!(
         " {:<20} | {:<22} | {:<22}",
         "Class", class1, class2
@@ -98,15 +101,18 @@ pub async fn run(
         "World", world1, world2
     );
     println!(
-        " {:<20} | Lv.{:<19} | Lv.{:<19} ({:+})",
-        "Level", lvl1, lvl2, lvl2 - lvl1
+        " {:<20} | Lv.{:<19} | Lv.{:<19} ({})",
+        "Level",
+        lvl1,
+        lvl2,
+        format_diff_colored(lvl2 - lvl1)
     );
     println!(
         " {:<20} | {:>22} | {:>22} ({})",
         "Combat Power (전투력)",
         format_number(cp1),
         format_number(cp2),
-        format_diff(cp2 - cp1)
+        format_diff_colored(cp2 - cp1)
     );
     println!(
         " {:<20} | {:>21.2}% | {:>21.2}% ({:+.2}%)",
@@ -117,44 +123,59 @@ pub async fn run(
         "IED (방무)", ied1, ied2, ied2 - ied1
     );
     println!(
-        " {:<20} | {:>16} stars | {:>16} stars ({:+})",
-        "Starforce Total", sf1, sf2, sf2 - sf1
+        " {:<20} | {:>16} stars | {:>16} stars ({})",
+        "Starforce Total",
+        sf1,
+        sf2,
+        format_diff_colored(sf2 - sf1)
     );
     println!(
-        " {:<20} | {:>22} | {:>22} ({:+})",
-        "Arcane Force", af1, af2, af2 - af1
+        " {:<20} | {:>22} | {:>22} ({})",
+        "Arcane Force",
+        af1,
+        af2,
+        format_diff_colored(af2 - af1)
     );
     println!(
-        " {:<20} | {:>22} | {:>22} ({:+})",
-        "Authentic Force", aut1, aut2, aut2 - aut1
+        " {:<20} | {:>22} | {:>22} ({})",
+        "Authentic Force",
+        aut1,
+        aut2,
+        format_diff_colored(aut2 - aut1)
     );
-    println!("==========================================================================\n");
+
+    // Slot-by-slot equipment comparison
+    println!("{DIM}--------------------------------------------------------------------------{RESET}");
+    println!(" {BOLD_WHITE}[Key Equipment Slots Comparison]{RESET}");
+    println!("{DIM}--------------------------------------------------------------------------{RESET}");
+    let key_slots = ["무기", "모자", "상의", "하의", "장갑", "신발", "망토"];
+    for &slot in &key_slots {
+        let item1 = dash1.item_equipment.item_equipment.as_deref().unwrap_or(&[])
+            .iter()
+            .find(|i| i.item_equipment_slot.as_deref() == Some(slot) || i.item_equipment_part.as_deref() == Some(slot));
+        let item2 = dash2.item_equipment.item_equipment.as_deref().unwrap_or(&[])
+            .iter()
+            .find(|i| i.item_equipment_slot.as_deref() == Some(slot) || i.item_equipment_part.as_deref() == Some(slot));
+
+        let desc1 = item1.map(|i| {
+            let n = i.item_name.as_deref().unwrap_or("Unknown");
+            let sf = i.starforce.as_deref().unwrap_or("0");
+            format!("{} ({}★)", n, sf)
+        }).unwrap_or_else(|| "-".to_string());
+
+        let desc2 = item2.map(|i| {
+            let n = i.item_name.as_deref().unwrap_or("Unknown");
+            let sf = i.starforce.as_deref().unwrap_or("0");
+            format!("{} ({}★)", n, sf)
+        }).unwrap_or_else(|| "-".to_string());
+
+        println!(
+            " {:<20} | {:<22} | {:<22}",
+            slot, desc1, desc2
+        );
+    }
+
+    println!("{BOLD_CYAN}=========================================================================={RESET}\n");
 
     Ok(())
-}
-
-fn format_diff(diff: i64) -> String {
-    if diff > 0 {
-        format!("+{}", format_number(diff))
-    } else if diff < 0 {
-        format!("-{}", format_number(diff.abs()))
-    } else {
-        "0".to_string()
-    }
-}
-
-fn format_number(n: i64) -> String {
-    if n >= 100_000_000 {
-        let eok = n / 100_000_000;
-        let man = (n % 100_000_000) / 10_000;
-        if man > 0 {
-            format!("{}억 {:04}만", eok, man)
-        } else {
-            format!("{}억", eok)
-        }
-    } else if n >= 10_000 {
-        format!("{}만", n / 10_000)
-    } else {
-        n.to_string()
-    }
 }

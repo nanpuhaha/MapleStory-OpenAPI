@@ -1,4 +1,5 @@
 use crate::cli::CharArgs;
+use crate::ui::{format_number, BOLD, BOLD_CYAN, BOLD_GREEN, BOLD_WHITE, BOLD_YELLOW, DIM, RESET};
 use maplestory_openapi::client::MapleStoryClient;
 use std::error::Error;
 
@@ -23,22 +24,22 @@ pub async fn run(
     let world = basic.world_name.as_deref().unwrap_or("Unknown");
     let guild = basic.character_guild_name.as_deref().unwrap_or("None");
 
-    println!("\n========================================================");
-    println!(" [Character] {} (Lv.{} {})", name, level, class);
-    println!(" World: {} | Guild: {}", world, guild);
-    println!("--------------------------------------------------------");
+    println!("\n{BOLD_CYAN}========================================================{RESET}");
+    println!(" {BOLD_WHITE}[Character]{RESET} {BOLD}{name}{RESET} ({BOLD_YELLOW}Lv.{level}{RESET} {class})");
+    println!(" {DIM}World:{RESET} {world} | {DIM}Guild:{RESET} {guild}");
+    println!("{DIM}--------------------------------------------------------{RESET}");
 
     let combat = dashboard.combat_analytics();
-    println!(" [Combat & Stats]");
-    println!("   Combat Power (전투력) : {:>12}", format_number(combat.combat_power));
+    println!(" {BOLD_WHITE}[Combat & Stats]{RESET}");
+    println!("   Combat Power (전투력) : {BOLD_GREEN}{:>12}{RESET}", format_number(combat.combat_power));
     println!("   Damage                : {:>11.2}%", combat.damage);
     println!("   Boss Damage           : {:>11.2}%", combat.boss_damage);
     println!("   Ignore Enemy DEF (IED): {:>11.2}%", combat.ignore_monster_armor);
     println!("   Critical Damage       : {:>11.2}%", combat.critical_damage);
     println!("   Critical Rate         : {:>11.2}%", combat.critical_rate);
-    println!("--------------------------------------------------------");
-    println!(" [Force & Equipment]");
-    println!("   Starforce Total       : {:>12} stars", combat.total_starforce);
+    println!("{DIM}--------------------------------------------------------{RESET}");
+    println!(" {BOLD_WHITE}[Force & Equipment]{RESET}");
+    println!("   Starforce Total       : {BOLD_YELLOW}{:>12} stars{RESET}", combat.total_starforce);
     println!("   Arcane Force          : {:>12}", combat.arcane_force);
     println!("   Authentic Force       : {:>12}", combat.authentic_force);
     if let Some(floor) = combat.dojang_best_floor {
@@ -48,8 +49,8 @@ pub async fn run(
     if let Some(hexa) = &dashboard.hexa_matrix {
         let remaining = hexa.remaining_materials(30);
         let cores = hexa.character_hexa_core_equipment.as_deref().unwrap_or(&[]);
-        println!("--------------------------------------------------------");
-        println!(" [6th Job HEXA Matrix Progression (Target: Lv.30)]");
+        println!("{DIM}--------------------------------------------------------{RESET}");
+        println!(" {BOLD_WHITE}[6th Job HEXA Matrix Progression (Target: Lv.30)]{RESET}");
         println!(
             "   Cores Active: {} (Maxed: {})",
             cores.len(),
@@ -62,31 +63,15 @@ pub async fn run(
     }
 
     if let Some(union) = &dashboard.union {
-        println!("--------------------------------------------------------");
+        println!("{DIM}--------------------------------------------------------{RESET}");
         println!(
-            " [Union Raider] Total Level: {} (Grade: {})",
+            " {BOLD_WHITE}[Union Raider]{RESET} Total Level: {} (Grade: {})",
             union.union_level.unwrap_or(0),
             union.union_grade.as_deref().unwrap_or("None")
         );
     }
 
-    println!("========================================================\n");
+    println!("{BOLD_CYAN}========================================================{RESET}\n");
 
     Ok(())
-}
-
-fn format_number(n: i64) -> String {
-    if n >= 100_000_000 {
-        let eok = n / 100_000_000;
-        let man = (n % 100_000_000) / 10_000;
-        if man > 0 {
-            format!("{}억 {:04}만", eok, man)
-        } else {
-            format!("{}억", eok)
-        }
-    } else if n >= 10_000 {
-        format!("{}만", n / 10_000)
-    } else {
-        n.to_string()
-    }
 }

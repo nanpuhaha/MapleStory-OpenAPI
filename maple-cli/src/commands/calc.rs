@@ -1,4 +1,5 @@
 use crate::cli::StarforceArgs;
+use crate::ui::{format_mesos, BOLD_CYAN, BOLD_GREEN, BOLD_WHITE, BOLD_YELLOW, DIM, RESET};
 use maplestory_openapi::models::calculator::{StarforceCalculator, StarforceOptions};
 use std::error::Error;
 
@@ -19,12 +20,12 @@ pub fn run_starforce(args: &StarforceArgs) -> Result<(), Box<dyn Error + Send + 
         return Ok(());
     }
 
-    println!("\n========================================================");
+    println!("\n{BOLD_CYAN}========================================================{RESET}");
     println!(
-        " [Starforce Calculator] Lv.{} Equipment ({}★ -> {}★)",
+        " {BOLD_WHITE}[Starforce Calculator]{RESET} Lv.{} Equipment ({BOLD_YELLOW}{}★ -> {}★{RESET})",
         args.level, args.from, args.to
     );
-    println!("--------------------------------------------------------");
+    println!("{DIM}--------------------------------------------------------{RESET}");
     println!(" Applied Modifiers:");
     println!(
         "   - Starcatch (+5%): {}",
@@ -42,10 +43,10 @@ pub fn run_starforce(args: &StarforceArgs) -> Result<(), Box<dyn Error + Send + 
         "   - 1+1 Event (<=10★): {}",
         if args.event1plus1 { "Enabled" } else { "Disabled" }
     );
-    println!("--------------------------------------------------------");
-    println!(" [Expected Results]");
+    println!("{DIM}--------------------------------------------------------{RESET}");
+    println!(" {BOLD_WHITE}[Expected Results]{RESET}");
     println!(
-        "   Expected Meso Cost     : {:>14}",
+        "   Expected Meso Cost     : {BOLD_GREEN}{:>14}{RESET}",
         format_mesos(estimate.expected_meso_cost as u64)
     );
     println!(
@@ -60,8 +61,8 @@ pub fn run_starforce(args: &StarforceArgs) -> Result<(), Box<dyn Error + Send + 
         "   Zero-Boom Probability  : {:>13.1}%",
         estimate.no_destruction_probability * 100.0
     );
-    println!("--------------------------------------------------------");
-    println!(" [Percentile Distribution (Budget Planning)]");
+    println!("{DIM}--------------------------------------------------------{RESET}");
+    println!(" {BOLD_WHITE}[Percentile Distribution (Budget Planning)]{RESET}");
     println!(
         "   10% Lucky Run (하위 10%) : {:>14}",
         format_mesos(estimate.percentile_10_cost)
@@ -74,23 +75,7 @@ pub fn run_starforce(args: &StarforceArgs) -> Result<(), Box<dyn Error + Send + 
         "   90% Unlucky Run (상위 10%): {:>14}",
         format_mesos(estimate.percentile_90_cost)
     );
-    println!("========================================================\n");
+    println!("{BOLD_CYAN}========================================================{RESET}\n");
 
     Ok(())
-}
-
-fn format_mesos(mesos: u64) -> String {
-    if mesos >= 100_000_000 {
-        let eok = mesos / 100_000_000;
-        let man = (mesos % 100_000_000) / 10_000;
-        if man > 0 {
-            format!("{}억 {:04}만 메소", eok, man)
-        } else {
-            format!("{}억 메소", eok)
-        }
-    } else if mesos >= 10_000 {
-        format!("{}만 메소", mesos / 10_000)
-    } else {
-        format!("{} 메소", mesos)
-    }
 }

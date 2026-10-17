@@ -32,9 +32,17 @@ impl<'a> AvatarClient<'a> {
         width: Option<u32>,
         height: Option<u32>,
     ) -> Result<Vec<AnimationFrame>> {
-        let frame_specs = avatar_code.animation_frame_urls(preset, width, height);
+        let frames = preset.frames();
 
-        let fetch_futures = frame_specs.into_iter().map(|(url, delay_ms)| {
+        let fetch_futures = frames.into_iter().map(|frame| {
+            let mut query = crate::avatar::AvatarLookQuery::new()
+                .action(frame.action.clone())
+                .emotion(frame.emotion.clone())
+                .weapon_motion(frame.wmotion.clone());
+            if let (Some(w), Some(h)) = (width, height) {
+                query = query.size(w, h);
+            }
+            let url = avatar_code.to_look_url(&query);
             let http = self.client.http.clone();
             async move {
                 let resp = http.get(&url).send().await?;
@@ -46,24 +54,16 @@ impl<'a> AvatarClient<'a> {
                     )));
                 }
                 let bytes = resp.bytes().await?.to_vec();
-                Ok::<_, MapleStoryError>(
-                    AnimationFrame::new(
-                        crate::avatar::AvatarAction::Stand1,
-                        crate::avatar::AvatarEmotion::Default,
-                        crate::avatar::WeaponMotion::Default,
-                        delay_ms,
-                    )
-                    .with_image(bytes),
-                )
+                Ok::<_, MapleStoryError>(frame.with_image(bytes))
             }
         });
 
         let results = futures_util::future::join_all(fetch_futures).await;
-        let mut frames = Vec::with_capacity(results.len());
+        let mut loaded_frames = Vec::with_capacity(results.len());
         for res in results {
-            frames.push(res?);
+            loaded_frames.push(res?);
         }
-        Ok(frames)
+        Ok(loaded_frames)
     }
 
     /// Fetches all frames of an animation preset for the given avatar code,
