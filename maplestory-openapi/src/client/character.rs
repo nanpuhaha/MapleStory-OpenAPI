@@ -17,6 +17,7 @@ use crate::{
         CharacterSymbolEquipment, CharacterVMatrix, DashboardOptions, DashboardSection,
         RingExchangeSkillEquipment, RingReserveSkillEquipment,
     },
+    models::batch::{BatchFailure, BatchResult},
     models::common::{DateParam, SkillGrade},
 };
 
@@ -1424,4 +1425,100 @@ impl<'a> CharacterClient<'a> {
             .render_gif_by_name(character_name, preset, width, height)
             .await
     }
+
+    /// Concurrently fetch comprehensive character profiles for multiple character names.
+    ///
+    /// Respects the client's configured concurrency limit (`max_concurrency`) using
+    /// stream buffer concurrency, and captures individual errors without aborting the batch.
+    pub async fn fetch_batch<I, S>(&self, names: I) -> BatchResult<CharacterProfile>
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<str>,
+    {
+        self.fetch_batch_with_date(names, None).await
+    }
+
+    /// Concurrently fetch comprehensive character profiles for multiple character names as of a specific date.
+    pub async fn fetch_batch_with_date<I, S>(
+        &self,
+        names: I,
+        date: impl Into<DateParam>,
+    ) -> BatchResult<CharacterProfile>
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<str>,
+    {
+        use futures_util::stream::StreamExt;
+
+        let name_list: Vec<String> = names
+            .into_iter()
+            .map(|s| s.as_ref().trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect();
+
+        if name_list.is_empty() {
+            return BatchResult::default();
+        }
+
+        let concurrency = self.client.max_concurrency().max(1);
+        let date_param = date.into();
+        let date_str = date_param.as_deref().map(|s| s.to_string());
+
+        let results: Vec<std::result::Result<CharacterProfile, BatchFailure>> =
+            futures_util::stream::iter(name_list)
+                .map(|name| {
+                    let client = self.client;
+                    let date_clone = date_str.clone();
+                    async move {
+                        let res = match client.get_ocid(&name).await {
+                            Ok(ocid) => {
+                                client
+                                    .get_character_profile(&ocid, date_clone.as_deref())
+                                    .await
+                            }
+                            Err(e) => Err(e),
+                        };
+                        match res {
+                            Ok(profile) => Ok(profile),
+                            Err(error) => Err(BatchFailure { name, error }),
+                        }
+                    }
+                })
+                .buffer_unordered(concurrency)
+                .collect()
+                .await;
+
+        let mut successful = Vec::with_capacity(results.len());
+        let mut failed = Vec::new();
+
+        for item in results {
+            match item {
+                Ok(profile) => successful.push(profile),
+                Err(failure) => failed.push(failure),
+            }
+        }
+
+        BatchResult { successful, failed }
+    }
+
+    /// Alias for [`fetch_batch`].
+    pub async fn fetch_character_batch<I, S>(&self, names: I) -> BatchResult<CharacterProfile>
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<str>,
+    {
+        self.fetch_batch(names).await
+    }
 }
+
+impl MapleStoryClient {
+    /// Concurrently fetch comprehensive character profiles for multiple character names.
+    pub async fn fetch_character_batch<I, S>(&self, names: I) -> BatchResult<CharacterProfile>
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<str>,
+    {
+        self.character().fetch_batch(names).await
+    }
+}
+

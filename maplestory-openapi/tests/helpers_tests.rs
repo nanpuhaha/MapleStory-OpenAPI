@@ -33,7 +33,9 @@ where
                 let (status, body, retry_after) = handler(&req_text);
                 let status_str = match status {
                     200 => "200 OK",
+                    400 => "400 Bad Request",
                     401 => "401 Unauthorized",
+                    404 => "404 Not Found",
                     429 => "429 Too Many Requests",
                     503 => "503 Service Unavailable",
                     _ => "200 OK",
@@ -2610,12 +2612,12 @@ async fn test_avatar_client_pipeline_and_custom_frames() {
     let code_str = "ABCD".repeat(32);
     let avatar_code = AvatarCode::new(&code_str);
 
-    let frame = FrameConfig {
-        action: AvatarAction::Stand1,
-        emotion: AvatarEmotion::Default,
-        wmotion: WeaponMotion::Default,
-        delay_ms: 500,
-    };
+    let frame = FrameConfig::new(
+        AvatarAction::Stand1,
+        AvatarEmotion::Default,
+        WeaponMotion::Default,
+        500,
+    );
 
     // Verify avatar pipeline URL construction and frame query formatting
     let mut query = maplestory_openapi::avatar::AvatarLookQuery::default()
@@ -3271,6 +3273,267 @@ async fn test_disk_identity_cache_with_maplestory_client_persistence() {
     server_task.abort();
     let _ = std::fs::remove_dir_all(&temp_dir);
 }
+
+#[test]
+fn test_batch_result_helpers() {
+    use maplestory_openapi::{BatchFailure, BatchResult, MapleStoryError};
+
+    let empty: BatchResult<String> = BatchResult::default();
+    assert!(empty.is_all_successful());
+    assert_eq!(empty.success_rate(), 1.0);
+    assert_eq!(empty.total_count(), 0);
+    assert!(!empty.has_failures());
+
+    let res: BatchResult<i32> = BatchResult {
+        successful: vec![10, 20, 30],
+        failed: vec![BatchFailure {
+            name: "fail1".to_string(),
+            error: MapleStoryError::CharacterNotFound {
+                name: "fail1".to_string(),
+            },
+        }],
+    };
+    assert!(!res.is_all_successful());
+    assert!(res.has_failures());
+    assert_eq!(res.total_count(), 4);
+    assert_eq!(res.success_rate(), 0.75);
+
+    let all_failed: BatchResult<i32> = BatchResult {
+        successful: vec![],
+        failed: vec![
+            BatchFailure {
+                name: "f1".to_string(),
+                error: MapleStoryError::InvalidParameter("err1".to_string()),
+            },
+            BatchFailure {
+                name: "f2".to_string(),
+                error: MapleStoryError::InvalidParameter("err2".to_string()),
+            },
+        ],
+    };
+    assert!(!all_failed.is_all_successful());
+    assert_eq!(all_failed.success_rate(), 0.0);
+    assert_eq!(all_failed.total_count(), 2);
+}
+
+#[tokio::test]
+async fn test_character_fetch_batch_and_partial_failures() {
+    use maplestory_openapi::MapleStoryClient;
+
+    let (base_url, server_task) = spawn_mock_server(|req_text| {
+        if req_text.contains("/maplestory/v1/id?character_name=hero") {
+            (200, r#"{"ocid":"ocid-hero"}"#.to_string(), None)
+        } else if req_text.contains("/maplestory/v1/id?character_name=paladin") {
+            (200, r#"{"ocid":"ocid-paladin"}"#.to_string(), None)
+        } else if req_text.contains("/maplestory/v1/id?character_name=ghost") {
+            (
+                400,
+                r#"{"error":{"name":"OPENAPI00003","message":"Please input valid character name."}}"#.to_string(),
+                None,
+            )
+        } else if req_text.contains("/maplestory/v1/character/basic") {
+            (200, r#"{"character_name":"hero","character_class":"히어로","character_level":260}"#.to_string(), None)
+        } else if req_text.contains("/maplestory/v1/character/stat") {
+            (200, r#"{"final_stat":[{"stat_name":"전투력","stat_value":"50000000"}]}"#.to_string(), None)
+        } else if req_text.contains("/maplestory/v1/character/item-equipment") {
+            (200, r#"{"item_equipment":[]}"#.to_string(), None)
+        } else if req_text.contains("/maplestory/v1/character/cashitem-equipment") {
+            (200, r#"{"cash_item_equipment_base":[]}"#.to_string(), None)
+        } else if req_text.contains("/maplestory/v1/character/beauty-equipment") {
+            (200, r#"{"character_hair":{"hair_name":"검은색"}}"#.to_string(), None)
+        } else if req_text.contains("/maplestory/v1/character/popularity") {
+            (200, r#"{"popularity":100}"#.to_string(), None)
+        } else if req_text.contains("/maplestory/v1/character/dojang") {
+            (200, r#"{"dojang_best_floor":60}"#.to_string(), None)
+        } else if req_text.contains("/maplestory/v1/guild/id") {
+            (200, r#"{"oguild_id":"oguild-test"}"#.to_string(), None)
+        } else if req_text.contains("/maplestory/v1/guild/basic") {
+            (200, r#"{"guild_name":"testguild","guild_member":["hero","ghost"]}"#.to_string(), None)
+        } else {
+            (404, r#"{"error":{"name":"OPENAPI00004","message":"Not found"}}"#.to_string(), None)
+        }
+    })
+    .await;
+
+    let client = MapleStoryClient::builder()
+        .api_key("test-key")
+        .base_url(&base_url)
+        .max_concurrency(5)
+        .build()
+        .unwrap();
+
+    // 1. Fetch batch with 2 characters (1 success, 1 failure)
+    let batch_res = client
+        .character()
+        .fetch_batch(["hero", "ghost"])
+        .await;
+
+    assert_eq!(batch_res.total_count(), 2);
+    assert_eq!(batch_res.successful.len(), 1);
+    assert_eq!(batch_res.failed.len(), 1);
+    assert_eq!(batch_res.success_rate(), 0.5);
+    assert!(!batch_res.is_all_successful());
+    assert!(batch_res.has_failures());
+
+    let success_char = &batch_res.successful[0];
+    assert_eq!(success_char.basic.character_name.as_deref(), Some("hero"));
+
+    let failure_char = &batch_res.failed[0];
+    assert_eq!(failure_char.name, "ghost");
+
+    // 2. Fetch guild roster profiles
+    let roster_res = client
+        .guild()
+        .fetch_roster_profiles("testguild", "luna")
+        .await
+        .unwrap();
+
+    assert_eq!(roster_res.total_count(), 2);
+    assert_eq!(roster_res.successful.len(), 1);
+    assert_eq!(roster_res.failed.len(), 1);
+    assert_eq!(roster_res.successful[0].basic.character_name.as_deref(), Some("hero"));
+
+    server_task.abort();
+}
+
+#[cfg(feature = "animation")]
+#[test]
+fn test_avatar_spritesheet_packer() {
+    use maplestory_openapi::{
+        encode_spritesheet, AnimationFrame, AvatarAction, AvatarEmotion, WeaponMotion,
+    };
+
+    fn create_frame(r: u8, g: u8, b: u8, a: u8, width: u32, height: u32, delay_ms: u32) -> AnimationFrame {
+        let mut img = image::RgbaImage::new(width, height);
+        for pixel in img.pixels_mut() {
+            *pixel = image::Rgba([r, g, b, a]);
+        }
+        let mut png_bytes = Vec::new();
+        img.write_to(
+            &mut std::io::Cursor::new(&mut png_bytes),
+            image::ImageFormat::Png,
+        )
+        .unwrap();
+
+        AnimationFrame {
+            action: AvatarAction::Stand1,
+            emotion: AvatarEmotion::Default,
+            wmotion: WeaponMotion::Default,
+            delay_ms,
+            image_bytes: png_bytes,
+        }
+    }
+
+    let frames = vec![
+        create_frame(255, 0, 0, 255, 32, 32, 200),
+        create_frame(0, 255, 0, 255, 32, 32, 300),
+        create_frame(0, 0, 255, 255, 32, 32, 400),
+        create_frame(255, 255, 0, 255, 32, 32, 500),
+    ];
+
+    // 1. Pack with 2 columns (2x2 grid)
+    let output = encode_spritesheet(&frames, Some(2)).expect("spritesheet packing should succeed");
+    assert_eq!(output.atlas.width, 64);
+    assert_eq!(output.atlas.height, 64);
+    assert_eq!(output.atlas.columns, 2);
+    assert_eq!(output.atlas.rows, 2);
+    assert_eq!(output.atlas.frame_count, 4);
+    assert_eq!(output.atlas.frames.len(), 4);
+
+    assert_eq!(output.atlas.frames[0].x, 0);
+    assert_eq!(output.atlas.frames[0].y, 0);
+    assert_eq!(output.atlas.frames[0].width, 32);
+    assert_eq!(output.atlas.frames[0].height, 32);
+    assert_eq!(output.atlas.frames[0].delay_ms, 200);
+
+    assert_eq!(output.atlas.frames[1].x, 32);
+    assert_eq!(output.atlas.frames[1].y, 0);
+    assert_eq!(output.atlas.frames[1].delay_ms, 300);
+
+    assert_eq!(output.atlas.frames[2].x, 0);
+    assert_eq!(output.atlas.frames[2].y, 32);
+    assert_eq!(output.atlas.frames[2].delay_ms, 400);
+
+    assert_eq!(output.atlas.frames[3].x, 32);
+    assert_eq!(output.atlas.frames[3].y, 32);
+    assert_eq!(output.atlas.frames[3].delay_ms, 500);
+
+    // PNG image validation
+    assert!(output.image_bytes.starts_with(b"\x89PNG\r\n\x1a\n"));
+    let decoded = image::load_from_memory(&output.image_bytes).expect("packed PNG must be decodable");
+    assert_eq!(decoded.width(), 64);
+    assert_eq!(decoded.height(), 64);
+
+    // JSON serialization validation
+    let json = output.to_json().expect("atlas to JSON should succeed");
+    assert!(json.contains("\"columns\":2"));
+    assert!(json.contains("\"frame_count\":4"));
+
+    // 2. Default columns calculation (None -> ceil(sqrt(4)) = 2)
+    let output_default = encode_spritesheet(&frames, None).unwrap();
+    assert_eq!(output_default.atlas.columns, 2);
+
+    // 3. Error case: empty frames
+    let empty_frames: Vec<AnimationFrame> = vec![];
+    assert!(encode_spritesheet(&empty_frames, Some(2)).is_err());
+}
+
+#[cfg(feature = "animation")]
+#[test]
+fn test_avatar_animated_webp_encoder() {
+    use maplestory_openapi::{
+        encode_animated_webp, AnimationFrame, AvatarAction, AvatarEmotion, WeaponMotion,
+    };
+
+    fn create_frame(r: u8, g: u8, b: u8, a: u8, width: u32, height: u32, delay_ms: u32) -> AnimationFrame {
+        let mut img = image::RgbaImage::new(width, height);
+        for pixel in img.pixels_mut() {
+            *pixel = image::Rgba([r, g, b, a]);
+        }
+        let mut png_bytes = Vec::new();
+        img.write_to(
+            &mut std::io::Cursor::new(&mut png_bytes),
+            image::ImageFormat::Png,
+        )
+        .unwrap();
+
+        AnimationFrame {
+            action: AvatarAction::Stand1,
+            emotion: AvatarEmotion::Default,
+            wmotion: WeaponMotion::Default,
+            delay_ms,
+            image_bytes: png_bytes,
+        }
+    }
+
+    let frames = vec![
+        create_frame(255, 0, 0, 128, 32, 32, 250),
+        create_frame(0, 0, 255, 255, 32, 32, 250),
+    ];
+
+    let webp_bytes = encode_animated_webp(&frames).expect("webp encoding should succeed");
+
+    // RIFF & WebP VP8X header validation
+    assert!(webp_bytes.len() > 32);
+    assert_eq!(&webp_bytes[0..4], b"RIFF");
+    assert_eq!(&webp_bytes[8..12], b"WEBP");
+    assert_eq!(&webp_bytes[12..16], b"VP8X");
+
+    // Flags byte at offset 20: animation flag (bit 1) must be set
+    let flags = webp_bytes[20];
+    assert_ne!(flags & 0x02, 0, "Animation flag must be set in VP8X chunk");
+
+    // Must contain ANIM and ANMF chunks
+    let webp_str = String::from_utf8_lossy(&webp_bytes);
+    assert!(webp_str.contains("ANIM"), "WebP should contain ANIM chunk");
+    assert!(webp_str.contains("ANMF"), "WebP should contain ANMF chunk");
+
+    // Empty frames error
+    let empty_frames: Vec<AnimationFrame> = vec![];
+    assert!(encode_animated_webp(&empty_frames).is_err());
+}
+
+
 
 
 

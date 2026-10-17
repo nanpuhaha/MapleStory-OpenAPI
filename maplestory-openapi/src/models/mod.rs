@@ -1,6 +1,7 @@
 // src/models/mod.rs
 //! Response model types for the MapleStory OpenAPI.
 
+pub mod batch;
 pub mod battle_practice;
 pub mod calculator;
 pub mod character;
@@ -13,6 +14,7 @@ pub mod scheduler;
 pub mod union;
 pub mod user;
 
+pub use batch::*;
 pub use battle_practice::*;
 pub use calculator::*;
 pub use character::*;

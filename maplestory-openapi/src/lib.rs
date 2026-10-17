@@ -48,10 +48,10 @@ pub mod error;
 pub mod models;
 
 #[cfg(feature = "animation")]
-pub use avatar::encode_animated_gif;
+pub use avatar::{encode_animated_gif, encode_animated_webp, encode_spritesheet};
 pub use avatar::{
     AnimationFrame, AnimationPreset, AvatarAction, AvatarCode, AvatarEmotion, AvatarLookQuery,
-    WeaponMotion,
+    SpritesheetAtlas, SpritesheetFrame, SpritesheetOutput, WeaponMotion,
 };
 #[cfg(not(target_arch = "wasm32"))]
 pub use client::DiskIdentityCache;
@@ -61,6 +61,7 @@ pub use client::{
     SchedulerClient, UnionClient, UserClient, DEFAULT_BASE_URL, MIN_DATE,
 };
 pub use error::{MapleStoryError, Result};
+pub use models::batch::{BatchFailure, BatchResult};
 pub use models::battle_practice::{
     BattlePracticeCharacterInfo, BattlePracticeResult, ReplayId, SkillTimeline,
 };

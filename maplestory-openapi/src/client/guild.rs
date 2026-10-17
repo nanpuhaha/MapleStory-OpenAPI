@@ -4,6 +4,8 @@
 use crate::{
     client::MapleStoryClient,
     error::{MapleStoryError, Result},
+    models::batch::BatchResult,
+    models::character::CharacterProfile,
     models::common::DateParam,
     models::guild::{GuildBasic, GuildId},
 };
@@ -163,6 +165,31 @@ impl<'a> GuildClient<'a> {
             member_combat_powers,
         ))
     }
+
+    /// Concurrently retrieve full character profiles for all members of a guild.
+    ///
+    /// First retrieves the guild basic roster, then concurrently collects each member's
+    /// [`CharacterProfile`] using [`CharacterClient::fetch_batch`].
+    pub async fn fetch_roster_profiles(
+        &self,
+        guild_name: &str,
+        world_name: &str,
+    ) -> Result<BatchResult<CharacterProfile>> {
+        self.fetch_roster_profiles_with_date(guild_name, world_name, None)
+            .await
+    }
+
+    /// Concurrently retrieve full character profiles for all members of a guild for a specific date.
+    pub async fn fetch_roster_profiles_with_date(
+        &self,
+        guild_name: &str,
+        world_name: &str,
+        date: impl Into<DateParam>,
+    ) -> Result<BatchResult<CharacterProfile>> {
+        let basic = self.get_by_name(guild_name, world_name, date).await?;
+        let member_names = basic.guild_member.unwrap_or_default();
+        Ok(self.client.character().fetch_batch(member_names).await)
+    }
 }
 
 impl MapleStoryClient {
@@ -240,5 +267,14 @@ impl MapleStoryClient {
         self.guild()
             .get_profile_with_members(guild_name, world_name, date, fetch_members)
             .await
+    }
+
+    /// Concurrently retrieve full character profiles for all members of a guild.
+    pub async fn fetch_guild_roster_profiles(
+        &self,
+        guild_name: &str,
+        world_name: &str,
+    ) -> Result<BatchResult<CharacterProfile>> {
+        self.guild().fetch_roster_profiles(guild_name, world_name).await
     }
 }

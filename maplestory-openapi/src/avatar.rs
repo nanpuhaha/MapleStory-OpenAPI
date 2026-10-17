@@ -198,6 +198,239 @@ pub fn encode_animated_gif(frames_data: &[(Vec<u8>, u32)]) -> crate::Result<Vec<
     Ok(buffer)
 }
 
+/// Metadata description of a packed spritesheet atlas.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SpritesheetAtlas {
+    pub width: u32,
+    pub height: u32,
+    pub columns: u32,
+    pub rows: u32,
+    pub frame_count: usize,
+    pub frames: Vec<SpritesheetFrame>,
+}
+
+/// Metadata description of a single frame entry within a spritesheet.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SpritesheetFrame {
+    pub index: usize,
+    pub x: u32,
+    pub y: u32,
+    pub width: u32,
+    pub height: u32,
+    pub delay_ms: u32,
+    pub action: AvatarAction,
+    pub emotion: AvatarEmotion,
+    pub wmotion: WeaponMotion,
+}
+
+/// Combined container holding spritesheet image bytes and atlas metadata.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SpritesheetOutput {
+    pub atlas: SpritesheetAtlas,
+    pub image_bytes: Vec<u8>,
+}
+
+impl SpritesheetOutput {
+    /// Serialize the atlas metadata to a compact JSON string.
+    pub fn to_json(&self) -> crate::Result<String> {
+        serde_json::to_string(&self.atlas)
+            .map_err(|e| crate::MapleStoryError::ParseError(e.to_string()))
+    }
+
+    /// Serialize the atlas metadata to pretty-printed JSON.
+    pub fn to_json_pretty(&self) -> crate::Result<String> {
+        serde_json::to_string_pretty(&self.atlas)
+            .map_err(|e| crate::MapleStoryError::ParseError(e.to_string()))
+    }
+}
+
+/// Packs multiple avatar animation frames into a single 2D grid spritesheet PNG image and atlas metadata.
+///
+/// Available when the `animation` feature is enabled.
+#[cfg(feature = "animation")]
+pub fn encode_spritesheet(
+    frames: &[AnimationFrame],
+    columns: Option<u32>,
+) -> crate::Result<SpritesheetOutput> {
+    if frames.is_empty() {
+        return Err(crate::MapleStoryError::InvalidParameter(
+            "Animation frames cannot be empty for spritesheet generation".to_string(),
+        ));
+    }
+
+    let mut decoded_images = Vec::with_capacity(frames.len());
+    for frame in frames {
+        let img = image::load_from_memory(&frame.image_bytes).map_err(|e| {
+            crate::MapleStoryError::Other(format!("Failed to decode frame for spritesheet: {e}"))
+        })?;
+        decoded_images.push(img.to_rgba8());
+    }
+
+    let max_frame_w = decoded_images.iter().map(|img| img.width()).max().unwrap_or(0);
+    let max_frame_h = decoded_images.iter().map(|img| img.height()).max().unwrap_or(0);
+    let frame_count = frames.len();
+    let cols = columns
+        .unwrap_or_else(|| (frame_count as f64).sqrt().ceil().max(1.0) as u32)
+        .max(1);
+    let rows = (frame_count as u32).div_ceil(cols);
+    let sheet_w = cols * max_frame_w;
+    let sheet_h = rows * max_frame_h;
+
+    let mut sheet = image::RgbaImage::new(sheet_w, sheet_h);
+    let mut atlas_frames = Vec::with_capacity(frame_count);
+
+    for (i, (frame, img)) in frames.iter().zip(&decoded_images).enumerate() {
+        let col = (i as u32) % cols;
+        let row = (i as u32) / cols;
+        let x = col * max_frame_w;
+        let y = row * max_frame_h;
+        image::imageops::overlay(&mut sheet, img, x as i64, y as i64);
+        atlas_frames.push(SpritesheetFrame {
+            index: i,
+            x,
+            y,
+            width: img.width(),
+            height: img.height(),
+            delay_ms: frame.delay_ms,
+            action: frame.action.clone(),
+            emotion: frame.emotion.clone(),
+            wmotion: frame.wmotion.clone(),
+        });
+    }
+
+    let mut png_bytes = Vec::new();
+    sheet
+        .write_to(
+            &mut std::io::Cursor::new(&mut png_bytes),
+            image::ImageFormat::Png,
+        )
+        .map_err(|e| {
+            crate::MapleStoryError::Other(format!("Failed to encode spritesheet PNG: {e}"))
+        })?;
+
+    Ok(SpritesheetOutput {
+        atlas: SpritesheetAtlas {
+            width: sheet_w,
+            height: sheet_h,
+            columns: cols,
+            rows,
+            frame_count,
+            frames: atlas_frames,
+        },
+        image_bytes: png_bytes,
+    })
+}
+
+/// Encodes multiple avatar animation frames into an animated WebP file with alpha transparency.
+///
+/// Available when the `animation` feature is enabled.
+#[cfg(feature = "animation")]
+pub fn encode_animated_webp(frames: &[AnimationFrame]) -> crate::Result<Vec<u8>> {
+    if frames.is_empty() {
+        return Err(crate::MapleStoryError::InvalidParameter(
+            "Animation frames cannot be empty for WebP generation".to_string(),
+        ));
+    }
+
+    let mut decoded_images = Vec::with_capacity(frames.len());
+    for frame in frames {
+        let img = image::load_from_memory(&frame.image_bytes).map_err(|e| {
+            crate::MapleStoryError::Other(format!("Failed to decode frame for WebP: {e}"))
+        })?;
+        decoded_images.push(img.to_rgba8());
+    }
+
+    let canvas_width = decoded_images
+        .iter()
+        .map(|img| img.width())
+        .max()
+        .unwrap_or(0);
+    let canvas_height = decoded_images
+        .iter()
+        .map(|img| img.height())
+        .max()
+        .unwrap_or(0);
+
+    let mut body = Vec::new();
+
+    // 1. VP8X Chunk (Extended header)
+    body.extend_from_slice(b"VP8X");
+    body.extend_from_slice(&10u32.to_le_bytes());
+    body.push(0x02 | 0x10); // flags: Animation + Alpha
+    body.extend_from_slice(&[0u8, 0u8, 0u8]); // reserved
+    let w_minus_1 = (canvas_width.saturating_sub(1)) & 0x00FF_FFFF;
+    body.push((w_minus_1 & 0xFF) as u8);
+    body.push(((w_minus_1 >> 8) & 0xFF) as u8);
+    body.push(((w_minus_1 >> 16) & 0xFF) as u8);
+    let h_minus_1 = (canvas_height.saturating_sub(1)) & 0x00FF_FFFF;
+    body.push((h_minus_1 & 0xFF) as u8);
+    body.push(((h_minus_1 >> 8) & 0xFF) as u8);
+    body.push(((h_minus_1 >> 16) & 0xFF) as u8);
+
+    // 2. ANIM Chunk
+    body.extend_from_slice(b"ANIM");
+    body.extend_from_slice(&6u32.to_le_bytes());
+    body.extend_from_slice(&[0u8, 0u8, 0u8, 0u8]); // background RGBA
+    body.extend_from_slice(&0u16.to_le_bytes()); // loop count (0 = infinite)
+
+    // 3. ANMF Chunks for each frame
+    for (frame, img) in frames.iter().zip(&decoded_images) {
+        let mut single_frame_webp = Vec::new();
+        img.write_to(
+            &mut std::io::Cursor::new(&mut single_frame_webp),
+            image::ImageFormat::WebP,
+        )
+        .map_err(|e| {
+            crate::MapleStoryError::Other(format!("Failed to encode WebP subframe: {e}"))
+        })?;
+
+        // Extract bitstream payload after RIFF header
+        let subchunk = if single_frame_webp.len() > 12
+            && &single_frame_webp[0..4] == b"RIFF"
+            && &single_frame_webp[8..12] == b"WEBP"
+        {
+            &single_frame_webp[12..]
+        } else {
+            &single_frame_webp[..]
+        };
+
+        let mut anmf_payload = Vec::with_capacity(16 + subchunk.len() + 1);
+        anmf_payload.extend_from_slice(&[0u8, 0u8, 0u8]); // X offset
+        anmf_payload.extend_from_slice(&[0u8, 0u8, 0u8]); // Y offset
+        let fw_minus_1 = (img.width().saturating_sub(1)) & 0x00FF_FFFF;
+        anmf_payload.push((fw_minus_1 & 0xFF) as u8);
+        anmf_payload.push(((fw_minus_1 >> 8) & 0xFF) as u8);
+        anmf_payload.push(((fw_minus_1 >> 16) & 0xFF) as u8);
+        let fh_minus_1 = (img.height().saturating_sub(1)) & 0x00FF_FFFF;
+        anmf_payload.push((fh_minus_1 & 0xFF) as u8);
+        anmf_payload.push(((fh_minus_1 >> 8) & 0xFF) as u8);
+        anmf_payload.push(((fh_minus_1 >> 16) & 0xFF) as u8);
+        let dur = frame.delay_ms & 0x00FF_FFFF;
+        anmf_payload.push((dur & 0xFF) as u8);
+        anmf_payload.push(((dur >> 8) & 0xFF) as u8);
+        anmf_payload.push(((dur >> 16) & 0xFF) as u8);
+        anmf_payload.push(0x02); // flags: do not blend
+
+        anmf_payload.extend_from_slice(subchunk);
+        if anmf_payload.len() % 2 != 0 {
+            anmf_payload.push(0);
+        }
+
+        body.extend_from_slice(b"ANMF");
+        body.extend_from_slice(&(anmf_payload.len() as u32).to_le_bytes());
+        body.extend_from_slice(&anmf_payload);
+    }
+
+    let mut file_bytes = Vec::with_capacity(12 + body.len());
+    file_bytes.extend_from_slice(b"RIFF");
+    let riff_size = (4 + body.len()) as u32;
+    file_bytes.extend_from_slice(&riff_size.to_le_bytes());
+    file_bytes.extend_from_slice(b"WEBP");
+    file_bytes.extend_from_slice(&body);
+
+    Ok(file_bytes)
+}
+
 impl fmt::Display for AvatarCode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)
@@ -354,6 +587,32 @@ pub struct AnimationFrame {
     pub emotion: AvatarEmotion,
     pub wmotion: WeaponMotion,
     pub delay_ms: u32,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub image_bytes: Vec<u8>,
+}
+
+impl AnimationFrame {
+    /// Create a new animation frame configuration without image payload.
+    pub fn new(
+        action: AvatarAction,
+        emotion: AvatarEmotion,
+        wmotion: WeaponMotion,
+        delay_ms: u32,
+    ) -> Self {
+        Self {
+            action,
+            emotion,
+            wmotion,
+            delay_ms,
+            image_bytes: Vec::new(),
+        }
+    }
+
+    /// Attach raw PNG/RGBA image bytes to this frame.
+    pub fn with_image(mut self, bytes: Vec<u8>) -> Self {
+        self.image_bytes = bytes;
+        self
+    }
 }
 
 /// Alias for [`AnimationFrame`] used in frame configuration.
@@ -364,114 +623,34 @@ impl AnimationPreset {
     pub fn frames(&self) -> Vec<AnimationFrame> {
         match self {
             Self::Stand => vec![
-                AnimationFrame {
-                    action: AvatarAction::Stand1,
-                    emotion: AvatarEmotion::Default,
-                    wmotion: WeaponMotion::Default,
-                    delay_ms: 500,
-                },
-                AnimationFrame {
-                    action: AvatarAction::Stand2,
-                    emotion: AvatarEmotion::Default,
-                    wmotion: WeaponMotion::Default,
-                    delay_ms: 500,
-                },
+                AnimationFrame::new(AvatarAction::Stand1, AvatarEmotion::Default, WeaponMotion::Default, 500),
+                AnimationFrame::new(AvatarAction::Stand2, AvatarEmotion::Default, WeaponMotion::Default, 500),
             ],
             Self::Walk => vec![
-                AnimationFrame {
-                    action: AvatarAction::Walk1,
-                    emotion: AvatarEmotion::Default,
-                    wmotion: WeaponMotion::Default,
-                    delay_ms: 250,
-                },
-                AnimationFrame {
-                    action: AvatarAction::Walk2,
-                    emotion: AvatarEmotion::Default,
-                    wmotion: WeaponMotion::Default,
-                    delay_ms: 250,
-                },
+                AnimationFrame::new(AvatarAction::Walk1, AvatarEmotion::Default, WeaponMotion::Default, 250),
+                AnimationFrame::new(AvatarAction::Walk2, AvatarEmotion::Default, WeaponMotion::Default, 250),
             ],
             Self::Jump => vec![
-                AnimationFrame {
-                    action: AvatarAction::Stand1,
-                    emotion: AvatarEmotion::Default,
-                    wmotion: WeaponMotion::Default,
-                    delay_ms: 300,
-                },
-                AnimationFrame {
-                    action: AvatarAction::Jump,
-                    emotion: AvatarEmotion::Default,
-                    wmotion: WeaponMotion::Default,
-                    delay_ms: 600,
-                },
+                AnimationFrame::new(AvatarAction::Stand1, AvatarEmotion::Default, WeaponMotion::Default, 300),
+                AnimationFrame::new(AvatarAction::Jump, AvatarEmotion::Default, WeaponMotion::Default, 600),
             ],
-            Self::Sit => vec![AnimationFrame {
-                action: AvatarAction::Sit,
-                emotion: AvatarEmotion::Default,
-                wmotion: WeaponMotion::Default,
-                delay_ms: 1000,
-            }],
-            Self::Prone => vec![AnimationFrame {
-                action: AvatarAction::Prone,
-                emotion: AvatarEmotion::Default,
-                wmotion: WeaponMotion::Default,
-                delay_ms: 1000,
-            }],
+            Self::Sit => vec![AnimationFrame::new(AvatarAction::Sit, AvatarEmotion::Default, WeaponMotion::Default, 1000)],
+            Self::Prone => vec![AnimationFrame::new(AvatarAction::Prone, AvatarEmotion::Default, WeaponMotion::Default, 1000)],
             Self::Fly => vec![
-                AnimationFrame {
-                    action: AvatarAction::Fly,
-                    emotion: AvatarEmotion::Default,
-                    wmotion: WeaponMotion::Default,
-                    delay_ms: 500,
-                },
-                AnimationFrame {
-                    action: AvatarAction::Stand1,
-                    emotion: AvatarEmotion::Default,
-                    wmotion: WeaponMotion::Default,
-                    delay_ms: 500,
-                },
+                AnimationFrame::new(AvatarAction::Fly, AvatarEmotion::Default, WeaponMotion::Default, 500),
+                AnimationFrame::new(AvatarAction::Stand1, AvatarEmotion::Default, WeaponMotion::Default, 500),
             ],
             Self::Climb => vec![
-                AnimationFrame {
-                    action: AvatarAction::Ladder,
-                    emotion: AvatarEmotion::Default,
-                    wmotion: WeaponMotion::Default,
-                    delay_ms: 300,
-                },
-                AnimationFrame {
-                    action: AvatarAction::Rope,
-                    emotion: AvatarEmotion::Default,
-                    wmotion: WeaponMotion::Default,
-                    delay_ms: 300,
-                },
+                AnimationFrame::new(AvatarAction::Ladder, AvatarEmotion::Default, WeaponMotion::Default, 300),
+                AnimationFrame::new(AvatarAction::Rope, AvatarEmotion::Default, WeaponMotion::Default, 300),
             ],
             Self::Blink => vec![
-                AnimationFrame {
-                    action: AvatarAction::Stand1,
-                    emotion: AvatarEmotion::Default,
-                    wmotion: WeaponMotion::Default,
-                    delay_ms: 800,
-                },
-                AnimationFrame {
-                    action: AvatarAction::Stand1,
-                    emotion: AvatarEmotion::Blink,
-                    wmotion: WeaponMotion::Default,
-                    delay_ms: 200,
-                },
+                AnimationFrame::new(AvatarAction::Stand1, AvatarEmotion::Default, WeaponMotion::Default, 800),
+                AnimationFrame::new(AvatarAction::Stand1, AvatarEmotion::Blink, WeaponMotion::Default, 200),
             ],
             Self::Wink => vec![
-                AnimationFrame {
-                    action: AvatarAction::Stand1,
-                    emotion: AvatarEmotion::Default,
-                    wmotion: WeaponMotion::Default,
-                    delay_ms: 600,
-                },
-                AnimationFrame {
-                    action: AvatarAction::Stand1,
-                    emotion: AvatarEmotion::Wink,
-                    wmotion: WeaponMotion::Default,
-                    delay_ms: 400,
-                },
+                AnimationFrame::new(AvatarAction::Stand1, AvatarEmotion::Default, WeaponMotion::Default, 600),
+                AnimationFrame::new(AvatarAction::Stand1, AvatarEmotion::Wink, WeaponMotion::Default, 400),
             ],
             Self::Custom(frames) => frames.clone(),
         }

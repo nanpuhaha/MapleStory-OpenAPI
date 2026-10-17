@@ -42,7 +42,7 @@ tracing = "0.1"
 
 # In-memory OCID caching (optional feature)
 moka = { version = "0.12", features = ["future"], optional = true }
-image = { version = "0.25.10", default-features = false, features = ["png", "gif"], optional = true }
+image = { version = "0.25.10", default-features = false, features = ["png", "gif", "webp"], optional = true }
 
 [features]
 default = ["default-tls"]

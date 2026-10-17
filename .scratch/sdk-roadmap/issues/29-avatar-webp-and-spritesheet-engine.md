@@ -5,9 +5,9 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] `image` 크레이트 또는 WebP 인코더를 활용한 애니메이션 WebP 생성 함수(`encode_animated_webp`) 구현
-- [ ] 다중 아바타 프레임(RGBA 이미지 버퍼)을 2D 바둑판 그리드로 결합하는 스프라이트 시트 패커 구현
-- [ ] 프레임별 바운딩 박스, 오프셋, 지속 시간(딜레이 ms)을 포함하는 스프라이트 아틀라스 메타데이터 JSON 생성 구조체 구현
-- [ ] 프레임 입력에 따른 WebP 바이너리 및 스프라이트시트 이미지/JSON 생성 검증 단위 테스트 작성
+- [x] `image` 크레이트 또는 WebP 인코더를 활용한 애니메이션 WebP 생성 함수(`encode_animated_webp`) 구현
+- [x] 다중 아바타 프레임(RGBA 이미지 버퍼)을 2D 바둑판 그리드로 결합하는 스프라이트 시트 패커 구현
+- [x] 프레임별 바운딩 박스, 오프셋, 지속 시간(딜레이 ms)을 포함하는 스프라이트 아틀라스 메타데이터 JSON 생성 구조체 구현
+- [x] 프레임 입력에 따른 WebP 바이너리 및 스프라이트시트 이미지/JSON 생성 검증 단위 테스트 작성
