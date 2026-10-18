@@ -42,10 +42,16 @@ Test-Driven Development is mandatory to prevent AI agents from "hallucinating" i
 Agents must rely on immediate, automated feedback rather than waiting for human intervention or CI/CD pipelines to catch basic errors.
 
 *   **Mandatory Verification Steps:** After any code modification, the implementing agent MUST execute the following commands before considering the task complete:
-    *   **Type Checking:** `npm run typecheck` (or equivalent). Resolve *all* type errors immediately.
-    *   **Linting/Formatting:** `npm run lint` (or equivalent).
-    *   **Unit Tests:** `npm run test` to ensure the specific slice is functioning.
+    *   **Type Checking:** `cargo check --workspace --all-targets --all-features`. Resolve *all* compile errors immediately.
+    *   **Linting/Clippy:** `cargo clippy --workspace --all-targets --all-features -- -D warnings`. Ensure 0 warnings.
+    *   **Unit & Integration Tests:** `cargo test --workspace --all-features` to ensure all tests pass.
 *   **Agent Directive (Implementation):** If a command fails, you must analyze the terminal output, correct the code, and re-run the command until it passes. Do not leave broken builds for the Reviewer agent.
+
+### 2.3 Mandatory Git Commit & Remote Push
+Development artifacts and task deliverables must never remain unpushed on local machines.
+
+*   **Continuous Synchronization:** Every completed unit of work, feature slice, bug fix, or review remediation must be committed with a descriptive Conventional Commit.
+*   **Immediate Remote Push:** Following each commit or completed task, the agent MUST immediately push to the remote repository (`git push origin <branch>`). Local branches must not lag behind or accumulate unpushed commits.
 
 ---
 
