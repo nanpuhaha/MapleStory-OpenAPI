@@ -25,7 +25,8 @@ async fn spawn_offline_fixture_server() -> String {
                 let first_line = req.lines().next().unwrap_or("");
                 let path = first_line.split_whitespace().nth(1).unwrap_or("");
 
-                let avatar_hex = "a1".repeat(512);
+                // AvatarCode::new only accepts 'A'..='P'; use a valid 1024-char code.
+                let avatar_hex = "AB".repeat(512);
                 let look_url = format!(
                     "https://open.api.nexon.com/static/maplestory/character/look/{}",
                     avatar_hex
