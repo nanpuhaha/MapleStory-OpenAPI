@@ -3,7 +3,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace MapleStory.OpenApi
+namespace MapleStory.OpenAPI
 {
     /// <summary>
     /// High-performance C# client for NEXON MapleStory OpenAPI, powered by Rust.

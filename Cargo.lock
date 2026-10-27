@@ -1013,6 +1013,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "maplestory-api-python"
+version = "0.1.0"
+dependencies = [
+ "maplestory-openapi",
+ "pyo3",
+ "pyo3-async-runtimes",
+ "pythonize",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "maplestory-openapi"
 version = "0.1.0"
 dependencies = [
@@ -1054,18 +1066,6 @@ dependencies = [
  "napi-build",
  "napi-derive",
  "serde_json",
-]
-
-[[package]]
-name = "maplestory-openapi-python"
-version = "0.1.0"
-dependencies = [
- "maplestory-openapi",
- "pyo3",
- "pyo3-async-runtimes",
- "pythonize",
- "serde_json",
- "tokio",
 ]
 
 [[package]]

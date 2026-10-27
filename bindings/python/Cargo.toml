@@ -1,5 +1,5 @@
 [package]
-name = "maplestory-openapi-python"
+name = "maplestory-api-python"
 version = "0.1.0"
 edition = "2021"
 description = "Official Python bindings for NEXON MapleStory OpenAPI Rust client"

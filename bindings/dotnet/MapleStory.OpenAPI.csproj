@@ -4,11 +4,11 @@
     <!-- netstandard2.0 does not support native LPUTF8Str unmanaged marshalling or direct Exe output; modern .NET 8 LTS and .NET 9 STS are targeted -->
     <TargetFrameworks>net8.0;net9.0</TargetFrameworks>
     <OutputType>Exe</OutputType>
-    <RootNamespace>MapleStory.OpenApi</RootNamespace>
-    <AssemblyName>MapleStory.OpenApi</AssemblyName>
+    <RootNamespace>MapleStory.OpenAPI</RootNamespace>
+    <AssemblyName>MapleStory.OpenAPI</AssemblyName>
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
-    <PackageId>MapleStory.OpenApi</PackageId>
+    <PackageId>MapleStory.OpenAPI</PackageId>
     <Version>0.1.0</Version>
     <Authors>Senior Engineer</Authors>
     <Description>High-performance .NET bindings for NEXON MapleStory OpenAPI, powered by Rust</Description>

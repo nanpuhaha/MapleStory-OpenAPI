@@ -1,5 +1,5 @@
 {
-  "name": "maplestory-openapi",
+  "name": "maplestory-api",
   "version": "0.1.0",
   "description": "High-performance Node.js bindings for NEXON MapleStory OpenAPI, powered by Rust",
   "main": "index.js",
@@ -25,6 +25,6 @@
     "@napi-rs/cli": "^3.0.0"
   },
   "napi": {
-    "binaryName": "maplestory-openapi"
+    "binaryName": "maplestory-api"
   }
 }
