@@ -44,7 +44,7 @@ jobs:
     name: Publish crates.io (maplestory-openapi)
     needs: verify
     if: github.event_name == 'push' || inputs.target == 'all' || inputs.target == 'crates'
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Setup Rust
@@ -56,7 +56,7 @@ jobs:
     name: Publish PyPI (maplestory-api)
     needs: verify
     if: github.event_name == 'push' || inputs.target == 'all' || inputs.target == 'pypi'
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Setup Rust
@@ -81,7 +81,7 @@ jobs:
     name: Publish npm (maplestory-api)
     needs: verify
     if: github.event_name == 'push' || inputs.target == 'all' || inputs.target == 'npm'
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Setup Rust
@@ -107,7 +107,7 @@ jobs:
     name: Publish NuGet
     needs: verify
     if: github.event_name == 'push' || inputs.target == 'all' || inputs.target == 'nuget'
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Setup .NET
