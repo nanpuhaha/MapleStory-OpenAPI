@@ -8,7 +8,7 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/nanpuhaha/MapleStory-OpenAPI-Rust"
 documentation = "https://docs.rs/maplestory-openapi"
 keywords = ["maplestory", "nexon", "openapi", "game", "api"]
-categories = ["api-bindings", "web-programming", "async"]
+categories = ["api-bindings", "web-programming", "asynchronous"]
 include = [
     "src/**/*",
     "tests/**/*",
