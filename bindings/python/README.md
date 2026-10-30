@@ -14,7 +14,7 @@ maturin develop
 ```python
 import asyncio
 import os
-from maplestory_openapi import MapleStoryClient
+from maplestory_api import MapleStoryClient
 
 async def main():
     client = MapleStoryClient.from_env()

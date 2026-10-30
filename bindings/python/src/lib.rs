@@ -583,7 +583,7 @@ impl PyAvatarCode {
 
 /// MapleStory OpenAPI Python Module powered by Rust
 #[pymodule]
-fn maplestory_openapi(m: &Bound<'_, PyModule>) -> PyResult<()> {
+fn maplestory_api(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyMapleStoryClient>()?;
     m.add_class::<PyAvatarCode>()?;
     Ok(())

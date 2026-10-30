@@ -1,17 +1,17 @@
-# maplestory-openapi (Node.js)
+# maplestory-api (Node.js)
 
 Official high-performance Node.js bindings for NEXON MapleStory OpenAPI, powered by Rust and `napi-rs`.
 
 ## 🚀 Installation
 
 ```bash
-npm install maplestory-openapi
+npm install maplestory-api
 ```
 
 ## 📖 Quick Start
 
 ```typescript
-import { MapleStoryClient } from 'maplestory-openapi';
+import { MapleStoryClient } from 'maplestory-api';
 import * as fs from 'fs';
 
 async function main() {

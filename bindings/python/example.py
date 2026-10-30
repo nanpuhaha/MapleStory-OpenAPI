@@ -1,6 +1,6 @@
 import asyncio
 import os
-from maplestory_openapi import MapleStoryClient
+from maplestory_api import MapleStoryClient
 
 async def run():
     print("=== [Python Binding Test] ===")

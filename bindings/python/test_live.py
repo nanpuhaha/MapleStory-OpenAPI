@@ -15,7 +15,7 @@ if os.path.exists(env_file):
                 k, v = line.strip().split("=", 1)
                 os.environ[k.strip()] = v.strip()
 
-from maplestory_openapi import MapleStoryClient
+from maplestory_api import MapleStoryClient
 
 async def main():
     print("========================================")

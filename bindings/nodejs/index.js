@@ -6,13 +6,13 @@ const { platform, arch } = process
 let nativeBinding = null
 
 try {
-  nativeBinding = require('./maplestory-openapi.node')
+  nativeBinding = require('./maplestory-api.node')
 } catch (e) {
   try {
-    nativeBinding = require(`./maplestory-openapi.${platform}-${arch}-msvc.node`)
+    nativeBinding = require(`./maplestory-api.${platform}-${arch}-msvc.node`)
   } catch (e2) {
     try {
-      nativeBinding = require(`@maplestory-openapi/binding-${platform}-${arch}`)
+      nativeBinding = require(`@maplestory-api/binding-${platform}-${arch}`)
     } catch (e3) {
       try {
         nativeBinding = require('./index.node')

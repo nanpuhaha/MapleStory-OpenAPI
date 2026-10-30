@@ -1,7 +1,7 @@
 import asyncio
 import os
 import unittest
-from maplestory_openapi import MapleStoryClient, AvatarCode
+from maplestory_api import MapleStoryClient, AvatarCode
 
 
 class TestMapleStoryBindingsSmoke(unittest.TestCase):

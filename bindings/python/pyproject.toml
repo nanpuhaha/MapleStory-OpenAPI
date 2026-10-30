@@ -22,4 +22,4 @@ Repository = "https://github.com/nanpuhaha/MapleStory-OpenAPI-Rust"
 
 [tool.maturin]
 features = ["pyo3/extension-module"]
-module-name = "maplestory_openapi"
+module-name = "maplestory_api"
