@@ -1,0 +1,128 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Publish target (all, crates, pypi, npm, nuget)'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - crates
+          - pypi
+          - npm
+          - nuget
+
+permissions:
+  contents: write
+  id-token: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  verify:
+    name: Verify Workspace
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - name: Workspace Clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
+      - name: Workspace Tests
+        run: cargo test --all --all-features
+
+  publish-crates:
+    name: Publish crates.io (maplestory-openapi)
+    needs: verify
+    if: github.event_name == 'push' || inputs.target == 'all' || inputs.target == 'crates'
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Publish to crates.io (Trusted Publishing / OIDC)
+        run: cargo publish -p maplestory-openapi
+
+  publish-pypi:
+    name: Publish PyPI (maplestory-api)
+    needs: verify
+    if: github.event_name == 'push' || inputs.target == 'all' || inputs.target == 'pypi'
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install maturin
+        run: pip install maturin
+      - name: Build wheels and sdist
+        run: |
+          cd bindings/python
+          maturin build --release --out dist
+          maturin sdist --out dist
+      - name: Publish to PyPI (Trusted Publishing / OIDC)
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: bindings/python/dist/
+
+  publish-npm:
+    name: Publish npm (maplestory-api)
+    needs: verify
+    if: github.event_name == 'push' || inputs.target == 'all' || inputs.target == 'npm'
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+      - name: Build native binding
+        run: |
+          cd bindings/nodejs
+          npm ci
+          npm run build
+      - name: Publish to npm (Provenance / OIDC)
+        run: |
+          cd bindings/nodejs
+          npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  publish-nuget:
+    name: Publish NuGet
+    needs: verify
+    if: github.event_name == 'push' || inputs.target == 'all' || inputs.target == 'nuget'
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            9.0.x
+      - name: Pack NuGet Package
+        run: |
+          cd bindings/dotnet
+          dotnet pack -c Release
+      - name: Push to NuGet (Trusted Publishing / OIDC or API Key)
+        run: |
+          cd bindings/dotnet
+          dotnet nuget push bin/Release/*.nupkg \
+            --source https://api.nuget.org/v3/index.json \
+            --skip-duplicate
