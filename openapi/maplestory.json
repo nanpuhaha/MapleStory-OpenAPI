@@ -69,7 +69,8 @@
                     "sub1": "소개",
                     "sub2": "사전 준비하기",
                     "sub3": "API 사용하기",
-                    "sub4": "Open API Analytics 연동 가이드"
+                    "sub4": "Open API Analytics 연동 가이드",
+                    "sub5": "AI 에이전트 가이드"
                   },
                   "support": {
                     "title": "지원",
@@ -446,6 +447,13 @@
                   }
                 },
                 "LNBPlaceholder": "게임 API 바로가기",
+                "aiAgentGuidePage": {
+                  "seoDescription": "AI 에이전트가 NEXON Open API 를 자동 호출할 때 어긋나기 쉬운 지점을 정리한 가이드입니다.",
+                  "rawNotice": "AI 에이전트에는 아래 Markdown 원문 주소를 전달하세요.",
+                  "viewRaw": "Markdown 원문 보기",
+                  "copyLink": "원문 링크 복사",
+                  "copied": "복사했습니다"
+                },
                 "openIdDesignGuidePage": {
                   "designGuideMainH1Title": "로그인 버튼 사용 가이드",
                   "designGuideMainH1TitleDescription": "NEXON Open ID 로그인 버튼 기본 이미지와 사용 가이드를 제공하는 문서입니다.\n문서 내 가이드를 기준으로, 각 서비스 상황에 맞게 버튼 이미지의 디자인을 유연하게 활용할 수 있습니다.",
@@ -1271,7 +1279,7 @@
                   "noServiceNameError": "서비스 이름을 입력해주세요.",
                   "longNameError": "20자 이하로 입력해주세요.",
                   "logoImgUrl": "서비스 로고",
-                  "logoImgUrlDesc": "*서비스 로고 이미지 1장을 등록해주세요.(권장 160 x 160px) 애플리케이션 등록 후에도 로고 이미지 등록/변경이 가능합니다.",
+                  "logoImgUrlDesc": "*서비스 로고 이미지 1장을 등록해주세요.(권장 160 x 160px) 애플리케이션 등록 후에도 로고 이미지 변경이 가능합니다.",
                   "clientEnv": "애플리케이션 정보 입력",
                   "clientEnvPlaceholder": "플랫폼을 선택해주세요.",
                   "serviceUrlAppDesc": "앱을 다운 받을 수 있는 URL을 입력해주세요.",
@@ -1301,6 +1309,7 @@
                   "informationReveiw": "입력 정보 확인",
                   "clientAfterModify": "애플리케이션 정보는 등록 후에도 수정 가능합니다.",
                   "imgNotRegistred": "이미지 미등록",
+                  "noLogoImgError": "서비스 로고를 등록해주세요.",
                   "flatForm": "플랫폼",
                   "clientCheck1": "등록 버튼을 누르면 애플리케이션이 테스트 단계로 등록됩니다.",
                   "clientCheck2": "테스트 단계에서는 NEXON Open ID 기능을 제한적으로 사용할 수 있습니다. (관리자 본인과 테스트 사용자만 로그인 가능)",
@@ -1714,6 +1723,8 @@
                 "clientTypeSimple": "단계",
                 "confirmClientMaxCountDesc": "새로운 애플리케이션을 등록하시려면 \n 기존 애플리케이션을 삭제해주세요.",
                 "confirmClientMaxCountTitle": " 애플리케이션을 6개까지만 등록 가능합니다.",
+                "krpcOnlyCreateTitle": "넥슨 계정으로만 애플리케이션을 등록할 수 있습니다.",
+                "krpcOnlyCreateDesc": "NEXON Open ID 애플리케이션은 넥슨 계정(KRPC)으로 로그인한 경우에만 등록할 수 있습니다.",
                 "confirmDeleteClient": "애플리케이션을 정말 삭제하시겠습니까?",
                 "confirmDeleteClientDesc": "애플리케이션을 정말 삭제하시겠습니까? \n 삭제 후에는 복구할 수 없습니다",
                 "confirmDeleteTestAccount": "테스트 사용자를 제거하시겠습니까?",
@@ -2094,7 +2105,8 @@
                     "sub1": "Overview",
                     "sub2": "Getting Started",
                     "sub3": "Using the API",
-                    "sub4": "Open API Analytics Integration Guide"
+                    "sub4": "Open API Analytics Integration Guide",
+                    "sub5": "AI Agent Guide"
                   },
                   "support": {
                     "title": "Support",
@@ -2471,6 +2483,13 @@
                   }
                 },
                 "LNBPlaceholder": "Go to Game API",
+                "aiAgentGuidePage": {
+                  "seoDescription": "A guide to where automated calls to NEXON Open API from AI agents commonly go wrong.",
+                  "rawNotice": "Give your AI agent the Markdown source URL below.",
+                  "viewRaw": "View Markdown source",
+                  "copyLink": "Copy source link",
+                  "copied": "Copied"
+                },
                 "openIdDesignGuidePage": {
                   "designGuideMainH1Title": "Login Button Implementation Guide",
                   "designGuideMainH1TitleDescription": "This document provides the default image and implementation guide for the NEXON Open ID login button. Based on the guide, you can flexibly adapt the button image design to suit your service's specific needs.",
@@ -3296,7 +3315,7 @@
                   "noServiceNameError": "Please enter the service name.",
                   "longNameError": "Please enter 20 characters or fewer.",
                   "logoImgUrl": "Service Logo",
-                  "logoImgUrlDesc": "*Please upload one service logo image (recommended: 160 x 160px).\nYou can upload or change the logo image even after registering the application.",
+                  "logoImgUrlDesc": "*Please upload one service logo image (recommended: 160 x 160px).\nYou can change the logo image even after registering the application.",
                   "clientEnv": "Application Information",
                   "clientEnvPlaceholder": "Please select a platform.",
                   "serviceUrlAppDesc": "Please enter the URL to download the app",
@@ -3326,6 +3345,7 @@
                   "informationReveiw": "Information Review",
                   "clientAfterModify": "Application information can be modified even after registration.",
                   "imgNotRegistred": "image not registered",
+                  "noLogoImgError": "Please upload a service logo.",
                   "flatForm": "Platform",
                   "clientCheck1": "In the Test stage, you can use NEXON Open ID on a limited basis. (Only the administrator and test users can log in.)",
                   "clientCheck2": "In the Test stage, you can use NEXON Open ID on a limited basis. (Only the administrator and test users can log in.)",
@@ -3803,6 +3823,8 @@
                 "clientTypeSimple": "Stage",
                 "confirmClientMaxCountDesc": "To add a new application, \nplease delete an existing one.",
                 "confirmClientMaxCountTitle": "You can register up to 6 applications.",
+                "krpcOnlyCreateTitle": "Only NEXON accounts can register applications.",
+                "krpcOnlyCreateDesc": "NEXON Open ID applications can only be registered when signed in with a NEXON (KRPC) account.",
                 "confirmDeleteClient": "Are you sure you want to delete this application?",
                 "confirmDeleteClientDesc": "Are you sure you want to delete this application?\n Once deleted, it cannot be restored.",
                 "confirmDeleteTestAccount": "Do you want to remove the test user?",
@@ -4417,9 +4439,9 @@
               "description": "한국어",
               "categoryName": "캐릭터 정보 조회",
               "represent": true,
-              "filePath": "/maplestory/14_ko_script20260917040003.yaml",
-              "fileName": "14_ko_script20260917040003.yaml",
-              "fileUrl": "https://openapi.nexon.com/static/api/maplestory/14_ko_script20260917040003.yaml"
+              "filePath": "/maplestory/14_ko_script20261022040014.yaml",
+              "fileName": "14_ko_script20261022040014.yaml",
+              "fileUrl": "https://openapi.nexon.com/static/api/maplestory/14_ko_script20261022040014.yaml"
             }
           ]
         },
@@ -4474,9 +4496,9 @@
               "description": "한국어",
               "categoryName": "연무장 정보 조회",
               "represent": true,
-              "filePath": "/maplestory/59_ko_script20260917040055.yaml",
-              "fileName": "59_ko_script20260917040055.yaml",
-              "fileUrl": "https://openapi.nexon.com/static/api/maplestory/59_ko_script20260917040055.yaml"
+              "filePath": "/maplestory/59_ko_script20261022041825.yaml",
+              "fileName": "59_ko_script20261022041825.yaml",
+              "fileUrl": "https://openapi.nexon.com/static/api/maplestory/59_ko_script20261022041825.yaml"
             }
           ]
         },
@@ -4493,9 +4515,9 @@
               "description": "한국어",
               "categoryName": "확률 정보 조회",
               "represent": true,
-              "filePath": "/maplestory/17_ko_script20260918020020.yaml",
-              "fileName": "17_ko_script20260918020020.yaml",
-              "fileUrl": "https://openapi.nexon.com/static/api/maplestory/17_ko_script20260918020020.yaml"
+              "filePath": "/maplestory/17_ko_script20261022040249.yaml",
+              "fileName": "17_ko_script20261022040249.yaml",
+              "fileUrl": "https://openapi.nexon.com/static/api/maplestory/17_ko_script20261022040249.yaml"
             }
           ]
         },
@@ -4531,9 +4553,9 @@
               "description": "한국어",
               "categoryName": "랭킹 정보 조회",
               "represent": true,
-              "filePath": "/maplestory/18_ko_script20260622043839.yaml",
-              "fileName": "18_ko_script20260622043839.yaml",
-              "fileUrl": "https://openapi.nexon.com/static/api/maplestory/18_ko_script20260622043839.yaml"
+              "filePath": "/maplestory/18_ko_script20261022021131.yaml",
+              "fileName": "18_ko_script20261022021131.yaml",
+              "fileUrl": "https://openapi.nexon.com/static/api/maplestory/18_ko_script20261022021131.yaml"
             }
           ]
         },
@@ -4599,7 +4621,7 @@
     "id": "14",
     "contextPath": "maplestory"
   },
-  "buildId": "oYBeThmNCmOWVnS8tJk7U",
+  "buildId": "7PzLR1Zlw2E9Sb1xWB-lF",
   "isFallback": false,
   "gssp": true,
   "locale": "ko",
